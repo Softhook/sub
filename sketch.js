@@ -25,7 +25,7 @@ const PLAYER_COLLISION_RADIUS_FACTOR = 0.7; // For cave collision checks
 const PLAYER_BUMP_DAMAGE = 2;
 const PLAYER_BUMP_RECOIL_FACTOR = 0.5;
 const PLAYER_BUMP_VELOCITY_REVERSE_FACTOR = -0.5;
-const PLAYER_ENEMY_COLLISION_DAMAGE = 15;
+const PLAYER_ENEMY_COLLISION_DAMAGE = 20;
 const PLAYER_ENEMY_COLLISION_KNOCKBACK = 1.5;
 const PLAYER_LOW_AIR_THRESHOLD_FACTOR = 0.25; // Percentage of air remaining to trigger warning
 const PLAYER_PROJECTILE_OFFSET_FACTOR = 0.8; // Multiplier of radius for projectile start
@@ -131,6 +131,8 @@ const ENEMY_AI_DECISION_MAX_INTERVAL_BASE_FRAMES = 180; // Max base frames befor
 const ENEMY_AI_DECISION_INTERVAL_LEVEL_REDUCTION_FRAMES = 10; // Reduces max random interval per level
 const ENEMY_AI_WALL_HIT_DECISION_MIN_INTERVAL_FRAMES = 20; // Quicker decision after hitting a wall
 const ENEMY_AI_WALL_HIT_DECISION_MAX_INTERVAL_FRAMES = 60;
+const ENEMY_HOMING_START_LEVEL = 0; // New: Level at which enemies start homing
+const ENEMY_HOMING_CHANCE = 0.6; // New: Chance (0-1) to home towards player on decision
 
 // Cave Generation
 const CAVE_EXIT_X_OFFSET_CELLS = 10; // How many cells from the right edge the exit starts
@@ -804,18 +806,35 @@ class PlayerSub {
 class Enemy {
   constructor(x, y) {
     this.pos = createVector(x, y); this.radius = ENEMY_RADIUS;
+    // Initial velocity calculation uses ENEMY_MIN_BASE_SPEED and ENEMY_MAX_BASE_SPEED
     this.vel = p5.Vector.random2D().mult(random(ENEMY_MIN_BASE_SPEED, ENEMY_MAX_BASE_SPEED + currentLevel * ENEMY_SPEED_LEVEL_MULTIPLIER));
     this.type = 'enemy'; this.nextDecisionTime = 0; // For AI behavior
   }
-  update(cave) {
+  update(cave, player) { // Added player argument
     if (frameCount > this.nextDecisionTime) {
-      this.vel = p5.Vector.random2D().mult(random(ENEMY_AI_NEW_VEL_MIN_SPEED_FACTOR, ENEMY_AI_NEW_VEL_MAX_SPEED_FACTOR + currentLevel * ENEMY_SPEED_LEVEL_MULTIPLIER));
-      this.nextDecisionTime = frameCount + random(ENEMY_AI_DECISION_MIN_INTERVAL_FRAMES, ENEMY_AI_DECISION_MAX_INTERVAL_BASE_FRAMES - currentLevel * ENEMY_AI_DECISION_INTERVAL_LEVEL_REDUCTION_FRAMES);
+      // Speed calculation for new velocity decision
+      // Note: The original code used ENEMY_AI_NEW_VEL_MIN_SPEED_FACTOR and MAX_SPEED_FACTOR here.
+      // For consistency with constructor and homing, let's use the base speed logic.
+      let newSpeed = random(ENEMY_MIN_BASE_SPEED, ENEMY_MAX_BASE_SPEED + currentLevel * ENEMY_SPEED_LEVEL_MULTIPLIER);
+
+      if (currentLevel >= ENEMY_HOMING_START_LEVEL && player && random() < ENEMY_HOMING_CHANCE) {
+        // Homing behavior
+        let directionToPlayer = p5.Vector.sub(player.pos, this.pos).normalize();
+        this.vel = directionToPlayer.mult(newSpeed);
+      } else {
+        // Standard random behavior
+        this.vel = p5.Vector.random2D().mult(newSpeed);
+      }
+      // Reset decision time, ensuring it doesn't become too short or negative
+      let maxDecisionInterval = ENEMY_AI_DECISION_MAX_INTERVAL_BASE_FRAMES - currentLevel * ENEMY_AI_DECISION_INTERVAL_LEVEL_REDUCTION_FRAMES;
+      maxDecisionInterval = max(maxDecisionInterval, ENEMY_AI_DECISION_MIN_INTERVAL_FRAMES); // Ensure max is not less than min
+      this.nextDecisionTime = frameCount + random(ENEMY_AI_DECISION_MIN_INTERVAL_FRAMES, maxDecisionInterval);
     }
     let nextPos = p5.Vector.add(this.pos, this.vel);
     if (cave.isWall(nextPos.x, nextPos.y, this.radius)) {
       this.vel.mult(-1); // Reverse direction
-      this.nextDecisionTime = frameCount + random(ENEMY_AI_WALL_HIT_DECISION_MIN_INTERVAL_FRAMES, ENEMY_AI_WALL_HIT_DECISION_MAX_INTERVAL_FRAMES); // Decide new path sooner
+      // Quicker decision after hitting a wall
+      this.nextDecisionTime = frameCount + random(ENEMY_AI_WALL_HIT_DECISION_MIN_INTERVAL_FRAMES, ENEMY_AI_WALL_HIT_DECISION_MAX_INTERVAL_FRAMES); 
     } else {
       this.pos.add(this.vel);
     }
@@ -1104,7 +1123,7 @@ function drawPlayingState() {
   processGameObjectArray(projectiles, cameraOffsetX, cameraOffsetY, cave); // Projectiles need cave context
 
   player.update(cave, enemies);
-  for (let enemy of enemies) enemy.update(cave);
+  for (let enemy of enemies) enemy.update(cave, player);
   player.handleEnemyCollisions(enemies);
 
   // Projectile-Enemy Collisions (This loop needs to stay separate due to nested iteration and specific logic)
