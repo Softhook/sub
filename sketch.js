@@ -47,6 +47,20 @@ const PLAYER_SONAR_HIT_SIZE_MIN = 3;
 const PLAYER_SONAR_HIT_OFFSCREEN_BUFFER = 20;
 const PLAYER_SONAR_ENEMY_HIT_SIZE_FACTOR = 1.3;
 
+// Sonar Bubbles
+const SONAR_BUBBLES_PER_FIRE = 3; // Number of bubbles when sonar fires
+const SONAR_BUBBLE_SPAWN_RADIUS_AROUND_SUB = 60; // Max distance from sub center for bubble spawn
+// const SONAR_BUBBLE_COUNT_PER_WALL_HIT = 1; // No longer used - bubbles spawn around sub
+const SONAR_BUBBLE_MAX_LIFESPAN_FRAMES = 75; // How long bubbles last (slightly reduced for more dynamic feel)
+const SONAR_BUBBLE_MIN_SPEED_Y = 0.2;      // Min upward speed (slightly increased)
+const SONAR_BUBBLE_MAX_SPEED_Y = 0.5;      // Max upward speed (slightly increased)
+const SONAR_BUBBLE_MIN_SIZE = 2;
+const SONAR_BUBBLE_MAX_SIZE = 6; // Slightly larger max size
+// const SONAR_BUBBLE_SPAWN_RADIUS_OFFSET = 10; // No longer used by SonarBubble constructor
+const SONAR_BUBBLE_COLOR_H = 180; const SONAR_BUBBLE_COLOR_S = 70; const SONAR_BUBBLE_COLOR_B = 95; // Brighter bubbles
+const SONAR_BUBBLE_ALPHA_MAX = 180; // Brighter alpha
+
+
 // Player Rendering
 const PLAYER_BODY_WIDTH_FACTOR = 2.2;
 const PLAYER_BODY_HEIGHT_FACTOR = 1.2;
@@ -250,6 +264,7 @@ let player;
 let cave;
 let enemies = [];
 let projectiles = [];
+let sonarBubbles = []; // New: Array for sonar bubbles
 let cameraOffsetX, cameraOffsetY;
 let gameState = 'start';
 let currentLevel = 1;
@@ -271,6 +286,34 @@ class Projectile {
     ellipse(this.pos.x - offsetX, this.pos.y - offsetY, this.radius * 2); pop();
   }
   isOffscreen() { return this.life <= 0; }
+}
+
+// --- SonarBubble Class ---
+class SonarBubble {
+  constructor(x, y) {
+    this.pos = createVector(x, y); // Position is now exact as passed
+    this.velY = random(SONAR_BUBBLE_MIN_SPEED_Y, SONAR_BUBBLE_MAX_SPEED_Y);
+    this.lifespan = SONAR_BUBBLE_MAX_LIFESPAN_FRAMES;
+    this.size = random(SONAR_BUBBLE_MIN_SIZE, SONAR_BUBBLE_MAX_SIZE);
+    this.initialLifespan = this.lifespan;
+  }
+
+  update() {
+    this.pos.y -= this.velY; // Move upwards
+    this.lifespan--;
+  }
+
+  render(offsetX, offsetY) {
+    let ageRatio = this.lifespan / this.initialLifespan;
+    let alpha = SONAR_BUBBLE_ALPHA_MAX * ageRatio;
+    fill(SONAR_BUBBLE_COLOR_H, SONAR_BUBBLE_COLOR_S, SONAR_BUBBLE_COLOR_B, alpha);
+    noStroke();
+    ellipse(this.pos.x - offsetX, this.pos.y - offsetY, this.size);
+  }
+
+  isOffscreen() {
+    return this.lifespan <= 0;
+  }
 }
 
 // --- Cave Class --- (No changes from previous complete version)
@@ -348,9 +391,20 @@ class PlayerSub {
     this.airDepletionRate = airDepletionRatePerFrame;
     this.shotCooldown = PLAYER_SHOT_COOLDOWN_FRAMES; this.lastShotTime = -this.shotCooldown; // Allow immediate first shot
     this.propellerAngle = 0; // For propeller animation
+    // No need to store bubbles in player, they will be global
   }
   fireSonar(cave, enemies) {
     this.lastSonarTime = frameCount; playSound('sonar');
+
+    // Create sonar bubbles around the player
+    for (let i = 0; i < SONAR_BUBBLES_PER_FIRE; i++) {
+      let angle = random(TWO_PI);
+      let distOffset = random(this.radius, SONAR_BUBBLE_SPAWN_RADIUS_AROUND_SUB + this.radius); // Spawn outside sub, up to radius
+      let bubbleX = this.pos.x + cos(angle) * distOffset;
+      let bubbleY = this.pos.y + sin(angle) * distOffset;
+      sonarBubbles.push(new SonarBubble(bubbleX, bubbleY));
+    }
+
     for (let i = 0; i < this.sonarPulses; i++) {
       let rayAngle = this.angle - PI + (TWO_PI / this.sonarPulses) * i; // Sonar sweeps around the sub
       let hitDetectedOnRay = false;
@@ -531,6 +585,7 @@ function initializeSounds() {
   sonarEnv.setADSR(SONAR_ENV_ADSR.aT, SONAR_ENV_ADSR.dT, SONAR_ENV_ADSR.sR, SONAR_ENV_ADSR.rT);
   sonarEnv.setRange(SONAR_ENV_LEVELS.aL, SONAR_ENV_LEVELS.rL);
   sonarOsc.amp(sonarEnv);
+  // No start here, will be started in playSound
 
   explosionNoise = new p5.Noise('white'); explosionEnv = new p5.Envelope();
   explosionEnv.setADSR(EXPLOSION_NOISE_ENV_ADSR.aT, EXPLOSION_NOISE_ENV_ADSR.dT, EXPLOSION_NOISE_ENV_ADSR.sR, EXPLOSION_NOISE_ENV_ADSR.rT);
@@ -643,6 +698,7 @@ function initGameObjects() {
   player = new PlayerSub(playerStartX, playerStartY, airForLevel, airDepletion);
   
   enemies = []; projectiles = [];
+  sonarBubbles = []; // Initialize sonar bubbles array
   let enemyCount = BASE_ENEMY_COUNT + (currentLevel - 1) * ENEMY_COUNT_PER_LEVEL_INCREASE;
   enemyCount = min(enemyCount, MAX_ENEMY_COUNT); // Cap enemy count
   for (let i = 0; i < enemyCount; i++) {
@@ -660,6 +716,7 @@ function resetGame() {
   player.health = PLAYER_INITIAL_HEALTH; player.airSupply = player.initialAirSupply; // Reset to full for new game
   player.lastSonarTime = frameCount - player.sonarCooldown; // Allow immediate sonar
   player.lastShotTime = frameCount - player.shotCooldown;   // Allow immediate shot
+  sonarBubbles = []; // Clear bubbles on reset
   gameState = 'start';
   if (audioInitialized && lowAirOsc && lowAirOsc.started) lowAirEnv.triggerRelease(lowAirOsc);
   lastLowAirBeepTime = 0; // Reset beep timer
@@ -779,6 +836,15 @@ function draw() {
 
   // --- Playing State ---
   cameraOffsetX = player.pos.x - width / 2; cameraOffsetY = player.pos.y - height / 2;
+
+  // Update and render Sonar Bubbles first, so they are behind other elements
+  for (let i = sonarBubbles.length - 1; i >= 0; i--) {
+    sonarBubbles[i].update();
+    sonarBubbles[i].render(cameraOffsetX, cameraOffsetY);
+    if (sonarBubbles[i].isOffscreen()) {
+      sonarBubbles.splice(i, 1);
+    }
+  }
 
   player.update(cave, enemies);
   for (let enemy of enemies) enemy.update(cave); // Enemies update themselves
