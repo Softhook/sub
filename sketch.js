@@ -61,13 +61,11 @@ const PLAYER_FIN_X4_FACTOR = -1.4; const PLAYER_FIN_Y4_FACTOR = -0.3;
 const PLAYER_SONAR_ARC_RADIUS_FACTOR = 3.5;
 const PLAYER_SHOT_ARC_RADIUS_FACTOR = 2.5;
 
-// Player Propeller Rendering
+// Player Propeller Rendering (Side View)
 const PLAYER_PROPELLER_X_OFFSET_FACTOR = -1.2; // Offset from player center, behind the body
-const PLAYER_PROPELLER_RADIUS_FACTOR = 0.4;    // Radius of the propeller hub
-const PLAYER_PROPELLER_BLADE_COUNT = 3;
-const PLAYER_PROPELLER_BLADE_LENGTH_FACTOR = 0.5; // Length of blades from hub edge
-const PLAYER_PROPELLER_BLADE_WIDTH_FACTOR = 0.15;  // Width of blades
-const PLAYER_PROPELLER_SPIN_SPEED_FACTOR = 0.1; // How fast it spins when moving
+const PLAYER_PROPELLER_MAX_SIDE_HEIGHT_FACTOR = 0.8; // New: Max apparent height from side view (relative to player radius)
+const PLAYER_PROPELLER_THICKNESS_FACTOR = 0.3;   // New: Thickness of the propeller from side view (relative to player radius)
+const PLAYER_PROPELLER_SPIN_SPEED_FACTOR = 0.2; // How fast it appears to spin (adjust for visual preference)
 
 // Projectile Constants
 const PROJECTILE_SPEED = 10;
@@ -431,29 +429,24 @@ class PlayerSub {
     vertex(-this.radius * PLAYER_FIN_X3_FACTOR, this.radius * PLAYER_FIN_Y3_FACTOR); vertex(-this.radius * PLAYER_FIN_X4_FACTOR, -this.radius * PLAYER_FIN_Y4_FACTOR);
     endShape(CLOSE);
 
-    // Propeller
+    // Propeller (Side View)
     push();
     translate(this.radius * PLAYER_PROPELLER_X_OFFSET_FACTOR, 0); // Position propeller at the back
-    rotate(this.propellerAngle); // Spin propeller
 
     fill(PLAYER_COLOR_PROPELLER_H, PLAYER_COLOR_PROPELLER_S, PLAYER_COLOR_PROPELLER_B);
-    // Propeller Hub
-    ellipse(0, 0, this.radius * PLAYER_PROPELLER_RADIUS_FACTOR * 2);
+    noStroke();
 
-    // Propeller Blades
-    for (let i = 0; i < PLAYER_PROPELLER_BLADE_COUNT; i++) {
-        push();
-        rotate(i * TWO_PI / PLAYER_PROPELLER_BLADE_COUNT);
-        // Draw blade extending from hub edge
-        rectMode(CORNER); // Ensure rectMode is suitable for blade drawing
-        rect(this.radius * PLAYER_PROPELLER_RADIUS_FACTOR * 0.8, -this.radius * PLAYER_PROPELLER_BLADE_WIDTH_FACTOR / 2,
-             this.radius * PLAYER_PROPELLER_BLADE_LENGTH_FACTOR,
-             this.radius * PLAYER_PROPELLER_BLADE_WIDTH_FACTOR);
-        pop();
-    }
+    // Modulate the apparent height of the propeller based on its spin angle
+    // abs(sin(angle)) gives a value from 0 to 1, cycling twice per full rotation (one full cycle of apparent motion)
+    let apparentHeight = this.radius * PLAYER_PROPELLER_MAX_SIDE_HEIGHT_FACTOR * abs(sin(this.propellerAngle));
+    let thickness = this.radius * PLAYER_PROPELLER_THICKNESS_FACTOR;
+
+    rectMode(CENTER); // Draw the propeller centered at its translated origin
+    rect(0, 0, thickness, apparentHeight); // Draw as a thin, vertically oriented rectangle that changes height
+
     pop(); // End propeller transformations
 
-    rectMode(CORNER); // Reset rectMode
+    rectMode(CORNER); // Reset rectMode for other drawing operations if any
     pop(); // End player transformations
 
     // Render Sonar Hits
