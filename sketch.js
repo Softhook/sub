@@ -698,8 +698,7 @@ class PlayerSub {
       lowAirEnv.triggerRelease(lowAirOsc);
     }
   }
-  render(offsetX, offsetY) {
-    // Render Sonar Hits FIRST, so they are behind the player sub
+  _renderSonarHits(offsetX, offsetY) {
     for (let i = this.sonarHits.length - 1; i >= 0; i--) {
       let hit = this.sonarHits[i]; let age = frameCount - hit.receivedAt;
       if (age < this.sonarDisplayTime) {
@@ -717,39 +716,69 @@ class PlayerSub {
         this.sonarHits.splice(i, 1); // Remove old hits
       }
     }
+  }
 
-    push(); translate(width / 2, height / 2); rotate(this.angle); // Player is always centered and rotated
-    // Submarine Body
-    fill(PLAYER_COLOR_BODY_H, PLAYER_COLOR_BODY_S, PLAYER_COLOR_BODY_B); noStroke(); ellipse(0, 0, this.radius * PLAYER_BODY_WIDTH_FACTOR, this.radius * PLAYER_BODY_HEIGHT_FACTOR);
-    // Sail (formerly Cockpit)
-    fill(PLAYER_COLOR_SAIL_H, PLAYER_COLOR_SAIL_S, PLAYER_COLOR_SAIL_B); rectMode(CENTER); rect(this.radius * PLAYER_SAIL_OFFSET_X_FACTOR, 0, this.radius * PLAYER_SAIL_WIDTH_FACTOR, this.radius * PLAYER_SAIL_HEIGHT_FACTOR, this.radius * PLAYER_SAIL_CORNER_RADIUS_FACTOR);
-    // Fin
-    fill(PLAYER_COLOR_FIN_H, PLAYER_COLOR_FIN_S, PLAYER_COLOR_FIN_B); beginShape();
-    vertex(-this.radius * PLAYER_FIN_X1_FACTOR, -this.radius * PLAYER_FIN_Y1_FACTOR); vertex(-this.radius * PLAYER_FIN_X2_FACTOR, this.radius * PLAYER_FIN_Y2_FACTOR);
-    vertex(-this.radius * PLAYER_FIN_X3_FACTOR, this.radius * PLAYER_FIN_Y3_FACTOR); vertex(-this.radius * PLAYER_FIN_X4_FACTOR, -this.radius * PLAYER_FIN_Y4_FACTOR);
+  _renderBody() {
+    fill(PLAYER_COLOR_BODY_H, PLAYER_COLOR_BODY_S, PLAYER_COLOR_BODY_B);
+    noStroke();
+    ellipse(0, 0, this.radius * PLAYER_BODY_WIDTH_FACTOR, this.radius * PLAYER_BODY_HEIGHT_FACTOR);
+  }
+
+  _renderSail() {
+    fill(PLAYER_COLOR_SAIL_H, PLAYER_COLOR_SAIL_S, PLAYER_COLOR_SAIL_B);
+    rectMode(CENTER);
+    rect(this.radius * PLAYER_SAIL_OFFSET_X_FACTOR, 0, this.radius * PLAYER_SAIL_WIDTH_FACTOR, this.radius * PLAYER_SAIL_HEIGHT_FACTOR, this.radius * PLAYER_SAIL_CORNER_RADIUS_FACTOR);
+    rectMode(CORNER); // Reset rectMode
+  }
+
+  _renderFin() {
+    fill(PLAYER_COLOR_FIN_H, PLAYER_COLOR_FIN_S, PLAYER_COLOR_FIN_B);
+    beginShape();
+    vertex(-this.radius * PLAYER_FIN_X1_FACTOR, -this.radius * PLAYER_FIN_Y1_FACTOR);
+    vertex(-this.radius * PLAYER_FIN_X2_FACTOR, this.radius * PLAYER_FIN_Y2_FACTOR);
+    vertex(-this.radius * PLAYER_FIN_X3_FACTOR, this.radius * PLAYER_FIN_Y3_FACTOR);
+    vertex(-this.radius * PLAYER_FIN_X4_FACTOR, -this.radius * PLAYER_FIN_Y4_FACTOR);
     endShape(CLOSE);
+  }
 
-    // Propeller (Side View)
+  _renderPropeller() {
     push();
     translate(this.radius * PLAYER_PROPELLER_X_OFFSET_FACTOR, 0); // Position propeller at the back
 
     fill(PLAYER_COLOR_PROPELLER_H, PLAYER_COLOR_PROPELLER_S, PLAYER_COLOR_PROPELLER_B);
     noStroke();
 
-    // Modulate the apparent height of the propeller based on its spin angle
-    // abs(sin(angle)) gives a value from 0 to 1, cycling twice per full rotation (one full cycle of apparent motion)
     let apparentHeight = this.radius * PLAYER_PROPELLER_MAX_SIDE_HEIGHT_FACTOR * abs(sin(this.propellerAngle));
     let thickness = this.radius * PLAYER_PROPELLER_THICKNESS_FACTOR;
 
-    rectMode(CENTER); // Draw the propeller centered at its translated origin
-    rect(0, 0, thickness, apparentHeight); // Draw as a thin, vertically oriented rectangle that changes height
+    rectMode(CENTER);
+    rect(0, 0, thickness, apparentHeight);
+    rectMode(CORNER); // Reset rectMode
 
     pop(); // End propeller transformations
+  }
 
-    rectMode(CORNER); // Reset rectMode for other drawing operations if any
+  render(offsetX, offsetY) {
+    // Render Sonar Hits FIRST, so they are behind the player sub
+    this._renderSonarHits(offsetX, offsetY);
+
+    push();
+    translate(width / 2, height / 2); // Player is always centered
+    rotate(this.angle); // And rotated
+
+    this._renderBody();
+    this._renderSail();
+    this._renderFin();
+    this._renderPropeller();
+    
+    // Note: rectMode(CORNER) is reset inside _renderSail and _renderPropeller if they use CENTER.
+    // If other parts used rectMode(CENTER) and didn't reset, it might be an issue.
+    // However, ellipse and beginShape/endShape are not affected by rectMode.
+    // The main pop() will restore the drawing context anyway.
+
     pop(); // End player transformations
 
-    // Sonar Cooldown Indicator (currently commented out, but if re-enabled, it should be here or in HUD)
+    // Sonar Cooldown Indicator (currently commented out)
     //let sonarCycleProgress = (frameCount - this.lastSonarTime) / this.sonarCooldown;
     //sonarCycleProgress = sonarCycleProgress - floor(sonarCycleProgress); // Keep it 0-1
     //noFill(); strokeWeight(PLAYER_SONAR_ARC_WEIGHT); stroke(PLAYER_SONAR_ARC_COLOR_H, PLAYER_SONAR_ARC_COLOR_S, PLAYER_SONAR_ARC_COLOR_B, PLAYER_SONAR_ARC_COLOR_A);
