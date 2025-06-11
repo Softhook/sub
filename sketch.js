@@ -312,6 +312,24 @@ let cameraOffsetX, cameraOffsetY;
 let gameState = 'start';
 let currentLevel = 1;
 
+// Helper function to process game object arrays (update, render, remove offscreen)
+function processGameObjectArray(arr, offsetX, offsetY, caveContext = null) {
+  for (let i = arr.length - 1; i >= 0; i--) {
+    let obj = arr[i];
+    if (obj.update) {
+        if (caveContext && obj instanceof Projectile) { // Pass cave only if needed (e.g. Projectile)
+            obj.update(caveContext);
+        } else {
+            obj.update(); 
+        }
+    }
+    if (obj.render) obj.render(offsetX, offsetY);
+    if (obj.isOffscreen && obj.isOffscreen()) {
+      arr.splice(i, 1);
+    }
+  }
+}
+
 // --- Projectile Class ---
 class Projectile {
   constructor(x, y, angle) {
@@ -791,49 +809,46 @@ class Enemy {
 
 // --- Sound Setup and Functions ---
 function initializeSounds() {
-  sonarOsc = new p5.Oscillator('sine'); sonarEnv = new p5.Envelope();
-  sonarEnv.setADSR(SONAR_ENV_ADSR.aT, SONAR_ENV_ADSR.dT, SONAR_ENV_ADSR.sR, SONAR_ENV_ADSR.rT);
-  sonarEnv.setRange(SONAR_ENV_LEVELS.aL, SONAR_ENV_LEVELS.rL);
-  sonarOsc.amp(sonarEnv);
-  // No start here, will be started in playSound
+  function setupSound(type, freqOrNoiseType, adsr, levels) {
+    let soundObj;
+    let env = new p5.Envelope();
+    env.setADSR(adsr.aT, adsr.dT, adsr.sR, adsr.rT);
+    env.setRange(levels.aL, levels.rL);
 
-  explosionNoise = new p5.Noise('white'); explosionEnv = new p5.Envelope();
-  explosionEnv.setADSR(EXPLOSION_NOISE_ENV_ADSR.aT, EXPLOSION_NOISE_ENV_ADSR.dT, EXPLOSION_NOISE_ENV_ADSR.sR, EXPLOSION_NOISE_ENV_ADSR.rT);
-  explosionEnv.setRange(EXPLOSION_NOISE_ENV_LEVELS.aL, EXPLOSION_NOISE_ENV_LEVELS.rL);
-  explosionNoise.amp(explosionEnv);
-  explosionBoomOsc = new p5.Oscillator('triangle'); explosionBoomEnv = new p5.Envelope();
-  explosionBoomEnv.setADSR(EXPLOSION_BOOM_ENV_ADSR.aT, EXPLOSION_BOOM_ENV_ADSR.dT, EXPLOSION_BOOM_ENV_ADSR.sR, EXPLOSION_BOOM_ENV_ADSR.rT);
-  explosionBoomEnv.setRange(EXPLOSION_BOOM_ENV_LEVELS.aL, EXPLOSION_BOOM_ENV_LEVELS.rL);
-  explosionBoomOsc.amp(explosionBoomEnv);
+    if (type === 'osc') {
+      soundObj = new p5.Oscillator(freqOrNoiseType); // freqOrNoiseType is actual frequency string like 'sine' or 'triangle'
+    } else { // 'noise'
+      soundObj = new p5.Noise(freqOrNoiseType); // freqOrNoiseType is noise type string like 'white' or 'pink'
+    }
+    soundObj.amp(env);
+    return { sound: soundObj, envelope: env };
+  }
 
-  bumpOsc = new p5.Oscillator('triangle'); bumpEnv = new p5.Envelope();
-  bumpEnv.setADSR(BUMP_ENV_ADSR.aT, BUMP_ENV_ADSR.dT, BUMP_ENV_ADSR.sR, BUMP_ENV_ADSR.rT);
-  bumpEnv.setRange(BUMP_ENV_LEVELS.aL, BUMP_ENV_LEVELS.rL);
-  bumpOsc.amp(bumpEnv);
+  let sonarSound = setupSound('osc', 'sine', SONAR_ENV_ADSR, SONAR_ENV_LEVELS);
+  sonarOsc = sonarSound.sound; sonarEnv = sonarSound.envelope;
 
-  torpedoNoise = new p5.Noise('pink'); torpedoEnv = new p5.Envelope();
-  torpedoEnv.setADSR(TORPEDO_ENV_ADSR.aT, TORPEDO_ENV_ADSR.dT, TORPEDO_ENV_ADSR.sR, TORPEDO_ENV_ADSR.rT);
-  torpedoEnv.setRange(TORPEDO_ENV_LEVELS.aL, TORPEDO_ENV_LEVELS.rL);
-  torpedoNoise.amp(torpedoEnv);
+  let explosionNoiseSound = setupSound('noise', 'white', EXPLOSION_NOISE_ENV_ADSR, EXPLOSION_NOISE_ENV_LEVELS);
+  explosionNoise = explosionNoiseSound.sound; explosionEnv = explosionNoiseSound.envelope;
+  let explosionBoomSound = setupSound('osc', 'triangle', EXPLOSION_BOOM_ENV_ADSR, EXPLOSION_BOOM_ENV_LEVELS);
+  explosionBoomOsc = explosionBoomSound.sound; explosionBoomEnv = explosionBoomSound.envelope;
 
-  lowAirOsc = new p5.Oscillator('square'); lowAirEnv = new p5.Envelope();
-  lowAirEnv.setADSR(LOW_AIR_ENV_ADSR.aT, LOW_AIR_ENV_ADSR.dT, LOW_AIR_ENV_ADSR.sR, LOW_AIR_ENV_ADSR.rT);
-  lowAirEnv.setRange(LOW_AIR_ENV_LEVELS.aL, LOW_AIR_ENV_LEVELS.rL);
-  lowAirOsc.amp(lowAirEnv);
+  let bumpSound = setupSound('osc', 'triangle', BUMP_ENV_ADSR, BUMP_ENV_LEVELS);
+  bumpOsc = bumpSound.sound; bumpEnv = bumpSound.envelope;
 
-  gameOverImpactNoise = new p5.Noise('white'); gameOverImpactEnv = new p5.Envelope();
-  gameOverImpactEnv.setADSR(GAME_OVER_IMPACT_ENV_ADSR.aT, GAME_OVER_IMPACT_ENV_ADSR.dT, GAME_OVER_IMPACT_ENV_ADSR.sR, GAME_OVER_IMPACT_ENV_ADSR.rT);
-  gameOverImpactEnv.setRange(GAME_OVER_IMPACT_ENV_LEVELS.aL, GAME_OVER_IMPACT_ENV_LEVELS.rL);
-  gameOverImpactNoise.amp(gameOverImpactEnv);
+  let torpedoSound = setupSound('noise', 'pink', TORPEDO_ENV_ADSR, TORPEDO_ENV_LEVELS);
+  torpedoNoise = torpedoSound.sound; torpedoEnv = torpedoSound.envelope;
 
-  gameOverGroanOsc = new p5.Oscillator('sawtooth'); gameOverGroanEnv = new p5.Envelope();
-  gameOverGroanEnv.setADSR(GAME_OVER_GROAN_ENV_ADSR.aT, GAME_OVER_GROAN_ENV_ADSR.dT, GAME_OVER_GROAN_ENV_ADSR.sR, GAME_OVER_GROAN_ENV_ADSR.rT);
-  gameOverGroanEnv.setRange(GAME_OVER_GROAN_ENV_LEVELS.aL, GAME_OVER_GROAN_ENV_LEVELS.rL);
-  gameOverGroanOsc.amp(gameOverGroanEnv);
+  let lowAirSound = setupSound('osc', 'square', LOW_AIR_ENV_ADSR, LOW_AIR_ENV_LEVELS);
+  lowAirOsc = lowAirSound.sound; lowAirEnv = lowAirSound.envelope;
 
-  gameOverFinalBoomNoise = new p5.Noise('brown'); gameOverFinalBoomEnv = new p5.Envelope();
-  gameOverFinalBoomEnv.setADSR(GAME_OVER_FINAL_BOOM_ENV_ADSR.aT, GAME_OVER_FINAL_BOOM_ENV_ADSR.dT, GAME_OVER_FINAL_BOOM_ENV_ADSR.sR, GAME_OVER_FINAL_BOOM_ENV_ADSR.rT);
-  gameOverFinalBoomEnv.setRange(GAME_OVER_FINAL_BOOM_ENV_LEVELS.aL, GAME_OVER_FINAL_BOOM_ENV_LEVELS.rL);
+  let gameOverImpact = setupSound('noise', 'white', GAME_OVER_IMPACT_ENV_ADSR, GAME_OVER_IMPACT_ENV_LEVELS);
+  gameOverImpactNoise = gameOverImpact.sound; gameOverImpactEnv = gameOverImpact.envelope;
+  let gameOverGroan = setupSound('osc', 'sawtooth', GAME_OVER_GROAN_ENV_ADSR, GAME_OVER_GROAN_ENV_LEVELS);
+  gameOverGroanOsc = gameOverGroan.sound; gameOverGroanEnv = gameOverGroan.envelope;
+  let gameOverFinalBoom = setupSound('noise', 'brown', GAME_OVER_FINAL_BOOM_ENV_ADSR, GAME_OVER_FINAL_BOOM_ENV_LEVELS);
+  gameOverFinalBoomNoise = gameOverFinalBoom.sound; gameOverFinalBoomEnv = gameOverFinalBoom.envelope;
+  // Note: The original code had gameOverFinalBoomEnv.setRange(GAME_OVER_FINAL_BOOM_ENV_LEVELS.aL, GAME_OVER_FINAL_BOOM_ENV_LEVELS.rL);
+  // but it was missing the ADSR setting for gameOverFinalBoomEnv. The helper now handles both.
 }
 
 function playSound(soundName) {
@@ -1000,126 +1015,118 @@ function keyPressed() {
   }
 }
 
-function draw() {
-  background(BACKGROUND_COLOR_H, BACKGROUND_COLOR_S, BACKGROUND_COLOR_B);
-
-  if (gameState === 'start') {
-    textAlign(CENTER, CENTER);
-    fill(START_SCREEN_TITLE_COLOR_H, START_SCREEN_TITLE_COLOR_S, START_SCREEN_TITLE_COLOR_B); textSize(START_SCREEN_TITLE_TEXT_SIZE);
-    text(`Reactor Dive`, width / 2, height / 2 + START_SCREEN_TITLE_Y_OFFSET); // Removed level display from here, as it's always level 1 on start screen after reset
-    textSize(START_SCREEN_INFO_TEXT_SIZE);
-    text("WASD/Arrows: Move. SPACE: Shoot.", width / 2, height / 2 + START_SCREEN_INFO_Y_OFFSET_1);
-    text(`Goal: Destroy < ${LEVEL_EXIT_MAX_ENEMIES_THRESHOLD} enemies and reach the reactor`, width / 2, height / 2 + START_SCREEN_INFO_Y_OFFSET_3);
-
-
-    textSize(START_SCREEN_PROMPT_TEXT_SIZE); fill(START_SCREEN_PROMPT_COLOR_H, START_SCREEN_PROMPT_COLOR_S, START_SCREEN_PROMPT_COLOR_B);
-    text("Press ENTER to Dive", width / 2, height / 2 + START_SCREEN_PROMPT_Y_OFFSET);
-    if (!audioInitialized) {
-        textSize(START_SCREEN_AUDIO_NOTE_TEXT_SIZE); fill(START_SCREEN_AUDIO_NOTE_COLOR_H, START_SCREEN_AUDIO_NOTE_COLOR_S, START_SCREEN_AUDIO_NOTE_COLOR_B);
-        text("(Sound will enable after you press Enter or Click)", width/2, height/2 + START_SCREEN_AUDIO_NOTE_Y_OFFSET);
-    }
-    return;
+function drawStartScreen() {
+  textAlign(CENTER, CENTER);
+  fill(START_SCREEN_TITLE_COLOR_H, START_SCREEN_TITLE_COLOR_S, START_SCREEN_TITLE_COLOR_B); textSize(START_SCREEN_TITLE_TEXT_SIZE);
+  text(`Reactor Dive`, width / 2, height / 2 + START_SCREEN_TITLE_Y_OFFSET);
+  textSize(START_SCREEN_INFO_TEXT_SIZE);
+  text("WASD/Arrows: Move. SPACE: Shoot.", width / 2, height / 2 + START_SCREEN_INFO_Y_OFFSET_1);
+  text(`Goal: Destroy < ${LEVEL_EXIT_MAX_ENEMIES_THRESHOLD} enemies and reach the reactor`, width / 2, height / 2 + START_SCREEN_INFO_Y_OFFSET_3);
+  textSize(START_SCREEN_PROMPT_TEXT_SIZE); fill(START_SCREEN_PROMPT_COLOR_H, START_SCREEN_PROMPT_COLOR_S, START_SCREEN_PROMPT_COLOR_B);
+  text("Press ENTER to Dive", width / 2, height / 2 + START_SCREEN_PROMPT_Y_OFFSET);
+  if (!audioInitialized) {
+      textSize(START_SCREEN_AUDIO_NOTE_TEXT_SIZE); fill(START_SCREEN_AUDIO_NOTE_COLOR_H, START_SCREEN_AUDIO_NOTE_COLOR_S, START_SCREEN_AUDIO_NOTE_COLOR_B);
+      text("(Sound will enable after you press Enter or Click)", width/2, height/2 + START_SCREEN_AUDIO_NOTE_Y_OFFSET);
   }
-  if (gameState === 'levelComplete') {
-    textAlign(CENTER, CENTER); 
-    fill(LEVEL_COMPLETE_TITLE_COLOR_H, LEVEL_COMPLETE_TITLE_COLOR_S, LEVEL_COMPLETE_TITLE_COLOR_B); textSize(LEVEL_COMPLETE_TITLE_TEXT_SIZE);
-    text(`LEVEL ${currentLevel -1} CLEARED!`, width / 2, height / 2 + LEVEL_COMPLETE_TITLE_Y_OFFSET); 
-    textSize(LEVEL_COMPLETE_INFO_TEXT_SIZE);
-    text(`Air Supply Replenished. Prepare for Level ${currentLevel}.`, width/2, height / 2 + LEVEL_COMPLETE_INFO_Y_OFFSET);
-    text("Press ENTER to Continue", width / 2, height / 2 + LEVEL_COMPLETE_PROMPT_Y_OFFSET);
-    return;
-  }
-  if (gameState === 'gameComplete') {
-    textAlign(CENTER, CENTER); // Ensure text is centered for this screen
-    fill(GAME_COMPLETE_TITLE_COLOR_H, GAME_COMPLETE_TITLE_COLOR_S, GAME_COMPLETE_TITLE_COLOR_B); textSize(GAME_COMPLETE_TITLE_TEXT_SIZE);
-    text("MISSION ACCOMPLISHED!", width / 2, height / 2 + GAME_COMPLETE_TITLE_Y_OFFSET);
-    textSize(GAME_COMPLETE_INFO_TEXT_SIZE);
-    text(`You cleared all ${MAX_LEVELS} levels!`, width/2, height/2 + GAME_COMPLETE_INFO_Y_OFFSET);
-    text("Press ENTER to Play Again", width / 2, height / 2 + GAME_COMPLETE_PROMPT_Y_OFFSET);
-    return;
-  }
-  if (gameState === 'gameOver') {
-    textAlign(CENTER, CENTER); // Ensure text is centered for this screen
-    fill(GAME_OVER_TITLE_COLOR_H, GAME_OVER_TITLE_COLOR_S, GAME_OVER_TITLE_COLOR_B); textSize(GAME_OVER_TITLE_TEXT_SIZE);
-    //text("GAME OVER", width / 2, height / 2 + GAME_OVER_TITLE_Y_OFFSET);
-    textSize(GAME_OVER_INFO_TEXT_SIZE);
-    text(player.health <= 0 ? "Submarine Destroyed!" : "Air Supply Depleted!", width/2, height/2 + GAME_OVER_INFO_Y_OFFSET);
-    text("Press ENTER to Restart", width / 2, height / 2 + GAME_OVER_PROMPT_Y_OFFSET);
-    return;
-  }
+}
 
-  // --- Playing State ---
+function drawLevelCompleteScreen() {
+  textAlign(CENTER, CENTER); 
+  fill(LEVEL_COMPLETE_TITLE_COLOR_H, LEVEL_COMPLETE_TITLE_COLOR_S, LEVEL_COMPLETE_TITLE_COLOR_B); textSize(LEVEL_COMPLETE_TITLE_TEXT_SIZE);
+  text(`LEVEL ${currentLevel -1} CLEARED!`, width / 2, height / 2 + LEVEL_COMPLETE_TITLE_Y_OFFSET); 
+  textSize(LEVEL_COMPLETE_INFO_TEXT_SIZE);
+  text(`Air Supply Replenished. Prepare for Level ${currentLevel}.`, width/2, height / 2 + LEVEL_COMPLETE_INFO_Y_OFFSET);
+  text("Press ENTER to Continue", width / 2, height / 2 + LEVEL_COMPLETE_PROMPT_Y_OFFSET);
+}
+
+function drawGameCompleteScreen() {
+  textAlign(CENTER, CENTER);
+  fill(GAME_COMPLETE_TITLE_COLOR_H, GAME_COMPLETE_TITLE_COLOR_S, GAME_COMPLETE_TITLE_COLOR_B); textSize(GAME_COMPLETE_TITLE_TEXT_SIZE);
+  text("MISSION ACCOMPLISHED!", width / 2, height / 2 + GAME_COMPLETE_TITLE_Y_OFFSET);
+  textSize(GAME_COMPLETE_INFO_TEXT_SIZE);
+  text(`You cleared all ${MAX_LEVELS} levels!`, width/2, height/2 + GAME_COMPLETE_INFO_Y_OFFSET);
+  text("Press ENTER to Play Again", width / 2, height / 2 + GAME_COMPLETE_PROMPT_Y_OFFSET);
+}
+
+function drawGameOverScreen() {
+  textAlign(CENTER, CENTER);
+  fill(GAME_OVER_TITLE_COLOR_H, GAME_OVER_TITLE_COLOR_S, GAME_OVER_TITLE_COLOR_B); textSize(GAME_OVER_TITLE_TEXT_SIZE);
+  textSize(GAME_OVER_INFO_TEXT_SIZE);
+  text(player.health <= 0 ? "Submarine Destroyed!" : "Air Supply Depleted!", width/2, height/2 + GAME_OVER_INFO_Y_OFFSET);
+  text("Press ENTER to Restart", width / 2, height / 2 + GAME_OVER_PROMPT_Y_OFFSET);
+}
+
+function drawPlayingState() {
   cameraOffsetX = player.pos.x - width / 2; cameraOffsetY = player.pos.y - height / 2;
 
-  // Render the goal square first so it's behind bubbles and player, but visible
-  //cave.renderGoal(cameraOffsetX, cameraOffsetY);
+  // Render the goal square
+  cave.renderGoal(cameraOffsetX, cameraOffsetY);
 
-  // Update and render Sonar Bubbles first, so they are behind other elements
-  for (let i = sonarBubbles.length - 1; i >= 0; i--) {
-    sonarBubbles[i].update();
-    sonarBubbles[i].render(cameraOffsetX, cameraOffsetY);
-    if (sonarBubbles[i].isOffscreen()) {
-      sonarBubbles.splice(i, 1);
-    }
-  }
-
-  // Update and render Torpedo Trail Particles
-  for (let i = particles.length - 1; i >= 0; i--) {
-    particles[i].update();
-    particles[i].render(cameraOffsetX, cameraOffsetY);
-    if (particles[i].isOffscreen()) {
-      particles.splice(i, 1);
-    }
-  }
+  // Process sonar bubbles, particles, and projectiles
+  processGameObjectArray(sonarBubbles, cameraOffsetX, cameraOffsetY);
+  processGameObjectArray(particles, cameraOffsetX, cameraOffsetY);
+  processGameObjectArray(projectiles, cameraOffsetX, cameraOffsetY, cave); // Projectiles need cave context
 
   player.update(cave, enemies);
-  for (let enemy of enemies) enemy.update(cave); // Enemies update themselves
-  // No explicit enemy render call here, sonar handles their "visibility"
+  for (let enemy of enemies) enemy.update(cave);
   player.handleEnemyCollisions(enemies);
 
-  // Projectiles
-  for (let i = projectiles.length - 1; i >= 0; i--) {
-    projectiles[i].update(cave); projectiles[i].render(cameraOffsetX, cameraOffsetY);
-    if (projectiles[i].isOffscreen()) projectiles.splice(i, 1);
-  }
-  // Projectile-Enemy Collisions
+  // Projectile-Enemy Collisions (This loop needs to stay separate due to nested iteration and specific logic)
   for (let i = projectiles.length - 1; i >= 0; i--) {
     for (let j = enemies.length - 1; j >= 0; j--) {
-      if (projectiles[i] && enemies[j]) { // Ensure both exist before checking
+      if (projectiles[i] && enemies[j]) {
         let d = dist(projectiles[i].pos.x, projectiles[i].pos.y, enemies[j].pos.x, enemies[j].pos.y);
         if (d < projectiles[i].radius + enemies[j].radius) {
-          enemies.splice(j, 1); projectiles.splice(i, 1); playSound('explosion'); break; // break inner loop since projectile is gone
+          enemies.splice(j, 1); 
+          projectiles.splice(i, 1); 
+          playSound('explosion'); 
+          break; 
         }
       }
     }
   }
 
-  player.render(cameraOffsetX, cameraOffsetY); // Player renders self and its sonar hits
+  player.render(cameraOffsetX, cameraOffsetY);
 
   // HUD
-  fill(HUD_TEXT_COLOR_H, HUD_TEXT_COLOR_S, HUD_TEXT_COLOR_B); textSize(HUD_TEXT_SIZE); textAlign(LEFT, TOP); // HUD uses LEFT, TOP alignment
+  fill(HUD_TEXT_COLOR_H, HUD_TEXT_COLOR_S, HUD_TEXT_COLOR_B); textSize(HUD_TEXT_SIZE); textAlign(LEFT, TOP);
   text(`Level: ${currentLevel}/${MAX_LEVELS}`, HUD_MARGIN_X, HUD_MARGIN_Y);
   text(`Hull: ${player.health}`, HUD_MARGIN_X, HUD_MARGIN_Y + HUD_LINE_SPACING);
   text(`Air: ${floor(player.airSupply / AIR_SUPPLY_FRAMES_TO_SECONDS_DIVISOR)}s (${floor(player.airSupply)})`, HUD_MARGIN_X, HUD_MARGIN_Y + HUD_LINE_SPACING * 2);
   text(`Enemies: ${enemies.length}`, HUD_MARGIN_X, HUD_MARGIN_Y + HUD_LINE_SPACING * 3);
-  // Calculate distance to the center of the goal square
   let distanceToGoal = dist(player.pos.x, player.pos.y, cave.goalPos.x, cave.goalPos.y);
   text(`Distance to Reactor: ${floor(distanceToGoal)}`, HUD_MARGIN_X, HUD_MARGIN_Y + HUD_LINE_SPACING * 4);
 
   // Check Game Over / Level Complete Conditions
   if (player.health <= 0 || player.airSupply <= 0) {
-      if(gameState === 'playing') { // Trigger game over sound only once on transition
-          playSound('gameOver');
-      }
+      if(gameState === 'playing') playSound('gameOver');
       gameState = 'gameOver';
-  } else if (cave.isGoal(player.pos.x, player.pos.y) && enemies.length < LEVEL_EXIT_MAX_ENEMIES_THRESHOLD) { // Use cave.isGoal() for level completion
-    if (currentLevel >= MAX_LEVELS) {
-        gameState = 'gameComplete';
-    } else {
-        gameState = 'levelComplete';
-        // Note: prepareNextLevel() is called on ENTER press from 'levelComplete' state
-    }
+  } else if (cave.isGoal(player.pos.x, player.pos.y) && enemies.length < LEVEL_EXIT_MAX_ENEMIES_THRESHOLD) {
+    gameState = (currentLevel >= MAX_LEVELS) ? 'gameComplete' : 'levelComplete';
   }
+}
+
+function draw() {
+  background(BACKGROUND_COLOR_H, BACKGROUND_COLOR_S, BACKGROUND_COLOR_B);
+
+  if (gameState === 'start') {
+    drawStartScreen();
+    return;
+  }
+  if (gameState === 'levelComplete') {
+    drawLevelCompleteScreen();
+    return;
+  }
+  if (gameState === 'gameComplete') {
+    drawGameCompleteScreen();
+    return;
+  }
+  if (gameState === 'gameOver') {
+    drawGameOverScreen();
+    return;
+  }
+  // gameState === 'playing'
+  drawPlayingState();
 }
 function windowResized() { resizeCanvas(windowWidth, windowHeight); }
 
