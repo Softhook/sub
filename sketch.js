@@ -1,7 +1,8 @@
 // --- Configuration Constants ---
 
 // Game Mechanics & World
-const CELL_SIZE = 20;
+const BASE_CELL_SIZE = 20; // Base size, will increase per level
+let currentCellSize = BASE_CELL_SIZE; // Variable to hold current cell size
 const WORLD_WIDTH = 4000;
 const WORLD_HEIGHT = 2000;
 const MAX_LEVELS = 3;
@@ -334,18 +335,17 @@ class SonarBubble {
 
 // --- Cave Class ---
 class Cave {
-  constructor(worldWidth, worldHeight, cellSize) {
-    this.worldWidth = worldWidth; this.worldHeight = worldHeight; this.cellSize = cellSize;
-    this.gridWidth = Math.ceil(worldWidth / cellSize); this.gridHeight = Math.ceil(worldHeight / cellSize);
+  constructor(worldWidth, worldHeight, cellSize) { // Accept cellSize as a parameter
+    this.worldWidth = worldWidth; this.worldHeight = worldHeight; this.cellSize = cellSize; // Use passed cellSize
+    this.gridWidth = Math.ceil(worldWidth / this.cellSize); // Use this.cellSize
+    this.gridHeight = Math.ceil(worldHeight / this.cellSize); // Use this.cellSize
     this.grid = []; this.exitPathY = 0; this.exitPathRadius = 0;
-    this.goalPos = createVector(0,0); // To store the center of the goal square
-    this.goalSize = GOAL_SQUARE_SIZE_CELLS * cellSize;
+    this.goalPos = createVector(0,0);
+    this.goalSize = GOAL_SQUARE_SIZE_CELLS * this.cellSize; // Use this.cellSize
     this.generateCave();
-    this.exitX = worldWidth - cellSize * CAVE_EXIT_X_OFFSET_CELLS; // This is the line the player must cross
-    // The visual goal square will be placed near this.exitX and this.exitPathY
-    this.goalPos.x = this.exitX + this.goalSize / 2; // Place it slightly past the exit line, centered
-    this.goalPos.y = this.exitPathY * cellSize;     // Align with the cave exit path vertically
-
+    this.exitX = worldWidth - this.cellSize * CAVE_EXIT_X_OFFSET_CELLS; // Use this.cellSize
+    this.goalPos.x = this.exitX + this.goalSize / 2;
+    this.goalPos.y = this.exitPathY * this.cellSize; // Use this.cellSize
   }
   generateCave() {
     for (let i = 0; i < this.gridWidth; i++) {
@@ -760,6 +760,8 @@ function setup() {
 }
 
 function initGameObjects() {
+  currentCellSize = BASE_CELL_SIZE + (currentLevel - 1) * 20; // Calculate current cell size
+
   let baseAir = INITIAL_AIR_SUPPLY_BASE;
   let airForLevel = baseAir - (currentLevel - 1) * AIR_SUPPLY_LEVEL_REDUCTION;
   airForLevel = max(airForLevel, MIN_AIR_SUPPLY_PER_LEVEL); // Ensure minimum air
@@ -768,22 +770,22 @@ function initGameObjects() {
   let playerStartX, playerStartY;
   let attempts = 0;
   // MAX_PLAYER_SPAWN_ATTEMPTS is defined in Spawning constants
-  let playerSpawnRadiusBuffer = CELL_SIZE * PLAYER_SPAWN_RADIUS_BUFFER_CELL_FACTOR;
+  let playerSpawnRadiusBuffer = currentCellSize * PLAYER_SPAWN_RADIUS_BUFFER_CELL_FACTOR; // Use currentCellSize
 
-  cave = new Cave(WORLD_WIDTH, WORLD_HEIGHT, CELL_SIZE); // Generate cave first
+  cave = new Cave(WORLD_WIDTH, WORLD_HEIGHT, currentCellSize); // Pass currentCellSize to Cave constructor
 
   // Find a safe starting position for the player
   do {
-    playerStartX = CELL_SIZE * (PLAYER_START_X_BASE_CELLS + attempts * PLAYER_START_X_ATTEMPT_INCREMENT_CELLS); 
-    playerStartY = WORLD_HEIGHT / 2 + random(-CELL_SIZE * PLAYER_START_Y_RANDOM_RANGE_CELLS, CELL_SIZE * PLAYER_START_Y_RANDOM_RANGE_CELLS);
+    playerStartX = currentCellSize * (PLAYER_START_X_BASE_CELLS + attempts * PLAYER_START_X_ATTEMPT_INCREMENT_CELLS); // Use currentCellSize
+    playerStartY = WORLD_HEIGHT / 2 + random(-currentCellSize * PLAYER_START_Y_RANDOM_RANGE_CELLS, currentCellSize * PLAYER_START_Y_RANDOM_RANGE_CELLS); // Use currentCellSize
     attempts++;
-    if (playerStartX > WORLD_WIDTH * PLAYER_SPAWN_MAX_X_SEARCH_FACTOR) { // Don\'t search too far into the cave
-        playerStartX = CELL_SIZE * PLAYER_START_X_BASE_CELLS; playerStartY = WORLD_HEIGHT / 2; break; // Fallback
+    if (playerStartX > WORLD_WIDTH * PLAYER_SPAWN_MAX_X_SEARCH_FACTOR) {
+        playerStartX = currentCellSize * PLAYER_START_X_BASE_CELLS; playerStartY = WORLD_HEIGHT / 2; break; // Use currentCellSize
     }
   } while (cave.isWall(playerStartX, playerStartY, playerSpawnRadiusBuffer) && attempts < MAX_PLAYER_SPAWN_ATTEMPTS);
   
   if (attempts >= MAX_PLAYER_SPAWN_ATTEMPTS) { // If still no safe spot, use a default
-      playerStartX = CELL_SIZE * PLAYER_START_X_BASE_CELLS; playerStartY = WORLD_HEIGHT / 2;
+      playerStartX = currentCellSize * PLAYER_START_X_BASE_CELLS; playerStartY = WORLD_HEIGHT / 2; // Use currentCellSize
   }
 
   player = new PlayerSub(playerStartX, playerStartY, airForLevel, airDepletion);
@@ -803,7 +805,9 @@ function initGameObjects() {
 }
 
 function resetGame() {
-  currentLevel = 1; initGameObjects();
+  currentLevel = 1; // Start level numbering from 1
+  // currentCellSize will be set in initGameObjects based on currentLevel
+  initGameObjects();
   player.health = PLAYER_INITIAL_HEALTH; player.airSupply = player.initialAirSupply; // Reset to full for new game
   player.lastSonarTime = frameCount - player.sonarCooldown; // Allow immediate sonar
   player.lastShotTime = frameCount - player.shotCooldown;   // Allow immediate shot
@@ -880,9 +884,9 @@ function draw() {
   background(BACKGROUND_COLOR_H, BACKGROUND_COLOR_S, BACKGROUND_COLOR_B);
 
   if (gameState === 'start') {
-    textAlign(CENTER, CENTER); // Ensure text is centered for this screen
+    textAlign(CENTER, CENTER);
     fill(START_SCREEN_TITLE_COLOR_H, START_SCREEN_TITLE_COLOR_S, START_SCREEN_TITLE_COLOR_B); textSize(START_SCREEN_TITLE_TEXT_SIZE);
-    text(`Reactor Dive ${currentLevel > 1 ? '(Restart)': ''}`, width / 2, height / 2 + START_SCREEN_TITLE_Y_OFFSET);
+    text(`Reactor Dive`, width / 2, height / 2 + START_SCREEN_TITLE_Y_OFFSET); // Removed level display from here, as it's always level 1 on start screen after reset
     textSize(START_SCREEN_INFO_TEXT_SIZE);
     text("WASD/Arrows: Move. SPACE: Shoot.", width / 2, height / 2 + START_SCREEN_INFO_Y_OFFSET_1);
     text("Sonar pings automatically. Watch your Air Supply!", width / 2, height / 2 + START_SCREEN_INFO_Y_OFFSET_2);
@@ -898,9 +902,9 @@ function draw() {
     return;
   }
   if (gameState === 'levelComplete') {
-    textAlign(CENTER, CENTER); // Ensure text is centered for this screen
+    textAlign(CENTER, CENTER); 
     fill(LEVEL_COMPLETE_TITLE_COLOR_H, LEVEL_COMPLETE_TITLE_COLOR_S, LEVEL_COMPLETE_TITLE_COLOR_B); textSize(LEVEL_COMPLETE_TITLE_TEXT_SIZE);
-    text(`LEVEL ${currentLevel -1} CLEARED!`, width / 2, height / 2 + LEVEL_COMPLETE_TITLE_Y_OFFSET); // currentLevel was already incremented
+    text(`LEVEL ${currentLevel -1} CLEARED!`, width / 2, height / 2 + LEVEL_COMPLETE_TITLE_Y_OFFSET); 
     textSize(LEVEL_COMPLETE_INFO_TEXT_SIZE);
     text(`Air Supply Replenished. Prepare for Level ${currentLevel}.`, width/2, height / 2 + LEVEL_COMPLETE_INFO_Y_OFFSET);
     text("Press ENTER to Continue", width / 2, height / 2 + LEVEL_COMPLETE_PROMPT_Y_OFFSET);
