@@ -889,10 +889,9 @@ function draw() {
     text(`Reactor Dive`, width / 2, height / 2 + START_SCREEN_TITLE_Y_OFFSET); // Removed level display from here, as it's always level 1 on start screen after reset
     textSize(START_SCREEN_INFO_TEXT_SIZE);
     text("WASD/Arrows: Move. SPACE: Shoot.", width / 2, height / 2 + START_SCREEN_INFO_Y_OFFSET_1);
-    text("Sonar pings automatically. Watch your Air Supply!", width / 2, height / 2 + START_SCREEN_INFO_Y_OFFSET_2);
-    text(`Goal: Reach X > ${cave.exitX} with < ${LEVEL_EXIT_MAX_ENEMIES_THRESHOLD} enemies.`, width / 2, height / 2 + START_SCREEN_INFO_Y_OFFSET_3);
-    text(`Complete ${MAX_LEVELS} levels to win.`, width / 2, height / 2 + START_SCREEN_INFO_Y_OFFSET_4);
-    text("MOUSE CLICK for Fullscreen.", width/2, height/2 + START_SCREEN_FULLSCREEN_Y_OFFSET);
+    text(`Goal: Destroy < ${LEVEL_EXIT_MAX_ENEMIES_THRESHOLD} enemies and reach the reactor`, width / 2, height / 2 + START_SCREEN_INFO_Y_OFFSET_3);
+
+
     textSize(START_SCREEN_PROMPT_TEXT_SIZE); fill(START_SCREEN_PROMPT_COLOR_H, START_SCREEN_PROMPT_COLOR_S, START_SCREEN_PROMPT_COLOR_B);
     text("Press ENTER to Dive", width / 2, height / 2 + START_SCREEN_PROMPT_Y_OFFSET);
     if (!audioInitialized) {
@@ -971,11 +970,12 @@ function draw() {
   // HUD
   fill(HUD_TEXT_COLOR_H, HUD_TEXT_COLOR_S, HUD_TEXT_COLOR_B); textSize(HUD_TEXT_SIZE); textAlign(LEFT, TOP); // HUD uses LEFT, TOP alignment
   text(`Level: ${currentLevel}/${MAX_LEVELS}`, HUD_MARGIN_X, HUD_MARGIN_Y);
-  text(`Health: ${player.health}`, HUD_MARGIN_X, HUD_MARGIN_Y + HUD_LINE_SPACING);
+  text(`Hull: ${player.health}`, HUD_MARGIN_X, HUD_MARGIN_Y + HUD_LINE_SPACING);
   text(`Air: ${floor(player.airSupply / AIR_SUPPLY_FRAMES_TO_SECONDS_DIVISOR)}s (${floor(player.airSupply)})`, HUD_MARGIN_X, HUD_MARGIN_Y + HUD_LINE_SPACING * 2);
   text(`Enemies: ${enemies.length}`, HUD_MARGIN_X, HUD_MARGIN_Y + HUD_LINE_SPACING * 3);
-  text(`Position: ${floor(player.pos.x)}, ${floor(player.pos.y)}`, HUD_MARGIN_X, HUD_MARGIN_Y + HUD_LINE_SPACING * 4);
-  text(`Target: X > ${cave.exitX}`, HUD_MARGIN_X, HUD_MARGIN_Y + HUD_LINE_SPACING * 5);
+  // Calculate distance to the center of the goal square
+  let distanceToGoal = dist(player.pos.x, player.pos.y, cave.goalPos.x, cave.goalPos.y);
+  text(`Dist. to Reactor: ${floor(distanceToGoal)}`, HUD_MARGIN_X, HUD_MARGIN_Y + HUD_LINE_SPACING * 4);
 
   // Check Game Over / Level Complete Conditions
   if (player.health <= 0 || player.airSupply <= 0) {
