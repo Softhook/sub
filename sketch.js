@@ -108,6 +108,16 @@ const ENEMY_AI_WALL_HIT_DECISION_MAX_INTERVAL_FRAMES = 60;
 
 // Cave Generation
 const CAVE_EXIT_X_OFFSET_CELLS = 10; // How many cells from the right edge the exit starts
+const GOAL_SQUARE_SIZE_CELLS = 3; // Size of the goal square in terms of cells
+const GOAL_SQUARE_VISUAL_COLOR_H = 60; // Yellow for drawing the goal
+const GOAL_SQUARE_VISUAL_COLOR_S = 100;
+const GOAL_SQUARE_VISUAL_COLOR_B = 100;
+const PLAYER_SONAR_GOAL_HIT_COLOR_H = 55; // Distinct Yellow/Gold for sonar hit on goal
+const PLAYER_SONAR_GOAL_HIT_COLOR_S = 100;
+const PLAYER_SONAR_GOAL_HIT_COLOR_B = 100;
+const PLAYER_SONAR_GOAL_HIT_INTENSITY_MAX = 1.2; // Slightly brighter sonar hit for goal
+const PLAYER_SONAR_GOAL_HIT_INTENSITY_MIN = 0.5;
+
 const CAVE_PATH_Y_NOISE_FACTOR_1 = 0.03;
 const CAVE_PATH_Y_NOISE_OFFSET_1 = 10; // Base offset, currentLevel added
 const CAVE_PATH_Y_NOISE_MULT_1 = 2.5;
@@ -194,6 +204,7 @@ const PLAYER_COLOR_PROPELLER_H = 60; const PLAYER_COLOR_PROPELLER_S = 50; const 
 const PROJECTILE_COLOR_H = 60; const PROJECTILE_COLOR_S = 100; const PROJECTILE_COLOR_B = 100; const PROJECTILE_COLOR_A = 200;
 const PLAYER_SONAR_WALL_COLOR_H = 100; const PLAYER_SONAR_WALL_COLOR_S = 50; const PLAYER_SONAR_WALL_COLOR_B = 50;
 const PLAYER_SONAR_ENEMY_COLOR_H = 0; const PLAYER_SONAR_ENEMY_COLOR_S = 70; const PLAYER_SONAR_ENEMY_COLOR_B = 70;
+const PLAYER_SONAR_GOAL_COLOR_H = 60; const PLAYER_SONAR_GOAL_COLOR_S = 100; const PLAYER_SONAR_GOAL_COLOR_B = 100; // Yellow for goal
 const PLAYER_SONAR_ARC_WEIGHT = 3;
 const PLAYER_SONAR_ARC_COLOR_H = 120; const PLAYER_SONAR_ARC_COLOR_S = 100; const PLAYER_SONAR_ARC_COLOR_B = 100; const PLAYER_SONAR_ARC_COLOR_A = 100;
 const PLAYER_SHOT_ARC_WEIGHT = 2;
@@ -321,14 +332,20 @@ class SonarBubble {
   }
 }
 
-// --- Cave Class --- (No changes from previous complete version)
+// --- Cave Class ---
 class Cave {
   constructor(worldWidth, worldHeight, cellSize) {
     this.worldWidth = worldWidth; this.worldHeight = worldHeight; this.cellSize = cellSize;
     this.gridWidth = Math.ceil(worldWidth / cellSize); this.gridHeight = Math.ceil(worldHeight / cellSize);
     this.grid = []; this.exitPathY = 0; this.exitPathRadius = 0;
+    this.goalPos = createVector(0,0); // To store the center of the goal square
+    this.goalSize = GOAL_SQUARE_SIZE_CELLS * cellSize;
     this.generateCave();
-    this.exitX = worldWidth - cellSize * CAVE_EXIT_X_OFFSET_CELLS;
+    this.exitX = worldWidth - cellSize * CAVE_EXIT_X_OFFSET_CELLS; // This is the line the player must cross
+    // The visual goal square will be placed near this.exitX and this.exitPathY
+    this.goalPos.x = this.exitX + this.goalSize / 2; // Place it slightly past the exit line, centered
+    this.goalPos.y = this.exitPathY * cellSize;     // Align with the cave exit path vertically
+
   }
   generateCave() {
     for (let i = 0; i < this.gridWidth; i++) {
@@ -368,8 +385,36 @@ class Cave {
       if (abs(j - this.exitPathY) > this.exitPathRadius) this.grid[this.gridWidth - 1][j] = true;
       else this.grid[this.gridWidth - 1][j] = false;
     }
+    // Ensure the goal area itself is not a wall in the grid, if it falls within the last column
+    // This is more for logical consistency as direct drawing handles its appearance.
+    let goalGridMinX = floor((this.goalPos.x - this.goalSize / 2) / this.cellSize);
+    let goalGridMaxX = floor((this.goalPos.x + this.goalSize / 2) / this.cellSize);
+    let goalGridMinY = floor((this.goalPos.y - this.goalSize / 2) / this.cellSize);
+    let goalGridMaxY = floor((this.goalPos.y + this.goalSize / 2) / this.cellSize);
+
+    for (let i = goalGridMinX; i <= goalGridMaxX; i++) {
+      for (let j = goalGridMinY; j <= goalGridMaxY; j++) {
+        if (i >= 0 && i < this.gridWidth && j >= 0 && j < this.gridHeight) {
+          // Check if this part of the goal is within the last column where exit path is defined
+          if (i === this.gridWidth - 1) {
+             // Only clear if it's part of the intended open exit path area
+             if (abs(j - this.exitPathY) <= this.exitPathRadius) {
+                this.grid[i][j] = false; 
+             }
+          } else if (i > this.gridWidth - CAVE_EXIT_X_OFFSET_CELLS) {
+            // For parts of the goal square that might extend beyond the last column but are in the exit zone
+            this.grid[i][j] = false;
+          }
+        }
+      }
+    }
   }
+
   isWall(worldX, worldY, objectRadius = 0) {
+    // Check for goal square collision first for sonar detection (not for player passage)
+    // This is a simplified check; sonar will treat it as a distinct object.
+    // For actual player collision with walls, the grid check below is primary.
+
     if (worldX < 0 || worldX >= this.worldWidth || worldY < 0 || worldY >= this.worldHeight) return true; // Out of bounds is a wall
     const checks = CAVE_WALL_CHECK_POINTS;
     for (let i = 0; i < checks; i++) {
@@ -380,6 +425,24 @@ class Cave {
       if (this.grid[gridX] && this.grid[gridX][gridY]) return true;
     }
     return false;
+  }
+
+  // New method to check if a point is within the goal square
+  isGoal(worldX, worldY) {
+    return worldX >= this.goalPos.x - this.goalSize / 2 &&
+           worldX <= this.goalPos.x + this.goalSize / 2 &&
+           worldY >= this.goalPos.y - this.goalSize / 2 &&
+           worldY <= this.goalPos.y + this.goalSize / 2;
+  }
+
+  // New method to render the goal square
+  renderGoal(offsetX, offsetY) {
+    push();
+    fill(GOAL_SQUARE_VISUAL_COLOR_H, GOAL_SQUARE_VISUAL_COLOR_S, GOAL_SQUARE_VISUAL_COLOR_B);
+    noStroke();
+    rectMode(CENTER);
+    rect(this.goalPos.x - offsetX, this.goalPos.y - offsetY, this.goalSize, this.goalSize);
+    pop();
   }
 }
 
@@ -407,6 +470,17 @@ class PlayerSub {
       for (let dist = 0; dist < this.sonarRange; dist += PLAYER_SONAR_RAY_STEP) {
         if (hitDetectedOnRay) break; // Optimization: stop ray if something is hit
         let checkX = this.pos.x + cos(rayAngle) * dist; let checkY = this.pos.y + sin(rayAngle) * dist;
+        
+        // Check for goal hit first
+        if (cave.isGoal(checkX, checkY)) {
+            this.sonarHits.push({ 
+                x: checkX, y: checkY, type: 'goal', receivedAt: frameCount, 
+                intensity: map(dist, 0, this.sonarRange, PLAYER_SONAR_GOAL_HIT_INTENSITY_MAX, PLAYER_SONAR_GOAL_HIT_INTENSITY_MIN) 
+            });
+            hitDetectedOnRay = true; 
+            break; // Goal hit, stop this ray
+        }
+
         // Check for enemy hits first
         for (let enemy of enemies) {
           if (p5.Vector.dist(createVector(checkX, checkY), enemy.pos) < enemy.radius) {
@@ -489,6 +563,25 @@ class PlayerSub {
     }
   }
   render(offsetX, offsetY) {
+    // Render Sonar Hits FIRST, so they are behind the player sub
+    for (let i = this.sonarHits.length - 1; i >= 0; i--) {
+      let hit = this.sonarHits[i]; let age = frameCount - hit.receivedAt;
+      if (age < this.sonarDisplayTime) {
+        let alpha = map(age, 0, this.sonarDisplayTime, PLAYER_SONAR_HIT_ALPHA_MAX, PLAYER_SONAR_HIT_ALPHA_MIN);
+        let hitSize = map(age, 0, this.sonarDisplayTime, PLAYER_SONAR_HIT_SIZE_MAX, PLAYER_SONAR_HIT_SIZE_MIN) * hit.intensity;
+        let displayX = hit.x - offsetX; let displayY = hit.y - offsetY;
+        // Cull off-screen sonar pings for performance
+        if (displayX < -PLAYER_SONAR_HIT_OFFSCREEN_BUFFER || displayX > width + PLAYER_SONAR_HIT_OFFSCREEN_BUFFER || displayY < -PLAYER_SONAR_HIT_OFFSCREEN_BUFFER || displayY > height + PLAYER_SONAR_HIT_OFFSCREEN_BUFFER) continue;
+
+        if (hit.type === 'wall') fill(PLAYER_SONAR_WALL_COLOR_H, PLAYER_SONAR_WALL_COLOR_S, PLAYER_SONAR_WALL_COLOR_B, alpha * hit.intensity);
+        else if (hit.type === 'enemy') { fill(PLAYER_SONAR_ENEMY_COLOR_H, PLAYER_SONAR_ENEMY_COLOR_S, PLAYER_SONAR_ENEMY_COLOR_B, alpha * hit.intensity); hitSize *= PLAYER_SONAR_ENEMY_HIT_SIZE_FACTOR; }
+        else if (hit.type === 'goal') { fill(PLAYER_SONAR_GOAL_HIT_COLOR_H, PLAYER_SONAR_GOAL_HIT_COLOR_S, PLAYER_SONAR_GOAL_HIT_COLOR_B, alpha * hit.intensity); } // Use goal sonar color
+        noStroke(); ellipse(displayX, displayY, hitSize, hitSize);
+      } else {
+        this.sonarHits.splice(i, 1); // Remove old hits
+      }
+    }
+
     push(); translate(width / 2, height / 2); rotate(this.angle); // Player is always centered and rotated
     // Submarine Body
     fill(PLAYER_COLOR_BODY_H, PLAYER_COLOR_BODY_S, PLAYER_COLOR_BODY_B); noStroke(); ellipse(0, 0, this.radius * PLAYER_BODY_WIDTH_FACTOR, this.radius * PLAYER_BODY_HEIGHT_FACTOR);
@@ -520,29 +613,11 @@ class PlayerSub {
     rectMode(CORNER); // Reset rectMode for other drawing operations if any
     pop(); // End player transformations
 
-    // Render Sonar Hits
-    for (let i = this.sonarHits.length - 1; i >= 0; i--) {
-      let hit = this.sonarHits[i]; let age = frameCount - hit.receivedAt;
-      if (age < this.sonarDisplayTime) {
-        let alpha = map(age, 0, this.sonarDisplayTime, PLAYER_SONAR_HIT_ALPHA_MAX, PLAYER_SONAR_HIT_ALPHA_MIN);
-        let hitSize = map(age, 0, this.sonarDisplayTime, PLAYER_SONAR_HIT_SIZE_MAX, PLAYER_SONAR_HIT_SIZE_MIN) * hit.intensity;
-        let displayX = hit.x - offsetX; let displayY = hit.y - offsetY;
-        // Cull off-screen sonar pings for performance
-        if (displayX < -PLAYER_SONAR_HIT_OFFSCREEN_BUFFER || displayX > width + PLAYER_SONAR_HIT_OFFSCREEN_BUFFER || displayY < -PLAYER_SONAR_HIT_OFFSCREEN_BUFFER || displayY > height + PLAYER_SONAR_HIT_OFFSCREEN_BUFFER) continue;
-
-        if (hit.type === 'wall') fill(PLAYER_SONAR_WALL_COLOR_H, PLAYER_SONAR_WALL_COLOR_S, PLAYER_SONAR_WALL_COLOR_B, alpha * hit.intensity);
-        else if (hit.type === 'enemy') { fill(PLAYER_SONAR_ENEMY_COLOR_H, PLAYER_SONAR_ENEMY_COLOR_S, PLAYER_SONAR_ENEMY_COLOR_B, alpha * hit.intensity); hitSize *= PLAYER_SONAR_ENEMY_HIT_SIZE_FACTOR; }
-        noStroke(); ellipse(displayX, displayY, hitSize, hitSize);
-      } else {
-        this.sonarHits.splice(i, 1); // Remove old hits
-      }
-    }
-    // Sonar Cooldown Indicator
+    // Sonar Cooldown Indicator (currently commented out, but if re-enabled, it should be here or in HUD)
     //let sonarCycleProgress = (frameCount - this.lastSonarTime) / this.sonarCooldown;
     //sonarCycleProgress = sonarCycleProgress - floor(sonarCycleProgress); // Keep it 0-1
     //noFill(); strokeWeight(PLAYER_SONAR_ARC_WEIGHT); stroke(PLAYER_SONAR_ARC_COLOR_H, PLAYER_SONAR_ARC_COLOR_S, PLAYER_SONAR_ARC_COLOR_B, PLAYER_SONAR_ARC_COLOR_A);
     //arc(width / 2, height / 2, this.radius * PLAYER_SONAR_ARC_RADIUS_FACTOR, this.radius * PLAYER_SONAR_ARC_RADIUS_FACTOR, -PI / 2, -PI / 2 + TWO_PI * sonarCycleProgress);
-
 
     strokeWeight(DEFAULT_STROKE_WEIGHT); // Reset stroke weight
   }
@@ -641,7 +716,6 @@ function initializeSounds() {
   gameOverFinalBoomNoise = new p5.Noise('brown'); gameOverFinalBoomEnv = new p5.Envelope();
   gameOverFinalBoomEnv.setADSR(GAME_OVER_FINAL_BOOM_ENV_ADSR.aT, GAME_OVER_FINAL_BOOM_ENV_ADSR.dT, GAME_OVER_FINAL_BOOM_ENV_ADSR.sR, GAME_OVER_FINAL_BOOM_ENV_ADSR.rT);
   gameOverFinalBoomEnv.setRange(GAME_OVER_FINAL_BOOM_ENV_LEVELS.aL, GAME_OVER_FINAL_BOOM_ENV_LEVELS.rL);
-  gameOverFinalBoomNoise.amp(gameOverFinalBoomEnv);
 }
 
 function playSound(soundName) {
@@ -808,7 +882,7 @@ function draw() {
   if (gameState === 'start') {
     textAlign(CENTER, CENTER); // Ensure text is centered for this screen
     fill(START_SCREEN_TITLE_COLOR_H, START_SCREEN_TITLE_COLOR_S, START_SCREEN_TITLE_COLOR_B); textSize(START_SCREEN_TITLE_TEXT_SIZE);
-    text(`DEEP SEA SONAR ${currentLevel > 1 ? '(Restart)': ''}`, width / 2, height / 2 + START_SCREEN_TITLE_Y_OFFSET);
+    text(`Reactor Dive ${currentLevel > 1 ? '(Restart)': ''}`, width / 2, height / 2 + START_SCREEN_TITLE_Y_OFFSET);
     textSize(START_SCREEN_INFO_TEXT_SIZE);
     text("WASD/Arrows: Move. SPACE: Shoot.", width / 2, height / 2 + START_SCREEN_INFO_Y_OFFSET_1);
     text("Sonar pings automatically. Watch your Air Supply!", width / 2, height / 2 + START_SCREEN_INFO_Y_OFFSET_2);
@@ -844,7 +918,7 @@ function draw() {
   if (gameState === 'gameOver') {
     textAlign(CENTER, CENTER); // Ensure text is centered for this screen
     fill(GAME_OVER_TITLE_COLOR_H, GAME_OVER_TITLE_COLOR_S, GAME_OVER_TITLE_COLOR_B); textSize(GAME_OVER_TITLE_TEXT_SIZE);
-    text("GAME OVER", width / 2, height / 2 + GAME_OVER_TITLE_Y_OFFSET);
+    //text("GAME OVER", width / 2, height / 2 + GAME_OVER_TITLE_Y_OFFSET);
     textSize(GAME_OVER_INFO_TEXT_SIZE);
     text(player.health <= 0 ? "Submarine Destroyed!" : "Air Supply Depleted!", width/2, height/2 + GAME_OVER_INFO_Y_OFFSET);
     text("Press ENTER to Restart", width / 2, height / 2 + GAME_OVER_PROMPT_Y_OFFSET);
@@ -853,6 +927,9 @@ function draw() {
 
   // --- Playing State ---
   cameraOffsetX = player.pos.x - width / 2; cameraOffsetY = player.pos.y - height / 2;
+
+  // Render the goal square first so it's behind bubbles and player, but visible
+  //cave.renderGoal(cameraOffsetX, cameraOffsetY);
 
   // Update and render Sonar Bubbles first, so they are behind other elements
   for (let i = sonarBubbles.length - 1; i >= 0; i--) {
