@@ -89,10 +89,35 @@ const PLAYER_SHOT_ARC_RADIUS_FACTOR = 2.5;
 
 // Projectile Constants
 const PROJECTILE_SPEED = 3;
-const PROJECTILE_RADIUS = 3;
+const PROJECTILE_RADIUS = 3; // This will be the base for torpedo size
 const PROJECTILE_LIFESPAN_FRAMES = 100;
 const PLAYER_SHOT_COOLDOWN_FRAMES = 70;
 const PROJECTILE_WALL_COLLISION_RADIUS_FACTOR = 0.5; // For more accurate feel
+
+// New Torpedo Visual Constants
+const TORPEDO_BODY_LENGTH_FACTOR = 3.5; // e.g., 3.5 * PROJECTILE_RADIUS
+const TORPEDO_BODY_WIDTH_FACTOR = 1;  // e.g., PROJECTILE_RADIUS
+const TORPEDO_FIN_SIZE_FACTOR = 0.3;    // e.g., 1.0 * PROJECTILE_RADIUS (for small side fins)
+const TORPEDO_FIN_OFFSET_FACTOR = 0.7; // How far back fins are from center
+const TORPEDO_COLOR_H = 30; // Orange-ish
+const TORPEDO_COLOR_S = 80;
+const TORPEDO_COLOR_B = 90;
+const TORPEDO_COLOR_A = 220; // Slightly more opaque
+
+// New Torpedo Trail Particle Constants
+const TORPEDO_TRAIL_PARTICLE_SPAWN_CHANCE = 0.7; // High chance per frame per torpedo
+const TORPEDO_TRAIL_PARTICLE_MAX_LIFESPAN = 40; // Shorter lifespan
+const TORPEDO_TRAIL_PARTICLE_MIN_SIZE = 0.5;
+const TORPEDO_TRAIL_PARTICLE_MAX_SIZE = 1.5;
+const TORPEDO_TRAIL_PARTICLE_SPEED_MIN = 0.1; // Slow drift
+const TORPEDO_TRAIL_PARTICLE_SPEED_MAX = 0.3;
+const TORPEDO_TRAIL_PARTICLE_SPREAD_ANGLE = Math.PI / 4; // Cone of spread for particles - USE Math.PI
+const TORPEDO_TRAIL_OFFSET_FACTOR = -1.8; // How far behind the torpedo center particles spawn (negative of TORPEDO_BODY_LENGTH_FACTOR / 2)
+const TORPEDO_TRAIL_PARTICLE_COLOR_H = 180; // Similar to sonar bubbles
+const TORPEDO_TRAIL_PARTICLE_COLOR_S = 60;
+const TORPEDO_TRAIL_PARTICLE_COLOR_B = 90;
+const TORPEDO_TRAIL_PARTICLE_ALPHA_MAX = 150;
+
 
 // Enemy Constants
 const ENEMY_RADIUS = 14; // Note: PlayerSub also has radius 14, consider if they should differ
@@ -281,7 +306,8 @@ let player;
 let cave;
 let enemies = [];
 let projectiles = [];
-let sonarBubbles = []; // New: Array for sonar bubbles
+let sonarBubbles = [];
+let particles = []; // New global array for torpedo trail particles
 let cameraOffsetX, cameraOffsetY;
 let gameState = 'start';
 let currentLevel = 1;
@@ -291,16 +317,76 @@ class Projectile {
   constructor(x, y, angle) {
     this.pos = createVector(x, y);
     this.vel = p5.Vector.fromAngle(angle).mult(PROJECTILE_SPEED);
-    this.radius = PROJECTILE_RADIUS; this.life = PROJECTILE_LIFESPAN_FRAMES;
+    this.radius = PROJECTILE_RADIUS; // Base size for torpedo
+    this.life = PROJECTILE_LIFESPAN_FRAMES;
+    this.angle = angle; // Store the angle for rendering and trail
   }
   update(cave) {
     this.pos.add(this.vel); this.life--;
+
+    // Spawn trail particles
+    if (random() < TORPEDO_TRAIL_PARTICLE_SPAWN_CHANCE) {
+        let particleAngleOffset = random(-TORPEDO_TRAIL_PARTICLE_SPREAD_ANGLE / 2, TORPEDO_TRAIL_PARTICLE_SPREAD_ANGLE / 2);
+        let particleBaseAngle = this.angle + Math.PI; // Particles move away from torpedo's rear
+        let finalParticleAngle = particleBaseAngle + particleAngleOffset;
+
+        let particleSpeed = random(TORPEDO_TRAIL_PARTICLE_SPEED_MIN, TORPEDO_TRAIL_PARTICLE_SPEED_MAX);
+        let particleVelX = cos(finalParticleAngle) * particleSpeed;
+        let particleVelY = sin(finalParticleAngle) * particleSpeed;
+
+        // Spawn particles from the rear of the torpedo
+        let trailSpawnX = this.pos.x + cos(this.angle) * (this.radius * TORPEDO_TRAIL_OFFSET_FACTOR);
+        let trailSpawnY = this.pos.y + sin(this.angle) * (this.radius * TORPEDO_TRAIL_OFFSET_FACTOR);
+
+        particles.push(new Particle(
+            trailSpawnX,
+            trailSpawnY,
+            particleVelX,
+            particleVelY,
+            TORPEDO_TRAIL_PARTICLE_MAX_LIFESPAN,
+            TORPEDO_TRAIL_PARTICLE_MIN_SIZE,
+            TORPEDO_TRAIL_PARTICLE_MAX_SIZE,
+            TORPEDO_TRAIL_PARTICLE_COLOR_H,
+            TORPEDO_TRAIL_PARTICLE_COLOR_S,
+            TORPEDO_TRAIL_PARTICLE_COLOR_B,
+            TORPEDO_TRAIL_PARTICLE_ALPHA_MAX
+        ));
+    }
+
     // Check collision with a smaller radius for projectiles to feel more accurate
     if (cave.isWall(this.pos.x, this.pos.y, this.radius * PROJECTILE_WALL_COLLISION_RADIUS_FACTOR)) this.life = 0;
   }
   render(offsetX, offsetY) {
-    push(); fill(PROJECTILE_COLOR_H, PROJECTILE_COLOR_S, PROJECTILE_COLOR_B, PROJECTILE_COLOR_A); noStroke();
-    ellipse(this.pos.x - offsetX, this.pos.y - offsetY, this.radius * 2); pop();
+    push();
+    translate(this.pos.x - offsetX, this.pos.y - offsetY);
+    rotate(this.angle); // Rotate by the stored angle
+
+    rectMode(CENTER);
+    fill(TORPEDO_COLOR_H, TORPEDO_COLOR_S, TORPEDO_COLOR_B, TORPEDO_COLOR_A);
+    noStroke();
+
+    let bodyLen = this.radius * TORPEDO_BODY_LENGTH_FACTOR;
+    let bodyWid = this.radius * TORPEDO_BODY_WIDTH_FACTOR;
+
+    // Body
+    rect(0, 0, bodyLen, bodyWid);
+
+    // Fins
+    // TORPEDO_FIN_SIZE_FACTOR determines the fin's dimension extending outwards from the body.
+    // TORPEDO_FIN_OFFSET_FACTOR determines how far back from the torpedo's center the fin's center is.
+    let finOutwardSize = this.radius * TORPEDO_FIN_SIZE_FACTOR;
+    let finBodyLength = bodyLen * 0.35; // Fin length along the torpedo's body (e.g., 35% of body length)
+    let finCenterX = -this.radius * TORPEDO_FIN_OFFSET_FACTOR; // Negative to place it towards the rear
+
+    // Top Fin: Extends upwards from the body
+    // rect(x_center_of_fin, y_center_of_fin, fin_length_along_torpedo, fin_width_extending_outward)
+    rect(finCenterX, -bodyWid / 2 - finOutwardSize / 2, finBodyLength, finOutwardSize);
+
+    // Bottom Fin: Extends downwards from the body
+    rect(finCenterX,  bodyWid / 2 + finOutwardSize / 2, finBodyLength, finOutwardSize);
+    
+    rectMode(CORNER); // Reset rectMode
+    pop();
   }
   isOffscreen() { return this.life <= 0; }
 }
@@ -324,6 +410,38 @@ class SonarBubble {
     let ageRatio = this.lifespan / this.initialLifespan;
     let alpha = SONAR_BUBBLE_ALPHA_MAX * ageRatio;
     fill(SONAR_BUBBLE_COLOR_H, SONAR_BUBBLE_COLOR_S, SONAR_BUBBLE_COLOR_B, alpha);
+    noStroke();
+    ellipse(this.pos.x - offsetX, this.pos.y - offsetY, this.size);
+  }
+
+  isOffscreen() {
+    return this.lifespan <= 0;
+  }
+}
+
+// --- Particle Class (for Torpedo Trails and other effects) ---
+class Particle {
+  constructor(x, y, velX, velY, lifespan, minSize, maxSize, colorH, colorS, colorB, alphaMax) {
+    this.pos = createVector(x, y);
+    this.vel = createVector(velX, velY);
+    this.lifespan = lifespan;
+    this.initialLifespan = lifespan;
+    this.size = random(minSize, maxSize);
+    this.colorH = colorH;
+    this.colorS = colorS;
+    this.colorB = colorB;
+    this.alphaMax = alphaMax;
+  }
+
+  update() {
+    this.pos.add(this.vel);
+    this.lifespan--;
+  }
+
+  render(offsetX, offsetY) {
+    let ageRatio = this.lifespan / this.initialLifespan;
+    let currentAlpha = this.alphaMax * ageRatio;
+    fill(this.colorH, this.colorS, this.colorB, currentAlpha);
     noStroke();
     ellipse(this.pos.x - offsetX, this.pos.y - offsetY, this.size);
   }
@@ -792,6 +910,7 @@ function initGameObjects() {
   
   enemies = []; projectiles = [];
   sonarBubbles = []; // Initialize sonar bubbles array
+  particles = []; // Initialize global particles array
   let enemyCount = BASE_ENEMY_COUNT + (currentLevel - 1) * ENEMY_COUNT_PER_LEVEL_INCREASE;
   enemyCount = min(enemyCount, MAX_ENEMY_COUNT); // Cap enemy count
   for (let i = 0; i < enemyCount; i++) {
@@ -812,6 +931,7 @@ function resetGame() {
   player.lastSonarTime = frameCount - player.sonarCooldown; // Allow immediate sonar
   player.lastShotTime = frameCount - player.shotCooldown;   // Allow immediate shot
   sonarBubbles = []; // Clear bubbles on reset
+  particles = []; // Clear global particles on reset
   gameState = 'start';
   if (audioInitialized && lowAirOsc && lowAirOsc.started) lowAirEnv.triggerRelease(lowAirOsc);
   lastLowAirBeepTime = 0; // Reset beep timer
@@ -943,6 +1063,15 @@ function draw() {
     }
   }
 
+  // Update and render Torpedo Trail Particles
+  for (let i = particles.length - 1; i >= 0; i--) {
+    particles[i].update();
+    particles[i].render(cameraOffsetX, cameraOffsetY);
+    if (particles[i].isOffscreen()) {
+      particles.splice(i, 1);
+    }
+  }
+
   player.update(cave, enemies);
   for (let enemy of enemies) enemy.update(cave); // Enemies update themselves
   // No explicit enemy render call here, sonar handles their "visibility"
@@ -975,7 +1104,7 @@ function draw() {
   text(`Enemies: ${enemies.length}`, HUD_MARGIN_X, HUD_MARGIN_Y + HUD_LINE_SPACING * 3);
   // Calculate distance to the center of the goal square
   let distanceToGoal = dist(player.pos.x, player.pos.y, cave.goalPos.x, cave.goalPos.y);
-  text(`Dist. to Reactor: ${floor(distanceToGoal)}`, HUD_MARGIN_X, HUD_MARGIN_Y + HUD_LINE_SPACING * 4);
+  text(`Distance to Reactor: ${floor(distanceToGoal)}`, HUD_MARGIN_X, HUD_MARGIN_Y + HUD_LINE_SPACING * 4);
 
   // Check Game Over / Level Complete Conditions
   if (player.health <= 0 || player.airSupply <= 0) {
@@ -983,7 +1112,7 @@ function draw() {
           playSound('gameOver');
       }
       gameState = 'gameOver';
-  } else if (player.pos.x > cave.exitX && enemies.length < LEVEL_EXIT_MAX_ENEMIES_THRESHOLD) {
+  } else if (cave.isGoal(player.pos.x, player.pos.y) && enemies.length < LEVEL_EXIT_MAX_ENEMIES_THRESHOLD) { // Use cave.isGoal() for level completion
     if (currentLevel >= MAX_LEVELS) {
         gameState = 'gameComplete';
     } else {
