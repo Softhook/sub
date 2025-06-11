@@ -1115,7 +1115,7 @@ function drawPlayingState() {
   cameraOffsetX = player.pos.x - width / 2; cameraOffsetY = player.pos.y - height / 2;
 
   // Render the goal square
-  cave.renderGoal(cameraOffsetX, cameraOffsetY);
+  //cave.renderGoal(cameraOffsetX, cameraOffsetY);
 
   // Process sonar bubbles, particles, and projectiles
   processGameObjectArray(sonarBubbles, cameraOffsetX, cameraOffsetY);
