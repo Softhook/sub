@@ -345,22 +345,21 @@ class Projectile {
     // Spawn trail particles
     if (random() < TORPEDO_TRAIL_PARTICLE_SPAWN_CHANCE) {
         let particleAngleOffset = random(-TORPEDO_TRAIL_PARTICLE_SPREAD_ANGLE / 2, TORPEDO_TRAIL_PARTICLE_SPREAD_ANGLE / 2);
-        let particleBaseAngle = this.angle + Math.PI; // Particles move away from torpedo's rear
+        let particleBaseAngle = this.angle + Math.PI; // Particles move away from torpedo\'s rear
         let finalParticleAngle = particleBaseAngle + particleAngleOffset;
-
         let particleSpeed = random(TORPEDO_TRAIL_PARTICLE_SPEED_MIN, TORPEDO_TRAIL_PARTICLE_SPEED_MAX);
-        let particleVelX = cos(finalParticleAngle) * particleSpeed;
-        let particleVelY = sin(finalParticleAngle) * particleSpeed;
-
+        
         // Spawn particles from the rear of the torpedo
         let trailSpawnX = this.pos.x + cos(this.angle) * (this.radius * TORPEDO_TRAIL_OFFSET_FACTOR);
         let trailSpawnY = this.pos.y + sin(this.angle) * (this.radius * TORPEDO_TRAIL_OFFSET_FACTOR);
 
+        let particleVel = p5.Vector.fromAngle(finalParticleAngle, particleSpeed); // More concise
+
         particles.push(new Particle(
             trailSpawnX,
             trailSpawnY,
-            particleVelX,
-            particleVelY,
+            particleVel.x, // Use components of the vector
+            particleVel.y,
             TORPEDO_TRAIL_PARTICLE_MAX_LIFESPAN,
             TORPEDO_TRAIL_PARTICLE_MIN_SIZE,
             TORPEDO_TRAIL_PARTICLE_MAX_SIZE,
@@ -882,31 +881,38 @@ function initializeSounds() {
 
 function playSound(soundName) {
   if (!audioInitialized || (getAudioContext() && getAudioContext().state !== 'running')) return;
+
+  function ensureStarted(soundObject) {
+    if (soundObject && !soundObject.started && typeof soundObject.start === 'function') {
+      soundObject.start();
+    }
+  }
+
   try {
     if (soundName === 'sonar') {
-      if (!sonarOsc.started) sonarOsc.start(); sonarOsc.freq(SONAR_FREQ); sonarEnv.play(sonarOsc);
+      ensureStarted(sonarOsc); sonarOsc.freq(SONAR_FREQ); sonarEnv.play(sonarOsc);
     } else if (soundName === 'explosion') {
-      if (!explosionNoise.started) explosionNoise.start(); explosionEnv.play(explosionNoise);
-      if (!explosionBoomOsc.started) explosionBoomOsc.start(); explosionBoomOsc.freq(random(EXPLOSION_BOOM_MIN_FREQ, EXPLOSION_BOOM_MAX_FREQ)); explosionBoomEnv.play(explosionBoomOsc);
+      ensureStarted(explosionNoise); explosionEnv.play(explosionNoise);
+      ensureStarted(explosionBoomOsc); explosionBoomOsc.freq(random(EXPLOSION_BOOM_MIN_FREQ, EXPLOSION_BOOM_MAX_FREQ)); explosionBoomEnv.play(explosionBoomOsc);
     } else if (soundName === 'bump') {
-      if (!bumpOsc.started) bumpOsc.start(); bumpOsc.freq(BUMP_FREQ); bumpEnv.play(bumpOsc);
+      ensureStarted(bumpOsc); bumpOsc.freq(BUMP_FREQ); bumpEnv.play(bumpOsc);
     } else if (soundName === 'torpedo') {
-      if (!torpedoNoise.started) torpedoNoise.start(); torpedoEnv.play(torpedoNoise);
+      ensureStarted(torpedoNoise); torpedoEnv.play(torpedoNoise);
     } else if (soundName === 'lowAir') {
-      if (!lowAirOsc.started) lowAirOsc.start(); lowAirOsc.freq(LOW_AIR_FREQ); lowAirEnv.play(lowAirOsc);
+      ensureStarted(lowAirOsc); lowAirOsc.freq(LOW_AIR_FREQ); lowAirEnv.play(lowAirOsc);
     } else if (soundName === 'gameOver') {
-      if (!gameOverImpactNoise.started) gameOverImpactNoise.start();
+      ensureStarted(gameOverImpactNoise);
       gameOverImpactEnv.play(gameOverImpactNoise);
 
       setTimeout(() => {
-        if (!gameOverGroanOsc.started) gameOverGroanOsc.start();
+        ensureStarted(gameOverGroanOsc);
         gameOverGroanOsc.freq(random(GAME_OVER_GROAN_MIN_FREQ, GAME_OVER_GROAN_MAX_FREQ));
         gameOverGroanEnv.play(gameOverGroanOsc);
         gameOverGroanOsc.freq(GAME_OVER_GROAN_PITCH_DOWN_TARGET_FREQ, GAME_OVER_GROAN_PITCH_DOWN_TIME, GAME_OVER_GROAN_PITCH_DOWN_DELAY); // Pitch down
       }, GAME_OVER_GROAN_DELAY_MS);
 
       setTimeout(() => {
-        if (!gameOverFinalBoomNoise.started) gameOverFinalBoomNoise.start();
+        ensureStarted(gameOverFinalBoomNoise);
         gameOverFinalBoomEnv.play(gameOverFinalBoomNoise);
       }, GAME_OVER_FINAL_BOOM_DELAY_MS);
     }
@@ -995,26 +1001,27 @@ function prepareNextLevel() {
 }
 
 function startAudioRoutine() {
-    function startOscillators() {
-        if (sonarOsc && !sonarOsc.started) sonarOsc.start();
-        if (explosionNoise && !explosionNoise.started) explosionNoise.start();
-        if (explosionBoomOsc && !explosionBoomOsc.started) explosionBoomOsc.start();
-        if (bumpOsc && !bumpOsc.started) bumpOsc.start();
-        if (torpedoNoise && !torpedoNoise.started) torpedoNoise.start();
-        if (lowAirOsc && !lowAirOsc.started) lowAirOsc.start();
-        if (gameOverImpactNoise && !gameOverImpactNoise.started) gameOverImpactNoise.start();
-        if (gameOverGroanOsc && !gameOverGroanOsc.started) gameOverGroanOsc.start();
-        if (gameOverFinalBoomNoise && !gameOverFinalBoomNoise.started) gameOverFinalBoomNoise.start();
+    function startAllSoundObjects() {
+        const soundObjects = [
+            sonarOsc, explosionNoise, explosionBoomOsc, bumpOsc, torpedoNoise, 
+            lowAirOsc, gameOverImpactNoise, gameOverGroanOsc, gameOverFinalBoomNoise
+        ];
+        for (const soundObj of soundObjects) {
+            if (soundObj && !soundObj.started && typeof soundObj.start === 'function') {
+                soundObj.start();
+            }
+        }
     }
+
     if (typeof userStartAudio === 'function') {
-        userStartAudio().then(() => { audioInitialized = true; startOscillators(); })
+        userStartAudio().then(() => { audioInitialized = true; startAllSoundObjects(); })
                         .catch(e => { /* console.error("userStartAudio error", e); */ });
     } else {
         let ctx = getAudioContext();
         if (ctx && ctx.state !== 'running') {
-            ctx.resume().then(() => { audioInitialized = true; startOscillators(); })
+            ctx.resume().then(() => { audioInitialized = true; startAllSoundObjects(); })
                         .catch(e => { /* console.error("AudioContext.resume error", e); */ });
-        } else if (ctx && ctx.state === 'running') { audioInitialized = true; startOscillators(); }
+        } else if (ctx && ctx.state === 'running') { audioInitialized = true; startAllSoundObjects(); }
     }
 }
 
