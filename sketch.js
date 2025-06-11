@@ -68,10 +68,10 @@ const PLAYER_PROPELLER_THICKNESS_FACTOR = 0.3;   // New: Thickness of the propel
 const PLAYER_PROPELLER_SPIN_SPEED_FACTOR = 0.2; // How fast it appears to spin (adjust for visual preference)
 
 // Projectile Constants
-const PROJECTILE_SPEED = 10;
-const PROJECTILE_RADIUS = 4;
+const PROJECTILE_SPEED = 3;
+const PROJECTILE_RADIUS = 3;
 const PROJECTILE_LIFESPAN_FRAMES = 100;
-const PLAYER_SHOT_COOLDOWN_FRAMES = 30;
+const PLAYER_SHOT_COOLDOWN_FRAMES = 70;
 const PROJECTILE_WALL_COLLISION_RADIUS_FACTOR = 0.5; // For more accurate feel
 
 // Enemy Constants
@@ -162,7 +162,7 @@ const GAME_OVER_GROAN_PITCH_DOWN_DELAY = 0.1;
 const GAME_OVER_FINAL_BOOM_ENV_ADSR = { aT: 0.05, dT: 0.8, sR: 0, rT: 0.5 };
 const GAME_OVER_FINAL_BOOM_ENV_LEVELS = { aL: 0.7, rL: 0 };
 const GAME_OVER_GROAN_DELAY_MS = 50;
-const GAME_OVER_FINAL_BOOM_DELAY_MS = 800;
+const GAME_OVER_FINAL_BOOM_DELAY_MS = 2000;
 
 // UI Colors & Styles
 const BACKGROUND_COLOR_H = 220; const BACKGROUND_COLOR_S = 70; const BACKGROUND_COLOR_B = 15;
