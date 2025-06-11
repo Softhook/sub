@@ -947,7 +947,7 @@ function setup() {
 }
 
 function initGameObjects() {
-  currentCellSize = BASE_CELL_SIZE + (currentLevel - 1) * 20; // Calculate current cell size
+  currentCellSize = BASE_CELL_SIZE + (currentLevel - 1) * 10; // Calculate current cell size
 
   let baseAir = INITIAL_AIR_SUPPLY_BASE;
   let airForLevel = baseAir - (currentLevel - 1) * AIR_SUPPLY_LEVEL_REDUCTION;
