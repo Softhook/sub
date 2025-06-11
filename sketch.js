@@ -47,18 +47,29 @@ const PLAYER_SONAR_HIT_SIZE_MIN = 3;
 const PLAYER_SONAR_HIT_OFFSCREEN_BUFFER = 20;
 const PLAYER_SONAR_ENEMY_HIT_SIZE_FACTOR = 1.3;
 
-// Sonar Bubbles
-const SONAR_BUBBLES_PER_FIRE = 3; // Number of bubbles when sonar fires
-const SONAR_BUBBLE_SPAWN_RADIUS_AROUND_SUB = 60; // Max distance from sub center for bubble spawn
-// const SONAR_BUBBLE_COUNT_PER_WALL_HIT = 1; // No longer used - bubbles spawn around sub
-const SONAR_BUBBLE_MAX_LIFESPAN_FRAMES = 75; // How long bubbles last (slightly reduced for more dynamic feel)
-const SONAR_BUBBLE_MIN_SPEED_Y = 0.2;      // Min upward speed (slightly increased)
-const SONAR_BUBBLE_MAX_SPEED_Y = 0.5;      // Max upward speed (slightly increased)
-const SONAR_BUBBLE_MIN_SIZE = 2;
-const SONAR_BUBBLE_MAX_SIZE = 6; // Slightly larger max size
-// const SONAR_BUBBLE_SPAWN_RADIUS_OFFSET = 10; // No longer used by SonarBubble constructor
-const SONAR_BUBBLE_COLOR_H = 180; const SONAR_BUBBLE_COLOR_S = 70; const SONAR_BUBBLE_COLOR_B = 95; // Brighter bubbles
-const SONAR_BUBBLE_ALPHA_MAX = 180; // Brighter alpha
+// Sonar Bubbles (Now Propeller Bubbles - constants might be reused or renamed)
+// const SONAR_BUBBLES_PER_FIRE = 3; // No longer used
+// const SONAR_BUBBLE_SPAWN_RADIUS_AROUND_SUB = 60; // No longer used for sonar fire
+const SONAR_BUBBLE_GROUP_SPAWN_CHANCE = 0.3; // Kept for reference, but new mechanism below
+const SONAR_BUBBLE_MAX_COUNT = 5; // Kept for reference
+// const SONAR_BUBBLE_COUNT_PER_WALL_HIT = 1; // No longer used
+const SONAR_BUBBLE_MAX_LIFESPAN_FRAMES = 75;
+const SONAR_BUBBLE_MIN_SPEED_Y = 0.2;
+const SONAR_BUBBLE_MAX_SPEED_Y = 0.5;
+const SONAR_BUBBLE_MIN_SIZE = 1;
+const SONAR_BUBBLE_MAX_SIZE = 2;
+const SONAR_BUBBLE_COLOR_H = 180; const SONAR_BUBBLE_COLOR_S = 70; const SONAR_BUBBLE_COLOR_B = 95;
+const SONAR_BUBBLE_ALPHA_MAX = 180;
+
+// Propeller Bubble Constants
+const PLAYER_PROPELLER_X_OFFSET_FACTOR = -1.2; // Offset from player center, behind the body
+const PLAYER_PROPELLER_MAX_SIDE_HEIGHT_FACTOR = 0.8; // New: Max apparent height from side view (relative to player radius)
+const PLAYER_PROPELLER_THICKNESS_FACTOR = 0.3;   // New: Thickness of the propeller from side view (relative to player radius)
+const PLAYER_PROPELLER_SPIN_SPEED_FACTOR = 0.2; // How fast it appears to spin (adjust for visual preference)
+const PROPELLER_BUBBLE_SPAWN_CHANCE_MOVING = 0.4; // Chance each frame when moving
+const PROPELLER_BUBBLE_MAX_COUNT_PER_SPAWN = 1;  // Max bubbles if chance passes
+const PROPELLER_BUBBLE_SPAWN_X_OFFSET_FACTOR = PLAYER_PROPELLER_X_OFFSET_FACTOR; // Spawn near propeller
+const PROPELLER_BUBBLE_SPAWN_AREA_RADIUS = 8; // Small radius for spawn randomization
 
 
 // Player Rendering
@@ -74,12 +85,6 @@ const PLAYER_FIN_X3_FACTOR = -1.4; const PLAYER_FIN_Y3_FACTOR = 0.3;
 const PLAYER_FIN_X4_FACTOR = -1.4; const PLAYER_FIN_Y4_FACTOR = -0.3;
 const PLAYER_SONAR_ARC_RADIUS_FACTOR = 3.5;
 const PLAYER_SHOT_ARC_RADIUS_FACTOR = 2.5;
-
-// Player Propeller Rendering (Side View)
-const PLAYER_PROPELLER_X_OFFSET_FACTOR = -1.2; // Offset from player center, behind the body
-const PLAYER_PROPELLER_MAX_SIDE_HEIGHT_FACTOR = 0.8; // New: Max apparent height from side view (relative to player radius)
-const PLAYER_PROPELLER_THICKNESS_FACTOR = 0.3;   // New: Thickness of the propeller from side view (relative to player radius)
-const PLAYER_PROPELLER_SPIN_SPEED_FACTOR = 0.2; // How fast it appears to spin (adjust for visual preference)
 
 // Projectile Constants
 const PROJECTILE_SPEED = 3;
@@ -249,12 +254,12 @@ const KEY_CODE_D = 68;
 // Note: ENTER key is already a p5.js constant, no need to redefine.
 
 // Sound objects
-let sonarOsc, sonarEnv;
-let explosionNoise, explosionEnv, explosionBoomOsc, explosionBoomEnv; // Enemy Explosion
-let bumpOsc, bumpEnv;
-let torpedoNoise, torpedoEnv; // Changed from Osc to Noise for woosh
-let lowAirOsc, lowAirEnv;
-let gameOverImpactNoise, gameOverImpactEnv, gameOverGroanOsc, gameOverGroanEnv, gameOverFinalBoomNoise, gameOverFinalBoomEnv; // Sub Destruction
+var sonarOsc, sonarEnv;
+var explosionNoise, explosionEnv, explosionBoomOsc, explosionBoomEnv; // Enemy Explosion
+var bumpOsc, bumpEnv;
+var torpedoNoise, torpedoEnv; // Changed from Osc to Noise for woosh
+var lowAirOsc, lowAirEnv;
+var gameOverImpactNoise, gameOverImpactEnv, gameOverGroanOsc, gameOverGroanEnv, gameOverFinalBoomNoise, gameOverFinalBoomEnv; // Sub Destruction
 
 let audioInitialized = false;
 let lastLowAirBeepTime = 0;
@@ -396,15 +401,6 @@ class PlayerSub {
   fireSonar(cave, enemies) {
     this.lastSonarTime = frameCount; playSound('sonar');
 
-    // Create sonar bubbles around the player
-    for (let i = 0; i < SONAR_BUBBLES_PER_FIRE; i++) {
-      let angle = random(TWO_PI);
-      let distOffset = random(this.radius, SONAR_BUBBLE_SPAWN_RADIUS_AROUND_SUB + this.radius); // Spawn outside sub, up to radius
-      let bubbleX = this.pos.x + cos(angle) * distOffset;
-      let bubbleY = this.pos.y + sin(angle) * distOffset;
-      sonarBubbles.push(new SonarBubble(bubbleX, bubbleY));
-    }
-
     for (let i = 0; i < this.sonarPulses; i++) {
       let rayAngle = this.angle - PI + (TWO_PI / this.sonarPulses) * i; // Sonar sweeps around the sub
       let hitDetectedOnRay = false;
@@ -447,6 +443,27 @@ class PlayerSub {
     // Update propeller angle based on movement
     if (this.vel.magSq() > 0.01) { // Check if moving (magSq is cheaper than mag)
         this.propellerAngle += this.vel.mag() * PLAYER_PROPELLER_SPIN_SPEED_FACTOR;
+
+        // Generate propeller bubbles
+        if (random() < PROPELLER_BUBBLE_SPAWN_CHANCE_MOVING) {
+            let numBubbles = floor(random(1, PROPELLER_BUBBLE_MAX_COUNT_PER_SPAWN + 1));
+            for (let i = 0; i < numBubbles; i++) {
+                // Calculate bubble spawn position relative to player center, then rotate by player angle
+                let relativeSpawnX = this.radius * PROPELLER_BUBBLE_SPAWN_X_OFFSET_FACTOR;
+                let relativeSpawnY = 0; // Bubbles originate from the center of the propeller vertically
+
+                // Add small random offset
+                let offsetX = random(-PROPELLER_BUBBLE_SPAWN_AREA_RADIUS, PROPELLER_BUBBLE_SPAWN_AREA_RADIUS);
+                let offsetY = random(-PROPELLER_BUBBLE_SPAWN_AREA_RADIUS, PROPELLER_BUBBLE_SPAWN_AREA_RADIUS);
+
+                let rotatedOffsetX = cos(this.angle) * (relativeSpawnX + offsetX) - sin(this.angle) * offsetY;
+                let rotatedOffsetY = sin(this.angle) * (relativeSpawnX + offsetX) + cos(this.angle) * offsetY;
+                
+                let bubbleX = this.pos.x + rotatedOffsetX;
+                let bubbleY = this.pos.y + rotatedOffsetY;
+                sonarBubbles.push(new SonarBubble(bubbleX, bubbleY));
+            }
+        }
     }
 
 
