@@ -7,7 +7,7 @@ const WORLD_HEIGHT = 2000;
 const MAX_LEVELS = 3;
 const INITIAL_AIR_SUPPLY_BASE = 4500; // Base air supply in frames
 const AIR_SUPPLY_LEVEL_REDUCTION = 600; // Air reduction per level
-const MIN_AIR_SUPPLY_PER_LEVEL = 1800; // Minimum air supply
+const MIN_AIR_SUPPLY_PER_LEVEL = 3000; // Minimum air supply
 const BASE_AIR_DEPLETION_RATE = 1; // Base air depletion per frame
 const AIR_DEPLETION_LEVEL_INCREASE = 0.1; // Additional depletion per level
 const LEVEL_EXIT_MAX_ENEMIES_THRESHOLD = 5; // Max enemies to exit level
@@ -467,17 +467,12 @@ class PlayerSub {
       }
     }
     // Sonar Cooldown Indicator
-    let sonarCycleProgress = (frameCount - this.lastSonarTime) / this.sonarCooldown;
-    sonarCycleProgress = sonarCycleProgress - floor(sonarCycleProgress); // Keep it 0-1
-    noFill(); strokeWeight(PLAYER_SONAR_ARC_WEIGHT); stroke(PLAYER_SONAR_ARC_COLOR_H, PLAYER_SONAR_ARC_COLOR_S, PLAYER_SONAR_ARC_COLOR_B, PLAYER_SONAR_ARC_COLOR_A);
-    arc(width / 2, height / 2, this.radius * PLAYER_SONAR_ARC_RADIUS_FACTOR, this.radius * PLAYER_SONAR_ARC_RADIUS_FACTOR, -PI / 2, -PI / 2 + TWO_PI * sonarCycleProgress);
+    //let sonarCycleProgress = (frameCount - this.lastSonarTime) / this.sonarCooldown;
+    //sonarCycleProgress = sonarCycleProgress - floor(sonarCycleProgress); // Keep it 0-1
+    //noFill(); strokeWeight(PLAYER_SONAR_ARC_WEIGHT); stroke(PLAYER_SONAR_ARC_COLOR_H, PLAYER_SONAR_ARC_COLOR_S, PLAYER_SONAR_ARC_COLOR_B, PLAYER_SONAR_ARC_COLOR_A);
+    //arc(width / 2, height / 2, this.radius * PLAYER_SONAR_ARC_RADIUS_FACTOR, this.radius * PLAYER_SONAR_ARC_RADIUS_FACTOR, -PI / 2, -PI / 2 + TWO_PI * sonarCycleProgress);
 
-    // Shot Cooldown Indicator
-    let shotCooldownProgress = min(1, (frameCount - this.lastShotTime) / this.shotCooldown);
-    if (shotCooldownProgress < 1) {
-      strokeWeight(PLAYER_SHOT_ARC_WEIGHT); stroke(PLAYER_SHOT_ARC_COLOR_H, PLAYER_SHOT_ARC_COLOR_S, PLAYER_SHOT_ARC_COLOR_B, PLAYER_SHOT_ARC_COLOR_A);
-      arc(width / 2, height / 2, this.radius * PLAYER_SHOT_ARC_RADIUS_FACTOR, this.radius * PLAYER_SHOT_ARC_RADIUS_FACTOR, -PI / 2, -PI / 2 + TWO_PI * shotCooldownProgress);
-    }
+
     strokeWeight(DEFAULT_STROKE_WEIGHT); // Reset stroke weight
   }
   handleEnemyCollisions(enemies) {
@@ -737,6 +732,7 @@ function draw() {
   background(BACKGROUND_COLOR_H, BACKGROUND_COLOR_S, BACKGROUND_COLOR_B);
 
   if (gameState === 'start') {
+    textAlign(CENTER, CENTER); // Ensure text is centered for this screen
     fill(START_SCREEN_TITLE_COLOR_H, START_SCREEN_TITLE_COLOR_S, START_SCREEN_TITLE_COLOR_B); textSize(START_SCREEN_TITLE_TEXT_SIZE);
     text(`DEEP SEA SONAR ${currentLevel > 1 ? '(Restart)': ''}`, width / 2, height / 2 + START_SCREEN_TITLE_Y_OFFSET);
     textSize(START_SCREEN_INFO_TEXT_SIZE);
@@ -754,6 +750,7 @@ function draw() {
     return;
   }
   if (gameState === 'levelComplete') {
+    textAlign(CENTER, CENTER); // Ensure text is centered for this screen
     fill(LEVEL_COMPLETE_TITLE_COLOR_H, LEVEL_COMPLETE_TITLE_COLOR_S, LEVEL_COMPLETE_TITLE_COLOR_B); textSize(LEVEL_COMPLETE_TITLE_TEXT_SIZE);
     text(`LEVEL ${currentLevel -1} CLEARED!`, width / 2, height / 2 + LEVEL_COMPLETE_TITLE_Y_OFFSET); // currentLevel was already incremented
     textSize(LEVEL_COMPLETE_INFO_TEXT_SIZE);
@@ -762,6 +759,7 @@ function draw() {
     return;
   }
   if (gameState === 'gameComplete') {
+    textAlign(CENTER, CENTER); // Ensure text is centered for this screen
     fill(GAME_COMPLETE_TITLE_COLOR_H, GAME_COMPLETE_TITLE_COLOR_S, GAME_COMPLETE_TITLE_COLOR_B); textSize(GAME_COMPLETE_TITLE_TEXT_SIZE);
     text("MISSION ACCOMPLISHED!", width / 2, height / 2 + GAME_COMPLETE_TITLE_Y_OFFSET);
     textSize(GAME_COMPLETE_INFO_TEXT_SIZE);
@@ -770,6 +768,7 @@ function draw() {
     return;
   }
   if (gameState === 'gameOver') {
+    textAlign(CENTER, CENTER); // Ensure text is centered for this screen
     fill(GAME_OVER_TITLE_COLOR_H, GAME_OVER_TITLE_COLOR_S, GAME_OVER_TITLE_COLOR_B); textSize(GAME_OVER_TITLE_TEXT_SIZE);
     text("GAME OVER", width / 2, height / 2 + GAME_OVER_TITLE_Y_OFFSET);
     textSize(GAME_OVER_INFO_TEXT_SIZE);
@@ -806,7 +805,7 @@ function draw() {
   player.render(cameraOffsetX, cameraOffsetY); // Player renders self and its sonar hits
 
   // HUD
-  fill(HUD_TEXT_COLOR_H, HUD_TEXT_COLOR_S, HUD_TEXT_COLOR_B); textSize(HUD_TEXT_SIZE); textAlign(LEFT, TOP);
+  fill(HUD_TEXT_COLOR_H, HUD_TEXT_COLOR_S, HUD_TEXT_COLOR_B); textSize(HUD_TEXT_SIZE); textAlign(LEFT, TOP); // HUD uses LEFT, TOP alignment
   text(`Level: ${currentLevel}/${MAX_LEVELS}`, HUD_MARGIN_X, HUD_MARGIN_Y);
   text(`Health: ${player.health}`, HUD_MARGIN_X, HUD_MARGIN_Y + HUD_LINE_SPACING);
   text(`Air: ${floor(player.airSupply / AIR_SUPPLY_FRAMES_TO_SECONDS_DIVISOR)}s (${floor(player.airSupply)})`, HUD_MARGIN_X, HUD_MARGIN_Y + HUD_LINE_SPACING * 2);
