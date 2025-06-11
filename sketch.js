@@ -118,6 +118,22 @@ const TORPEDO_TRAIL_PARTICLE_COLOR_S = 60;
 const TORPEDO_TRAIL_PARTICLE_COLOR_B = 90;
 const TORPEDO_TRAIL_PARTICLE_ALPHA_MAX = 150;
 
+// New Explosion Particle Constants
+const EXPLOSION_PARTICLE_COUNT_TORPEDO_WALL = 15;
+const EXPLOSION_PARTICLE_COUNT_TORPEDO_ENEMY = 25;
+const EXPLOSION_PARTICLE_MAX_LIFESPAN = 30; // Slightly longer than trail
+const EXPLOSION_PARTICLE_MIN_SIZE = 1;
+const EXPLOSION_PARTICLE_MAX_SIZE = 3;
+const EXPLOSION_PARTICLE_SPEED_MIN = 0.5;
+const EXPLOSION_PARTICLE_SPEED_MAX = 1.1; // Faster than trail
+const EXPLOSION_PARTICLE_COLOR_H_WALL = 200; // Bluish-grey for wall impact
+const EXPLOSION_PARTICLE_COLOR_S_WALL = 10;
+const EXPLOSION_PARTICLE_COLOR_B_WALL = 70;
+const EXPLOSION_PARTICLE_COLOR_H_ENEMY = 30; // Orange/Yellow for enemy explosion
+const EXPLOSION_PARTICLE_COLOR_S_ENEMY = 90;
+const EXPLOSION_PARTICLE_COLOR_B_ENEMY = 90;
+const EXPLOSION_PARTICLE_ALPHA_MAX = 200;
+
 
 // Enemy Constants
 const ENEMY_RADIUS = 14; // Note: PlayerSub also has radius 14, consider if they should differ
@@ -373,7 +389,11 @@ class Projectile {
     }
 
     // Check collision with a smaller radius for projectiles to feel more accurate
-    if (cave.isWall(this.pos.x, this.pos.y, this.radius * PROJECTILE_WALL_COLLISION_RADIUS_FACTOR)) this.life = 0;
+    if (cave.isWall(this.pos.x, this.pos.y, this.radius * PROJECTILE_WALL_COLLISION_RADIUS_FACTOR)) {
+        this.life = 0;
+        createExplosion(this.pos.x, this.pos.y, 'wall');
+        playSound('explosion'); // Play explosion sound for wall hit
+    }
   }
   render(offsetX, offsetY) {
     push();
@@ -1006,6 +1026,39 @@ function resetGame() {
   lastLowAirBeepTime = 0; // Reset beep timer
 }
 
+// --- Helper function to create explosions ---
+function createExplosion(x, y, type) {
+  let particleCount = 0;
+  let colorH, colorS, colorB;
+
+  if (type === 'wall') {
+    particleCount = EXPLOSION_PARTICLE_COUNT_TORPEDO_WALL;
+    colorH = EXPLOSION_PARTICLE_COLOR_H_WALL;
+    colorS = EXPLOSION_PARTICLE_COLOR_S_WALL;
+    colorB = EXPLOSION_PARTICLE_COLOR_B_WALL;
+  } else if (type === 'enemy') {
+    particleCount = EXPLOSION_PARTICLE_COUNT_TORPEDO_ENEMY;
+    colorH = EXPLOSION_PARTICLE_COLOR_H_ENEMY;
+    colorS = EXPLOSION_PARTICLE_COLOR_S_ENEMY;
+    colorB = EXPLOSION_PARTICLE_COLOR_B_ENEMY;
+  }
+
+  for (let i = 0; i < particleCount; i++) {
+    let angle = random(TWO_PI);
+    let speed = random(EXPLOSION_PARTICLE_SPEED_MIN, EXPLOSION_PARTICLE_SPEED_MAX);
+    let vel = p5.Vector.fromAngle(angle, speed);
+    particles.push(new Particle(
+      x, y, 
+      vel.x, vel.y, 
+      EXPLOSION_PARTICLE_MAX_LIFESPAN, 
+      EXPLOSION_PARTICLE_MIN_SIZE, 
+      EXPLOSION_PARTICLE_MAX_SIZE, 
+      colorH, colorS, colorB, 
+      EXPLOSION_PARTICLE_ALPHA_MAX
+    ));
+  }
+}
+
 function prepareNextLevel() {
   currentLevel++; initGameObjects(); // This will create new cave, player (with new air), enemies
   // Player position is set by initGameObjects to a safe start in the new cave
@@ -1132,6 +1185,7 @@ function drawPlayingState() {
       if (projectiles[i] && enemies[j]) {
         let d = dist(projectiles[i].pos.x, projectiles[i].pos.y, enemies[j].pos.x, enemies[j].pos.y);
         if (d < projectiles[i].radius + enemies[j].radius) {
+          createExplosion(projectiles[i].pos.x, projectiles[i].pos.y, 'enemy'); // Create enemy explosion before splicing
           enemies.splice(j, 1); 
           projectiles.splice(i, 1); 
           playSound('explosion'); 
