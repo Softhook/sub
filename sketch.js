@@ -151,13 +151,13 @@ const ENEMY_HOMING_START_LEVEL = 0; // New: Level at which enemies start homing
 const ENEMY_HOMING_CHANCE = 0.3; // 30% chance of homing behavior
 
 // Jellyfish Constants
-const JELLYFISH_RADIUS = 28; // Larger than regular enemies
+const JELLYFISH_RADIUS = 30; // Larger than regular enemies
 const JELLYFISH_HEALTH = 2; // Requires 2 hits
 const JELLYFISH_DAMAGE = 30; // More damage than regular enemies (was 20)
 const JELLYFISH_MIN_SPEED = 0.2; // Slower than regular enemies
 const JELLYFISH_MAX_SPEED = 0.5;
 const JELLYFISH_TENTACLE_COUNT = 8; // Number of tentacles
-const JELLYFISH_TENTACLE_LENGTH = 20; // Length of tentacles
+const JELLYFISH_TENTACLE_LENGTH = 40; // Length of tentacles
 const JELLYFISH_BODY_COLOR_H = 280; // Purple/magenta hue
 const JELLYFISH_BODY_COLOR_S = 80;
 const JELLYFISH_BODY_COLOR_B = 70;
@@ -201,7 +201,7 @@ const PLAYER_START_X_ATTEMPT_INCREMENT_CELLS = 0.2;
 const PLAYER_START_Y_RANDOM_RANGE_CELLS = 4; // +/- from center
 const PLAYER_SPAWN_MAX_X_SEARCH_FACTOR = 1/5; // Max distance to search for player spawn (world width factor)
 
-const BASE_ENEMY_COUNT = 5; // Initial number of enemies at level 1
+const BASE_ENEMY_COUNT = 4; // Initial number of enemies at level 1
 const ENEMY_COUNT_PER_LEVEL_INCREASE = 5; // How many more enemies per level
 const MAX_ENEMY_COUNT = 30; // Absolute maximum number of enemies
 const ENEMY_SPAWN_MIN_X_WORLD_FACTOR = 0.15; // Spawn enemies in this fraction of world width
@@ -679,7 +679,7 @@ class PlayerSub {
           if (p5.Vector.dist(createVector(checkX, checkY), enemy.pos) < enemy.radius) {
             this.sonarHits.push({ x: checkX, y: checkY, type: 'enemy', receivedAt: frameCount, intensity: map(dist, 0, this.sonarRange, PLAYER_SONAR_ENEMY_INTENSITY_MAX, PLAYER_SONAR_ENEMY_INTENSITY_MIN) });
             hitDetectedOnRay = true; 
-                // Play creature growl when enemy spawns
+                // Play creature growl when enemy hit by sonar
             playSound('creatureGrowl');
             break;
           }
@@ -691,6 +691,7 @@ class PlayerSub {
           if (p5.Vector.dist(createVector(checkX, checkY), jelly.pos) < jelly.radius) {
             this.sonarHits.push({ x: checkX, y: checkY, type: 'jellyfish', receivedAt: frameCount, intensity: map(dist, 0, this.sonarRange, PLAYER_SONAR_ENEMY_INTENSITY_MAX, PLAYER_SONAR_ENEMY_INTENSITY_MIN) });
             hitDetectedOnRay = true;
+            playSound('creatureGrowl');
             break;
           }
         }
@@ -956,9 +957,6 @@ class Jellyfish {
     for (let i = 0; i < JELLYFISH_TENTACLE_COUNT; i++) {
       this.tentacleOffsets.push(random(TWO_PI));
     }
-    
-    // Play creature growl when jellyfish spawns (deeper/different pitch)
-    playSound('creatureGrowl');
   }
   
   update(cave, player) {
