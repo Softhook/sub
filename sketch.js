@@ -656,6 +656,7 @@ class PlayerSub {
   }
   fireSonar(cave, enemies, jellyfish) {
     this.lastSonarTime = frameCount; playSound('sonar');
+    let playerInGoal = cave.isGoal(this.pos.x, this.pos.y); // Check if player is in goal
 
     for (let i = 0; i < this.sonarPulses; i++) {
       let rayAngle = this.angle - PI + (TWO_PI / this.sonarPulses) * i; // Sonar sweeps around the sub
@@ -665,7 +666,8 @@ class PlayerSub {
         let checkX = this.pos.x + cos(rayAngle) * dist; let checkY = this.pos.y + sin(rayAngle) * dist;
         
         // Check for goal hit first
-        if (cave.isGoal(checkX, checkY)) {
+        // Only detect goal with sonar if player is NOT in goal
+        if (!playerInGoal && cave.isGoal(checkX, checkY)) { 
             this.sonarHits.push({ 
                 x: checkX, y: checkY, type: 'goal', receivedAt: frameCount, 
                 intensity: map(dist, 0, this.sonarRange, PLAYER_SONAR_GOAL_HIT_INTENSITY_MAX, PLAYER_SONAR_GOAL_HIT_INTENSITY_MIN) 
@@ -1368,8 +1370,10 @@ function drawGameOverScreen() {
 function drawPlayingState() {
   cameraOffsetX = player.pos.x - width / 2; cameraOffsetY = player.pos.y - height / 2;
 
-  // Render the goal square
-  //cave.renderGoal(cameraOffsetX, cameraOffsetY);
+  // Render the goal square if player is inside it
+  if (cave.isGoal(player.pos.x, player.pos.y)) {
+    cave.renderGoal(cameraOffsetX, cameraOffsetY);
+  }
 
   // Process sonar bubbles, particles, and projectiles
   processGameObjectArray(sonarBubbles, cameraOffsetX, cameraOffsetY);
