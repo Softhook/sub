@@ -148,7 +148,22 @@ const ENEMY_AI_DECISION_INTERVAL_LEVEL_REDUCTION_FRAMES = 10; // Reduces max ran
 const ENEMY_AI_WALL_HIT_DECISION_MIN_INTERVAL_FRAMES = 20; // Quicker decision after hitting a wall
 const ENEMY_AI_WALL_HIT_DECISION_MAX_INTERVAL_FRAMES = 60;
 const ENEMY_HOMING_START_LEVEL = 0; // New: Level at which enemies start homing
-const ENEMY_HOMING_CHANCE = 0.6; // New: Chance (0-1) to home towards player on decision
+const ENEMY_HOMING_CHANCE = 0.3; // 30% chance of homing behavior
+
+// Jellyfish Constants
+const JELLYFISH_RADIUS = 28; // Larger than regular enemies
+const JELLYFISH_HEALTH = 2; // Requires 2 hits
+const JELLYFISH_DAMAGE = 30; // More damage than regular enemies (was 20)
+const JELLYFISH_MIN_SPEED = 0.2; // Slower than regular enemies
+const JELLYFISH_MAX_SPEED = 0.5;
+const JELLYFISH_TENTACLE_COUNT = 8; // Number of tentacles
+const JELLYFISH_TENTACLE_LENGTH = 20; // Length of tentacles
+const JELLYFISH_BODY_COLOR_H = 280; // Purple/magenta hue
+const JELLYFISH_BODY_COLOR_S = 80;
+const JELLYFISH_BODY_COLOR_B = 70;
+const JELLYFISH_TENTACLE_COLOR_H = 290;
+const JELLYFISH_TENTACLE_COLOR_S = 60;
+const JELLYFISH_TENTACLE_COLOR_B = 50;
 
 // Cave Generation
 const CAVE_EXIT_X_OFFSET_CELLS = 10; // How many cells from the right edge the exit starts
@@ -260,6 +275,7 @@ const PLAYER_COLOR_PROPELLER_H = 60; const PLAYER_COLOR_PROPELLER_S = 50; const 
 const PROJECTILE_COLOR_H = 60; const PROJECTILE_COLOR_S = 100; const PROJECTILE_COLOR_B = 100; const PROJECTILE_COLOR_A = 200;
 const PLAYER_SONAR_WALL_COLOR_H = 100; const PLAYER_SONAR_WALL_COLOR_S = 50; const PLAYER_SONAR_WALL_COLOR_B = 50;
 const PLAYER_SONAR_ENEMY_COLOR_H = 0; const PLAYER_SONAR_ENEMY_COLOR_S = 70; const PLAYER_SONAR_ENEMY_COLOR_B = 70;
+const PLAYER_SONAR_JELLYFISH_COLOR_H = 280; const PLAYER_SONAR_JELLYFISH_COLOR_S = 80; const PLAYER_SONAR_JELLYFISH_COLOR_B = 80; // Purple for jellyfish
 const PLAYER_SONAR_GOAL_COLOR_H = 60; const PLAYER_SONAR_GOAL_COLOR_S = 100; const PLAYER_SONAR_GOAL_COLOR_B = 100; // Yellow for goal
 const PLAYER_SONAR_ARC_WEIGHT = 3;
 const PLAYER_SONAR_ARC_COLOR_H = 120; const PLAYER_SONAR_ARC_COLOR_S = 100; const PLAYER_SONAR_ARC_COLOR_B = 100; const PLAYER_SONAR_ARC_COLOR_A = 100;
@@ -342,6 +358,7 @@ let lastLowAirBeepTime = 0;
 let player;
 let cave;
 let enemies = [];
+let jellyfish = []; // Array for jellyfish creatures
 let projectiles = [];
 let sonarBubbles = [];
 let particles = []; // New global array for torpedo trail particles
@@ -637,7 +654,7 @@ class PlayerSub {
     this.propellerAngle = 0; // For propeller animation
     // No need to store bubbles in player, they will be global
   }
-  fireSonar(cave, enemies) {
+  fireSonar(cave, enemies, jellyfish) {
     this.lastSonarTime = frameCount; playSound('sonar');
 
     for (let i = 0; i < this.sonarPulses; i++) {
@@ -667,7 +684,18 @@ class PlayerSub {
             break;
           }
         }
-        if (hitDetectedOnRay) break; // If enemy hit, don\'t check for wall at same spot
+        if (hitDetectedOnRay) break; // If enemy hit, don't check for wall at same spot
+        
+        // Check for jellyfish hits
+        for (let jelly of jellyfish) {
+          if (p5.Vector.dist(createVector(checkX, checkY), jelly.pos) < jelly.radius) {
+            this.sonarHits.push({ x: checkX, y: checkY, type: 'jellyfish', receivedAt: frameCount, intensity: map(dist, 0, this.sonarRange, PLAYER_SONAR_ENEMY_INTENSITY_MAX, PLAYER_SONAR_ENEMY_INTENSITY_MIN) });
+            hitDetectedOnRay = true;
+            break;
+          }
+        }
+        if (hitDetectedOnRay) break; // If jellyfish hit, don't check for wall at same spot
+        
         // Check for wall hits
         if (cave.isWall(checkX, checkY)) {
           this.sonarHits.push({ x: checkX, y: checkY, type: 'wall', receivedAt: frameCount, intensity: map(dist, 0, this.sonarRange, PLAYER_SONAR_WALL_INTENSITY_MAX, PLAYER_SONAR_WALL_INTENSITY_MIN) });
@@ -720,7 +748,7 @@ class PlayerSub {
     }
 
 
-    if (frameCount - this.lastSonarTime >= this.sonarCooldown) this.fireSonar(cave, currentEnemies);
+    if (frameCount - this.lastSonarTime >= this.sonarCooldown) this.fireSonar(cave, currentEnemies, jellyfish);
 
     this.vel.limit(this.maxSpeed); let nextPos = p5.Vector.add(this.pos, this.vel);
     if (cave.isWall(nextPos.x, nextPos.y, this.radius * PLAYER_COLLISION_RADIUS_FACTOR)) {
@@ -754,6 +782,7 @@ class PlayerSub {
         if (hit.type === 'wall') fill(PLAYER_SONAR_WALL_COLOR_H, PLAYER_SONAR_WALL_COLOR_S, PLAYER_SONAR_WALL_COLOR_B, alpha * hit.intensity);
         else if (hit.type === 'enemy') { fill(PLAYER_SONAR_ENEMY_COLOR_H, PLAYER_SONAR_ENEMY_COLOR_S, PLAYER_SONAR_ENEMY_COLOR_B, alpha * hit.intensity); hitSize *= PLAYER_SONAR_ENEMY_HIT_SIZE_FACTOR; }
         else if (hit.type === 'goal') { fill(PLAYER_SONAR_GOAL_HIT_COLOR_H, PLAYER_SONAR_GOAL_HIT_COLOR_S, PLAYER_SONAR_GOAL_HIT_COLOR_B, alpha * hit.intensity); } // Use goal sonar color
+        else if (hit.type === 'jellyfish') { fill(PLAYER_SONAR_JELLYFISH_COLOR_H, PLAYER_SONAR_JELLYFISH_COLOR_S, PLAYER_SONAR_JELLYFISH_COLOR_B, alpha * hit.intensity); hitSize *= PLAYER_SONAR_ENEMY_HIT_SIZE_FACTOR; } // Jellyfish sonar color
         noStroke(); ellipse(displayX, displayY, hitSize, hitSize);
       } else {
         this.sonarHits.splice(i, 1); // Remove old hits
@@ -841,6 +870,19 @@ class PlayerSub {
       }
     }
   }
+  handleJellyfishCollisions(jellyfish) {
+    for (let i = jellyfish.length - 1; i >= 0; i--) {
+      let jelly = jellyfish[i];
+      let d = dist(this.pos.x, this.pos.y, jelly.pos.x, jelly.pos.y);
+      if (d < this.radius * PLAYER_COLLISION_RADIUS_FACTOR + jelly.radius) {
+        this.health -= JELLYFISH_DAMAGE; // More damage than regular enemies
+        if (this.health < 0) this.health = 0;
+        let knockbackPlayer = p5.Vector.sub(this.pos, jelly.pos).normalize().mult(PLAYER_ENEMY_COLLISION_KNOCKBACK * 1.5); // Stronger knockback
+        this.vel.add(knockbackPlayer);
+        playSound('explosion'); // Play explosion sound for collision
+      }
+    }
+  }
 }
 
 // --- Enemy Class ---
@@ -894,6 +936,67 @@ class Enemy {
     // noStroke();
     // ellipse(this.pos.x - offsetX, this.pos.y - offsetY, this.radius * 2);
     // pop();
+  }
+}
+
+// --- Jellyfish Class ---
+class Jellyfish {
+  constructor(x, y) {
+    this.pos = createVector(x, y);
+    this.radius = JELLYFISH_RADIUS;
+    this.health = JELLYFISH_HEALTH;
+    this.maxHealth = JELLYFISH_HEALTH;
+    this.vel = p5.Vector.random2D().mult(random(JELLYFISH_MIN_SPEED, JELLYFISH_MAX_SPEED));
+    this.type = 'jellyfish';
+    this.nextDecisionTime = 0;
+    this.tentacleOffsets = []; // For tentacle animation
+    this.tentaclePhase = random(TWO_PI); // Random starting phase for animation
+    
+    // Initialize tentacle offsets for wavy animation
+    for (let i = 0; i < JELLYFISH_TENTACLE_COUNT; i++) {
+      this.tentacleOffsets.push(random(TWO_PI));
+    }
+    
+    // Play creature growl when jellyfish spawns (deeper/different pitch)
+    playSound('creatureGrowl');
+  }
+  
+  update(cave, player) {
+    if (frameCount > this.nextDecisionTime) {
+      let newSpeed = random(JELLYFISH_MIN_SPEED, JELLYFISH_MAX_SPEED);
+      
+      // Jellyfish move more slowly and predictably
+      if (player && random() < 0.2) { // 20% chance to move toward player
+        let dirToPlayer = p5.Vector.sub(player.pos, this.pos);
+        dirToPlayer.normalize();
+        this.vel = dirToPlayer.mult(newSpeed);
+      } else {
+        this.vel = p5.Vector.random2D().mult(newSpeed);
+      }
+      
+      let maxDecisionInterval = 240; // Slower decision making
+      this.nextDecisionTime = frameCount + random(120, maxDecisionInterval);
+    }
+    
+    // Handle wall collisions
+    if (cave.isWall(this.pos.x, this.pos.y)) {
+      this.vel.mult(-1); // Reverse direction
+      this.nextDecisionTime = frameCount + random(30, 90);
+    }
+    
+    this.pos.add(this.vel);
+    
+    // Keep jellyfish within world bounds
+    this.pos.x = constrain(this.pos.x, this.radius, cave.worldWidth - this.radius);
+    this.pos.y = constrain(this.pos.y, this.radius, cave.worldHeight - this.radius);
+    
+    // Update tentacle animation phase
+    this.tentaclePhase += 0.05;
+  }
+  
+  takeDamage() {
+    this.health--;
+    return this.health <= 0; // Return true if destroyed
   }
 }
 
@@ -1007,7 +1110,7 @@ function updateReactorHum(distanceToGoal) {
     volume = REACTOR_HUM_ENV_LEVELS.aL * (1 - Math.pow(normalizedDistance, 0.7));
   }
 
-  // Reduce overall hum volume by multiplying by a factor (e.g., 0.5 for half volume)
+  // Reduce overall hum volume by multiplying with a factor (e.g., 0.5 for half volume)
   const HUM_VOLUME_FACTOR = 0.3; // Lower this value for quieter hum
   volume *= HUM_VOLUME_FACTOR;
   
@@ -1031,7 +1134,7 @@ function initGameObjects() {
   currentCellSize = BASE_CELL_SIZE + (currentLevel - 1) * 10; // Calculate current cell size
 
   let baseAir = INITIAL_AIR_SUPPLY_BASE;
-  let airForLevel = baseAir - (currentLevel - 1) * AIR_SUPPLY_LEVEL_REDUCTION;
+  let airForLevel = baseAir; // Initialize airForLevel with baseAir
   airForLevel = max(airForLevel, MIN_AIR_SUPPLY_PER_LEVEL); // Ensure minimum air
   let airDepletion = BASE_AIR_DEPLETION_RATE + (currentLevel - 1) * AIR_DEPLETION_LEVEL_INCREASE;
   
@@ -1071,6 +1174,26 @@ function initGameObjects() {
     } while (cave.isWall(enemyX, enemyY, ENEMY_SPAWN_WALL_CHECK_RADIUS) && eAttempts < MAX_ENEMY_SPAWN_ATTEMPTS);
     if (eAttempts < MAX_ENEMY_SPAWN_ATTEMPTS) enemies.push(new Enemy(enemyX, enemyY));
 
+  }
+  
+  // Spawn jellyfish - 1 on level 1, +1 each level
+  jellyfish = [];
+  let jellyfishCount = currentLevel; // 1 on level 1, 2 on level 2, etc.
+  for (let i = 0; i < jellyfishCount; i++) {
+    let jellyfishX, jellyfishY, jAttempts = 0;
+    do { // Try to spawn jellyfish in a clear area, away from player
+      jellyfishX = random(WORLD_WIDTH * 0.3, WORLD_WIDTH * 0.9); // Spawn in middle to right area
+      jellyfishY = random(WORLD_HEIGHT * 0.2, WORLD_HEIGHT * 0.8);
+      jAttempts++;
+    } while (cave.isWall(jellyfishX, jellyfishY, JELLYFISH_RADIUS + 10) && jAttempts < MAX_ENEMY_SPAWN_ATTEMPTS);
+    
+    if (jAttempts < MAX_ENEMY_SPAWN_ATTEMPTS) {
+      // Make sure jellyfish isn't too close to player start
+      let distFromPlayer = dist(jellyfishX, jellyfishY, playerStartX, playerStartY);
+      if (distFromPlayer > 150) { // Minimum distance from player
+        jellyfish.push(new Jellyfish(jellyfishX, jellyfishY));
+      }
+    }
   }
 }
 
@@ -1256,7 +1379,11 @@ function drawPlayingState() {
 
   player.update(cave, enemies);
   for (let enemy of enemies) enemy.update(cave, player);
+  for (let jelly of jellyfish) jelly.update(cave, player);
+  
+  // Note: Jellyfish are not rendered directly - only visible through sonar hits
   player.handleEnemyCollisions(enemies);
+  player.handleJellyfishCollisions(jellyfish);
 
   // Projectile-Enemy Collisions (This loop needs to stay separate due to nested iteration and specific logic)
   for (let i = projectiles.length - 1; i >= 0; i--) {
@@ -1274,13 +1401,36 @@ function drawPlayingState() {
     }
   }
 
+  // Projectile-Jellyfish Collisions
+  for (let i = projectiles.length - 1; i >= 0; i--) {
+    for (let j = jellyfish.length - 1; j >= 0; j--) {
+      if (projectiles[i] && jellyfish[j]) {
+        let d = dist(projectiles[i].pos.x, projectiles[i].pos.y, jellyfish[j].pos.x, jellyfish[j].pos.y);
+        if (d < projectiles[i].radius + jellyfish[j].radius) {
+          // Jellyfish takes damage instead of being destroyed immediately
+          let destroyed = jellyfish[j].takeDamage();
+          createExplosion(projectiles[i].pos.x, projectiles[i].pos.y, 'enemy');
+          projectiles.splice(i, 1);
+          
+          if (destroyed) {
+            jellyfish.splice(j, 1);
+            playSound('explosion');
+          } else {
+            playSound('bump'); // Different sound for non-fatal hit
+          }
+          break;
+        }
+      }
+    }
+  }
+
   player.render(cameraOffsetX, cameraOffsetY);
 
   // HUD
   fill(HUD_TEXT_COLOR_H, HUD_TEXT_COLOR_S, HUD_TEXT_COLOR_B); textSize(HUD_TEXT_SIZE); textAlign(LEFT, TOP);
   text(`Hull: ${player.health}%`, HUD_MARGIN_X, HUD_MARGIN_Y + HUD_LINE_SPACING);
   text(`Air: ${floor(player.airSupply / AIR_SUPPLY_FRAMES_TO_SECONDS_DIVISOR)}s (${floor(player.airSupply)})`, HUD_MARGIN_X, HUD_MARGIN_Y + HUD_LINE_SPACING * 2);
-  text(`Enemies: ${enemies.length}`, HUD_MARGIN_X, HUD_MARGIN_Y + HUD_LINE_SPACING * 3);
+  text(`Enemies: ${enemies.length + jellyfish.length}`, HUD_MARGIN_X, HUD_MARGIN_Y + HUD_LINE_SPACING * 3);
   let distanceToGoal = dist(player.pos.x, player.pos.y, cave.goalPos.x, cave.goalPos.y);
   text(`Distance to Reactor: ${floor(distanceToGoal)}`, HUD_MARGIN_X, HUD_MARGIN_Y + HUD_LINE_SPACING * 4);
 
@@ -1291,7 +1441,7 @@ function drawPlayingState() {
   if (player.health <= 0 || player.airSupply <= 0) {
       if(gameState === 'playing') playSound('gameOver');
       gameState = 'gameOver';
-  } else if (cave.isGoal(player.pos.x, player.pos.y) && enemies.length === LEVEL_EXIT_MAX_ENEMIES_THRESHOLD) {
+  } else if (cave.isGoal(player.pos.x, player.pos.y) && enemies.length === LEVEL_EXIT_MAX_ENEMIES_THRESHOLD && jellyfish.length === 0) {
     gameState = (currentLevel >= MAX_LEVELS) ? 'gameComplete' : 'levelComplete';
   }
 }
