@@ -49,11 +49,9 @@ const PLAYER_SONAR_HIT_OFFSCREEN_BUFFER = 20;
 const PLAYER_SONAR_ENEMY_HIT_SIZE_FACTOR = 1.3;
 
 // Sonar Bubbles (Now Propeller Bubbles - constants might be reused or renamed)
-// const SONAR_BUBBLES_PER_FIRE = 3; // No longer used
-// const SONAR_BUBBLE_SPAWN_RADIUS_AROUND_SUB = 60; // No longer used for sonar fire
+
 const SONAR_BUBBLE_GROUP_SPAWN_CHANCE = 0.3; // Kept for reference, but new mechanism below
 const SONAR_BUBBLE_MAX_COUNT = 5; // Kept for reference
-// const SONAR_BUBBLE_COUNT_PER_WALL_HIT = 1; // No longer used
 const SONAR_BUBBLE_MAX_LIFESPAN_FRAMES = 75;
 const SONAR_BUBBLE_MIN_SPEED_Y = 0.2;
 const SONAR_BUBBLE_MAX_SPEED_Y = 0.5;
@@ -201,7 +199,7 @@ const PLAYER_START_X_ATTEMPT_INCREMENT_CELLS = 0.2;
 const PLAYER_START_Y_RANDOM_RANGE_CELLS = 4; // +/- from center
 const PLAYER_SPAWN_MAX_X_SEARCH_FACTOR = 1/5; // Max distance to search for player spawn (world width factor)
 
-const BASE_ENEMY_COUNT = 4; // Initial number of enemies at level 1
+const BASE_ENEMY_COUNT = 7; // Initial number of enemies at level 1
 const ENEMY_COUNT_PER_LEVEL_INCREASE = 5; // How many more enemies per level
 const MAX_ENEMY_COUNT = 30; // Absolute maximum number of enemies
 const ENEMY_SPAWN_MIN_X_WORLD_FACTOR = 0.15; // Spawn enemies in this fraction of world width
@@ -365,6 +363,7 @@ let particles = []; // New global array for torpedo trail particles
 let cameraOffsetX, cameraOffsetY;
 let gameState = 'start';
 let currentLevel = 1;
+let enemiesKilledThisLevel = 0; // New variable to track enemies killed this level
 
 // Helper function to process game object arrays (update, render, remove offscreen)
 function processGameObjectArray(arr, offsetX, offsetY, caveContext = null) {
@@ -1132,7 +1131,7 @@ function setup() {
 }
 
 function initGameObjects() {
-  currentCellSize = BASE_CELL_SIZE + (currentLevel - 1) * 10; // Calculate current cell size
+  currentCellSize = BASE_CELL_SIZE + (currentLevel - 1) * 2; // Calculate current cell size
 
   let baseAir = INITIAL_AIR_SUPPLY_BASE;
   let airForLevel = baseAir; // Initialize airForLevel with baseAir
@@ -1199,7 +1198,8 @@ function initGameObjects() {
 }
 
 function resetGame() {
-  currentLevel = 1; // Start level numbering from 1
+  currentLevel = 1;
+  enemiesKilledThisLevel = 0; // Reset kills tracking
   // currentCellSize will be set in initGameObjects based on currentLevel
   initGameObjects();
   player.health = PLAYER_INITIAL_HEALTH; player.airSupply = player.initialAirSupply; // Reset to full for new game
@@ -1251,7 +1251,9 @@ function createExplosion(x, y, type) {
 }
 
 function prepareNextLevel() {
-  currentLevel++; initGameObjects(); // This will create new cave, player (with new air), enemies
+  currentLevel++;
+  enemiesKilledThisLevel = 0; // Reset kills tracking
+  initGameObjects(); // This will create new cave, player (with new air), enemies
   // Player position is set by initGameObjects to a safe start in the new cave
   player.vel = createVector(0,0); player.angle = 0; // Reset movement
   player.health = PLAYER_INITIAL_HEALTH; // Replenish health
@@ -1332,7 +1334,8 @@ function drawStartScreen() {
   text(`Reactor Dive`, width / 2, height / 2 + START_SCREEN_TITLE_Y_OFFSET);
   textSize(START_SCREEN_INFO_TEXT_SIZE);
   text("WASD/Arrows: Move. SPACE: Shoot.", width / 2, height / 2 + START_SCREEN_INFO_Y_OFFSET_1);
-  text(`Goal: Destroy all enemies and reach the reactor`, width / 2, height / 2 + START_SCREEN_INFO_Y_OFFSET_3);
+  let killsForLevel1 = getKillsRequiredForLevel(1);
+  text(`Goal: Destroy ${killsForLevel1} enemies and reach the reactor`, width / 2, height / 2 + START_SCREEN_INFO_Y_OFFSET_3);
   textSize(START_SCREEN_PROMPT_TEXT_SIZE); fill(START_SCREEN_PROMPT_COLOR_H, START_SCREEN_PROMPT_COLOR_S, START_SCREEN_PROMPT_COLOR_B);
   text("Press ENTER to Dive", width / 2, height / 2 + START_SCREEN_PROMPT_Y_OFFSET);
   if (!audioInitialized) {
@@ -1346,13 +1349,14 @@ function drawLevelCompleteScreen() {
   fill(LEVEL_COMPLETE_TITLE_COLOR_H, LEVEL_COMPLETE_TITLE_COLOR_S, LEVEL_COMPLETE_TITLE_COLOR_B); textSize(LEVEL_COMPLETE_TITLE_TEXT_SIZE);
   text(`LEVEL ${currentLevel} CLEARED!`, width / 2, height / 2 + LEVEL_COMPLETE_TITLE_Y_OFFSET); 
   textSize(LEVEL_COMPLETE_INFO_TEXT_SIZE);
-  text(`Air Supply Replenished. Prepare for Level ${currentLevel+1}.`, width/2, height / 2 + LEVEL_COMPLETE_INFO_Y_OFFSET);
+  let killsForNextLevel = getKillsRequiredForLevel(currentLevel+1);
+  text(`Next Level: Destroy ${killsForNextLevel} enemies`, width/2, height / 2 + LEVEL_COMPLETE_INFO_Y_OFFSET);
   text("Press ENTER to Continue", width / 2, height / 2 + LEVEL_COMPLETE_PROMPT_Y_OFFSET);
 }
 
 function drawGameCompleteScreen() {
   textAlign(CENTER, CENTER);
-  fill(GAME_COMPLETE_TITLE_COLOR_H, GAME_COMPLETE_TITLE_COLOR_S, GAME_COMPLETE_TITLE_B); textSize(GAME_COMPLETE_TITLE_TEXT_SIZE);
+  fill(GAME_COMPLETE_TITLE_COLOR_H, GAME_COMPLETE_TITLE_COLOR_S, GAME_COMPLETE_TITLE_COLOR_B); textSize(GAME_COMPLETE_TITLE_TEXT_SIZE);
   text("MISSION ACCOMPLISHED!", width / 2, height / 2 + GAME_COMPLETE_TITLE_Y_OFFSET);
   textSize(GAME_COMPLETE_INFO_TEXT_SIZE);
   text(`You cleared all ${MAX_LEVELS} levels!`, width/2, height/2 + GAME_COMPLETE_INFO_Y_OFFSET);
@@ -1397,6 +1401,7 @@ function drawPlayingState() {
           createExplosion(projectiles[i].pos.x, projectiles[i].pos.y, 'enemy'); // Create enemy explosion before splicing
           enemies.splice(j, 1); 
           projectiles.splice(i, 1); 
+          enemiesKilledThisLevel++;
           playSound('explosion'); 
           break; 
         }
@@ -1417,6 +1422,7 @@ function drawPlayingState() {
           
           if (destroyed) {
             jellyfish.splice(j, 1);
+            enemiesKilledThisLevel++;
             playSound('explosion');
           } else {
             playSound('bump'); // Different sound for non-fatal hit
@@ -1433,7 +1439,9 @@ function drawPlayingState() {
   fill(HUD_TEXT_COLOR_H, HUD_TEXT_COLOR_S, HUD_TEXT_COLOR_B); textSize(HUD_TEXT_SIZE); textAlign(LEFT, TOP);
   text(`Hull: ${player.health}%`, HUD_MARGIN_X, HUD_MARGIN_Y + HUD_LINE_SPACING);
   text(`Air: ${floor(player.airSupply / AIR_SUPPLY_FRAMES_TO_SECONDS_DIVISOR)}s (${floor(player.airSupply)})`, HUD_MARGIN_X, HUD_MARGIN_Y + HUD_LINE_SPACING * 2);
-  text(`Enemies: ${enemies.length + jellyfish.length}`, HUD_MARGIN_X, HUD_MARGIN_Y + HUD_LINE_SPACING * 3);
+  const killsRequired = getKillsRequiredForLevel(currentLevel);
+  let killsStillNeeded = Math.max(0, killsRequired - enemiesKilledThisLevel);
+  text(`Kills Needed: ${killsStillNeeded}`, HUD_MARGIN_X, HUD_MARGIN_Y + HUD_LINE_SPACING * 3);
   let distanceToGoal = dist(player.pos.x, player.pos.y, cave.goalPos.x, cave.goalPos.y);
   text(`Distance to Reactor: ${floor(distanceToGoal)}`, HUD_MARGIN_X, HUD_MARGIN_Y + HUD_LINE_SPACING * 4);
 
@@ -1444,7 +1452,7 @@ function drawPlayingState() {
   if (player.health <= 0 || player.airSupply <= 0) {
       if(gameState === 'playing') playSound('gameOver');
       gameState = 'gameOver';
-  } else if (cave.isGoal(player.pos.x, player.pos.y) && enemies.length === LEVEL_EXIT_MAX_ENEMIES_THRESHOLD && jellyfish.length === 0) {
+  } else if (cave.isGoal(player.pos.x, player.pos.y) && killsStillNeeded === 0) {
     gameState = (currentLevel >= MAX_LEVELS) ? 'gameComplete' : 'levelComplete';
   }
 }
@@ -1472,4 +1480,12 @@ function draw() {
   drawPlayingState();
 }
 function windowResized() { resizeCanvas(windowWidth, windowHeight); }
+
+// --- Dynamic Kills Requirement Constants ---
+const BASE_KILLS_REQUIRED = 5; // Kills required for the first level
+const KILLS_INCREASE_PER_LEVEL = 3; // How many more kills needed each subsequent level
+function getKillsRequiredForLevel(level) {
+  if (level <= 0) return 0;
+  return BASE_KILLS_REQUIRED + (level - 1) * KILLS_INCREASE_PER_LEVEL;
+}
 
