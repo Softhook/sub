@@ -11,7 +11,7 @@ const AIR_SUPPLY_LEVEL_REDUCTION = 600; // Air reduction per level
 const MIN_AIR_SUPPLY_PER_LEVEL = 3000; // Minimum air supply
 const BASE_AIR_DEPLETION_RATE = 1; // Base air depletion per frame
 const AIR_DEPLETION_LEVEL_INCREASE = 0.1; // Additional depletion per level
-const LEVEL_EXIT_MAX_ENEMIES_THRESHOLD = 5; // Max enemies to exit level
+const LEVEL_EXIT_MAX_ENEMIES_THRESHOLD = 0; // Max enemies to exit level
 
 // Player Constants
 const PLAYER_RADIUS = 14;
@@ -186,8 +186,8 @@ const PLAYER_START_X_ATTEMPT_INCREMENT_CELLS = 0.2;
 const PLAYER_START_Y_RANDOM_RANGE_CELLS = 4; // +/- from center
 const PLAYER_SPAWN_MAX_X_SEARCH_FACTOR = 1/5; // Max distance to search for player spawn (world width factor)
 
-const BASE_ENEMY_COUNT = 10; // Initial number of enemies at level 1
-const ENEMY_COUNT_PER_LEVEL_INCREASE = 4; // How many more enemies per level
+const BASE_ENEMY_COUNT = 5; // Initial number of enemies at level 1
+const ENEMY_COUNT_PER_LEVEL_INCREASE = 5; // How many more enemies per level
 const MAX_ENEMY_COUNT = 30; // Absolute maximum number of enemies
 const ENEMY_SPAWN_MIN_X_WORLD_FACTOR = 0.15; // Spawn enemies in this fraction of world width
 const ENEMY_SPAWN_MAX_X_WORLD_FACTOR = 0.9;
@@ -815,7 +815,6 @@ class PlayerSub {
         this.health -= PLAYER_ENEMY_COLLISION_DAMAGE; if (this.health < 0) this.health = 0;
         let knockbackPlayer = p5.Vector.sub(this.pos, enemy.pos).normalize().mult(PLAYER_ENEMY_COLLISION_KNOCKBACK);
         this.vel.add(knockbackPlayer);
-        enemies.splice(i, 1); // Remove enemy
         playSound('explosion'); // Play explosion sound for enemy destruction
       }
     }
@@ -1129,7 +1128,7 @@ function drawStartScreen() {
   text(`Reactor Dive`, width / 2, height / 2 + START_SCREEN_TITLE_Y_OFFSET);
   textSize(START_SCREEN_INFO_TEXT_SIZE);
   text("WASD/Arrows: Move. SPACE: Shoot.", width / 2, height / 2 + START_SCREEN_INFO_Y_OFFSET_1);
-  text(`Goal: Destroy < ${LEVEL_EXIT_MAX_ENEMIES_THRESHOLD} enemies and reach the reactor`, width / 2, height / 2 + START_SCREEN_INFO_Y_OFFSET_3);
+  text(`Goal: Destroy all enemies and reach the reactor`, width / 2, height / 2 + START_SCREEN_INFO_Y_OFFSET_3);
   textSize(START_SCREEN_PROMPT_TEXT_SIZE); fill(START_SCREEN_PROMPT_COLOR_H, START_SCREEN_PROMPT_COLOR_S, START_SCREEN_PROMPT_COLOR_B);
   text("Press ENTER to Dive", width / 2, height / 2 + START_SCREEN_PROMPT_Y_OFFSET);
   if (!audioInitialized) {
@@ -1141,9 +1140,9 @@ function drawStartScreen() {
 function drawLevelCompleteScreen() {
   textAlign(CENTER, CENTER); 
   fill(LEVEL_COMPLETE_TITLE_COLOR_H, LEVEL_COMPLETE_TITLE_COLOR_S, LEVEL_COMPLETE_TITLE_COLOR_B); textSize(LEVEL_COMPLETE_TITLE_TEXT_SIZE);
-  text(`LEVEL ${currentLevel -1} CLEARED!`, width / 2, height / 2 + LEVEL_COMPLETE_TITLE_Y_OFFSET); 
+  text(`LEVEL ${currentLevel} CLEARED!`, width / 2, height / 2 + LEVEL_COMPLETE_TITLE_Y_OFFSET); 
   textSize(LEVEL_COMPLETE_INFO_TEXT_SIZE);
-  text(`Air Supply Replenished. Prepare for Level ${currentLevel}.`, width/2, height / 2 + LEVEL_COMPLETE_INFO_Y_OFFSET);
+  text(`Air Supply Replenished. Prepare for Level ${currentLevel+1}.`, width/2, height / 2 + LEVEL_COMPLETE_INFO_Y_OFFSET);
   text("Press ENTER to Continue", width / 2, height / 2 + LEVEL_COMPLETE_PROMPT_Y_OFFSET);
 }
 
@@ -1210,7 +1209,7 @@ function drawPlayingState() {
   if (player.health <= 0 || player.airSupply <= 0) {
       if(gameState === 'playing') playSound('gameOver');
       gameState = 'gameOver';
-  } else if (cave.isGoal(player.pos.x, player.pos.y) && enemies.length < LEVEL_EXIT_MAX_ENEMIES_THRESHOLD) {
+  } else if (cave.isGoal(player.pos.x, player.pos.y) && enemies.length === LEVEL_EXIT_MAX_ENEMIES_THRESHOLD) {
     gameState = (currentLevel >= MAX_LEVELS) ? 'gameComplete' : 'levelComplete';
   }
 }
