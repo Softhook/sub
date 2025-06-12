@@ -219,6 +219,12 @@ const BUMP_FREQ = 100;
 const TORPEDO_ENV_ADSR = { aT: 0.02, dT: 0.3, sR: 0, rT: 0.2 };
 const TORPEDO_ENV_LEVELS = { aL: 0.3, rL: 0 };
 
+// Reactor Hum Constants
+const REACTOR_HUM_ENV_ADSR = { aT: 0.1, dT: 0.1, sR: 1.0, rT: 0.1 }; // Quick attack, sustain continuously
+const REACTOR_HUM_ENV_LEVELS = { aL: 0.15, rL: 0 };
+const REACTOR_HUM_FREQ = 35; // Lower frequency hum (was 60)
+const REACTOR_HUM_MAX_DISTANCE = 2500; // Max distance where hum is audible
+
 const LOW_AIR_ENV_ADSR = { aT: 0.05, dT: 0.1, sR: 0.6, rT: 0.2 };
 const LOW_AIR_ENV_LEVELS = { aL: 0.2, rL: 0 };
 const LOW_AIR_FREQ = 1200;
@@ -315,6 +321,10 @@ var bumpOsc, bumpEnv;
 var torpedoNoise, torpedoEnv; // Changed from Osc to Noise for woosh
 var lowAirOsc, lowAirEnv;
 var gameOverImpactNoise, gameOverImpactEnv, gameOverGroanOsc, gameOverGroanEnv, gameOverFinalBoomNoise, gameOverFinalBoomEnv; // Sub Destruction
+
+// Reactor Hum Audio
+let reactorHumOsc, reactorHumEnv;
+let reactorHumAmplitude = 0;
 
 let audioInitialized = false;
 let lastLowAirBeepTime = 0;
@@ -907,6 +917,13 @@ function initializeSounds() {
   let lowAirSound = setupSound('osc', 'square', LOW_AIR_ENV_ADSR, LOW_AIR_ENV_LEVELS);
   lowAirOsc = lowAirSound.sound; lowAirEnv = lowAirSound.envelope;
 
+  // Initialize reactor hum
+  let reactorHumSound = setupSound('osc', 'sawtooth', REACTOR_HUM_ENV_ADSR, REACTOR_HUM_ENV_LEVELS);
+  reactorHumOsc = reactorHumSound.sound; reactorHumEnv = reactorHumSound.envelope;
+  reactorHumOsc.freq(REACTOR_HUM_FREQ);
+  // Set up for continuous play with amplitude control
+  reactorHumOsc.amp(0); // Start at zero volume
+
   let gameOverImpact = setupSound('noise', 'white', GAME_OVER_IMPACT_ENV_ADSR, GAME_OVER_IMPACT_ENV_LEVELS);
   gameOverImpactNoise = gameOverImpact.sound; gameOverImpactEnv = gameOverImpact.envelope;
   let gameOverGroan = setupSound('osc', 'sawtooth', GAME_OVER_GROAN_ENV_ADSR, GAME_OVER_GROAN_ENV_LEVELS);
@@ -955,6 +972,29 @@ function playSound(soundName) {
       }, GAME_OVER_FINAL_BOOM_DELAY_MS);
     }
   } catch (e) { /* console.error("Sound error:", soundName, e); */ }
+}
+
+function updateReactorHum(distanceToGoal) {
+  if (!audioInitialized || !reactorHumOsc) return;
+  
+  // Calculate volume based on distance (closer = louder)
+  let volume = 0;
+  if (distanceToGoal < REACTOR_HUM_MAX_DISTANCE) {
+    // Exponential falloff for more realistic audio spatialization
+    let normalizedDistance = distanceToGoal / REACTOR_HUM_MAX_DISTANCE;
+    volume = REACTOR_HUM_ENV_LEVELS.aL * (1 - Math.pow(normalizedDistance, 0.7));
+  }
+
+  // Reduce overall hum volume by multiplying by a factor (e.g., 0.5 for half volume)
+  const HUM_VOLUME_FACTOR = 0.3; // Lower this value for quieter hum
+  volume *= HUM_VOLUME_FACTOR;
+  
+  // Apply volume directly to oscillator for continuous play
+  if (reactorHumOsc.started) {
+    reactorHumOsc.amp(volume, 0.1); // Smooth transition over 0.1 seconds
+  }
+  
+  reactorHumAmplitude = volume;
 }
 
 // --- Main Game Functions ---
@@ -1022,6 +1062,11 @@ function resetGame() {
   particles = []; // Clear global particles on reset
   gameState = 'start';
   if (audioInitialized && lowAirOsc && lowAirOsc.started) lowAirEnv.triggerRelease(lowAirOsc);
+  // Reset reactor hum to zero volume when resetting game
+  if (audioInitialized && reactorHumOsc && reactorHumOsc.started) {
+    reactorHumOsc.amp(0, 0);
+    reactorHumAmplitude = 0;
+  }
   lastLowAirBeepTime = 0; // Reset beep timer
 }
 
@@ -1067,6 +1112,10 @@ function prepareNextLevel() {
   player.lastSonarTime = frameCount - player.sonarCooldown;
   player.lastShotTime = frameCount - player.shotCooldown;
   gameState = 'playing';
+  // Reactor hum is continuously playing, just reset to zero volume
+  if (audioInitialized && reactorHumOsc && reactorHumOsc.started) {
+    reactorHumOsc.amp(0, 0);
+  }
   if (audioInitialized && lowAirOsc && lowAirOsc.started) lowAirEnv.triggerRelease(lowAirOsc);
   lastLowAirBeepTime = 0;
 }
@@ -1075,12 +1124,16 @@ function startAudioRoutine() {
     function startAllSoundObjects() {
         const soundObjects = [
             sonarOsc, explosionNoise, explosionBoomOsc, bumpOsc, torpedoNoise, 
-            lowAirOsc, gameOverImpactNoise, gameOverGroanOsc, gameOverFinalBoomNoise
+            lowAirOsc, reactorHumOsc, gameOverImpactNoise, gameOverGroanOsc, gameOverFinalBoomNoise
         ];
         for (const soundObj of soundObjects) {
             if (soundObj && !soundObj.started && typeof soundObj.start === 'function') {
                 soundObj.start();
             }
+        }
+        // Start reactor hum playing continuously
+        if (reactorHumOsc && reactorHumOsc.started) {
+            // Reactor hum plays continuously, volume controlled by amp()
         }
     }
 
@@ -1115,6 +1168,10 @@ function keyPressed() {
   } else if (gameState === 'start' && keyCode === ENTER) {
     gameState = 'playing';
     player.lastSonarTime = frameCount - player.sonarCooldown; // Ensure sonar is ready
+    // Reactor hum is continuously playing, just needs to be started if not already
+    if (audioInitialized && reactorHumOsc && reactorHumOsc.started) {
+      reactorHumOsc.amp(0, 0); // Start at zero volume, will be controlled by updateReactorHum
+    }
   } else if ((gameState === 'gameOver' || gameState === 'gameComplete') && keyCode === ENTER) {
     resetGame();
   } else if (gameState === 'levelComplete' && keyCode === ENTER) {
@@ -1134,7 +1191,7 @@ function drawStartScreen() {
   if (!audioInitialized) {
       textSize(START_SCREEN_AUDIO_NOTE_TEXT_SIZE); fill(START_SCREEN_AUDIO_NOTE_COLOR_H, START_SCREEN_AUDIO_NOTE_COLOR_S, START_SCREEN_AUDIO_NOTE_COLOR_B);
       //text("(Sound will enable after you press Enter or Click)", width/2, height/2 + START_SCREEN_AUDIO_NOTE_Y_OFFSET);
-  }
+ }
 }
 
 function drawLevelCompleteScreen() {
@@ -1148,7 +1205,7 @@ function drawLevelCompleteScreen() {
 
 function drawGameCompleteScreen() {
   textAlign(CENTER, CENTER);
-  fill(GAME_COMPLETE_TITLE_COLOR_H, GAME_COMPLETE_TITLE_COLOR_S, GAME_COMPLETE_TITLE_COLOR_B); textSize(GAME_COMPLETE_TITLE_TEXT_SIZE);
+  fill(GAME_COMPLETE_TITLE_COLOR_H, GAME_COMPLETE_TITLE_COLOR_S, GAME_COMPLETE_TITLE_B); textSize(GAME_COMPLETE_TITLE_TEXT_SIZE);
   text("MISSION ACCOMPLISHED!", width / 2, height / 2 + GAME_COMPLETE_TITLE_Y_OFFSET);
   textSize(GAME_COMPLETE_INFO_TEXT_SIZE);
   text(`You cleared all ${MAX_LEVELS} levels!`, width/2, height/2 + GAME_COMPLETE_INFO_Y_OFFSET);
@@ -1203,6 +1260,9 @@ function drawPlayingState() {
   text(`Enemies: ${enemies.length}`, HUD_MARGIN_X, HUD_MARGIN_Y + HUD_LINE_SPACING * 3);
   let distanceToGoal = dist(player.pos.x, player.pos.y, cave.goalPos.x, cave.goalPos.y);
   text(`Distance to Reactor: ${floor(distanceToGoal)}`, HUD_MARGIN_X, HUD_MARGIN_Y + HUD_LINE_SPACING * 4);
+
+  // Update reactor hum volume based on distance to goal (reactor)
+  updateReactorHum(distanceToGoal);
 
   // Check Game Over / Level Complete Conditions
   if (player.health <= 0 || player.airSupply <= 0) {
