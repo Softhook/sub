@@ -5,7 +5,7 @@ const BASE_CELL_SIZE = 20; // Base size, will increase per level
 let currentCellSize = BASE_CELL_SIZE; // Variable to hold current cell size
 const WORLD_WIDTH = 4000;
 const WORLD_HEIGHT = 2000;
-const MAX_LEVELS = 3;
+const MAX_LEVELS = 10;
 const INITIAL_AIR_SUPPLY_BASE = 4500; // Base air supply in frames
 const AIR_SUPPLY_LEVEL_REDUCTION = 600; // Air reduction per level
 const MIN_AIR_SUPPLY_PER_LEVEL = 3000; // Minimum air supply
@@ -22,7 +22,7 @@ const PLAYER_TURN_SPEED = 0.04;
 const PLAYER_DAMPING = 0.985;
 const PLAYER_MAX_SPEED = 2.5;
 const PLAYER_COLLISION_RADIUS_FACTOR = 0.7; // For cave collision checks
-const PLAYER_BUMP_DAMAGE = 2;
+const PLAYER_BUMP_DAMAGE = 10;
 const PLAYER_BUMP_RECOIL_FACTOR = 0.5;
 const PLAYER_BUMP_VELOCITY_REVERSE_FACTOR = -0.5;
 const PLAYER_ENEMY_COLLISION_DAMAGE = 20;
@@ -1198,8 +1198,7 @@ function drawPlayingState() {
 
   // HUD
   fill(HUD_TEXT_COLOR_H, HUD_TEXT_COLOR_S, HUD_TEXT_COLOR_B); textSize(HUD_TEXT_SIZE); textAlign(LEFT, TOP);
-  text(`Level: ${currentLevel}/${MAX_LEVELS}`, HUD_MARGIN_X, HUD_MARGIN_Y);
-  text(`Hull: ${player.health}`, HUD_MARGIN_X, HUD_MARGIN_Y + HUD_LINE_SPACING);
+  text(`Hull: ${player.health}%`, HUD_MARGIN_X, HUD_MARGIN_Y + HUD_LINE_SPACING);
   text(`Air: ${floor(player.airSupply / AIR_SUPPLY_FRAMES_TO_SECONDS_DIVISOR)}s (${floor(player.airSupply)})`, HUD_MARGIN_X, HUD_MARGIN_Y + HUD_LINE_SPACING * 2);
   text(`Enemies: ${enemies.length}`, HUD_MARGIN_X, HUD_MARGIN_Y + HUD_LINE_SPACING * 3);
   let distanceToGoal = dist(player.pos.x, player.pos.y, cave.goalPos.x, cave.goalPos.y);
