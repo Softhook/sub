@@ -151,8 +151,8 @@ const ENEMY_HOMING_START_LEVEL = 0; // New: Level at which enemies start homing
 const ENEMY_HOMING_CHANCE = 0.3; // 30% chance of homing behavior
 
 // Jellyfish Constants
-const JELLYFISH_RADIUS = 30; // Larger than regular enemies
-const JELLYFISH_HEALTH = 2; // Requires 2 hits
+const JELLYFISH_RADIUS = 40; // Larger than regular enemies
+const JELLYFISH_HEALTH = 3; // Requires 3 hits
 const JELLYFISH_DAMAGE = 30; // More damage than regular enemies (was 20)
 const JELLYFISH_MIN_SPEED = 0.2; // Slower than regular enemies
 const JELLYFISH_MAX_SPEED = 0.5;
@@ -962,13 +962,14 @@ class Jellyfish {
   update(cave, player) {
     if (frameCount > this.nextDecisionTime) {
       let newSpeed = random(JELLYFISH_MIN_SPEED, JELLYFISH_MAX_SPEED);
-      
-      // Jellyfish move more slowly and predictably
-      if (player && random() < 0.2) { // 20% chance to move toward player
+
+      // Jellyfish always move toward player
+      if (player) {
         let dirToPlayer = p5.Vector.sub(player.pos, this.pos);
         dirToPlayer.normalize();
         this.vel = dirToPlayer.mult(newSpeed);
       } else {
+        // Fallback if player is not defined (should not happen in normal gameplay)
         this.vel = p5.Vector.random2D().mult(newSpeed);
       }
       
