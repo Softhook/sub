@@ -7,7 +7,7 @@ const WORLD_WIDTH = 4000;
 const WORLD_HEIGHT = 2000;
 const MAX_LEVELS = 10;
 const INITIAL_AIR_SUPPLY_BASE = 4500; // Base air supply in frames
-const AIR_SUPPLY_LEVEL_REDUCTION = 600; // Air reduction per level
+const AIR_SUPPLY_LEVEL_REDUCTION = 0; // Air reduction per level
 const MIN_AIR_SUPPLY_PER_LEVEL = 3000; // Minimum air supply
 const BASE_AIR_DEPLETION_RATE = 1; // Base air depletion per frame
 const AIR_DEPLETION_LEVEL_INCREASE = 0.1; // Additional depletion per level
@@ -219,6 +219,12 @@ const BUMP_FREQ = 100;
 const TORPEDO_ENV_ADSR = { aT: 0.02, dT: 0.3, sR: 0, rT: 0.2 };
 const TORPEDO_ENV_LEVELS = { aL: 0.3, rL: 0 };
 
+// Creature Growl/Scream Constants
+const CREATURE_GROWL_ENV_ADSR = { aT: 0.05, dT: 0.2, sR: 0.3, rT: 0.4 };
+const CREATURE_GROWL_ENV_LEVELS = { aL: 0.25, rL: 0 };
+const CREATURE_GROWL_MIN_FREQ = 80;
+const CREATURE_GROWL_MAX_FREQ = 85;
+
 // Reactor Hum Constants
 const REACTOR_HUM_ENV_ADSR = { aT: 0.1, dT: 0.1, sR: 1.0, rT: 0.1 }; // Quick attack, sustain continuously
 const REACTOR_HUM_ENV_LEVELS = { aL: 0.15, rL: 0 };
@@ -325,6 +331,9 @@ var gameOverImpactNoise, gameOverImpactEnv, gameOverGroanOsc, gameOverGroanEnv, 
 // Reactor Hum Audio
 let reactorHumOsc, reactorHumEnv;
 let reactorHumAmplitude = 0;
+
+// Creature Growl Audio
+let creatureGrowlOsc, creatureGrowlEnv;
 
 let audioInitialized = false;
 let lastLowAirBeepTime = 0;
@@ -652,7 +661,10 @@ class PlayerSub {
         for (let enemy of enemies) {
           if (p5.Vector.dist(createVector(checkX, checkY), enemy.pos) < enemy.radius) {
             this.sonarHits.push({ x: checkX, y: checkY, type: 'enemy', receivedAt: frameCount, intensity: map(dist, 0, this.sonarRange, PLAYER_SONAR_ENEMY_INTENSITY_MAX, PLAYER_SONAR_ENEMY_INTENSITY_MIN) });
-            hitDetectedOnRay = true; break;
+            hitDetectedOnRay = true; 
+                // Play creature growl when enemy spawns
+            playSound('creatureGrowl');
+            break;
           }
         }
         if (hitDetectedOnRay) break; // If enemy hit, don\'t check for wall at same spot
@@ -838,6 +850,8 @@ class Enemy {
     // Initial velocity calculation uses ENEMY_MIN_BASE_SPEED and ENEMY_MAX_BASE_SPEED
     this.vel = p5.Vector.random2D().mult(random(ENEMY_MIN_BASE_SPEED, ENEMY_MAX_BASE_SPEED + currentLevel * ENEMY_SPEED_LEVEL_MULTIPLIER));
     this.type = 'enemy'; this.nextDecisionTime = 0; // For AI behavior
+    
+
   }
   update(cave, player) { // Added player argument
     if (frameCount > this.nextDecisionTime) {
@@ -924,6 +938,10 @@ function initializeSounds() {
   // Set up for continuous play with amplitude control
   reactorHumOsc.amp(0); // Start at zero volume
 
+  // Initialize creature growl
+  let creatureGrowlSound = setupSound('osc', 'sawtooth', CREATURE_GROWL_ENV_ADSR, CREATURE_GROWL_ENV_LEVELS);
+  creatureGrowlOsc = creatureGrowlSound.sound; creatureGrowlEnv = creatureGrowlSound.envelope;
+
   let gameOverImpact = setupSound('noise', 'white', GAME_OVER_IMPACT_ENV_ADSR, GAME_OVER_IMPACT_ENV_LEVELS);
   gameOverImpactNoise = gameOverImpact.sound; gameOverImpactEnv = gameOverImpact.envelope;
   let gameOverGroan = setupSound('osc', 'sawtooth', GAME_OVER_GROAN_ENV_ADSR, GAME_OVER_GROAN_ENV_LEVELS);
@@ -955,6 +973,10 @@ function playSound(soundName) {
       ensureStarted(torpedoNoise); torpedoEnv.play(torpedoNoise);
     } else if (soundName === 'lowAir') {
       ensureStarted(lowAirOsc); lowAirOsc.freq(LOW_AIR_FREQ); lowAirEnv.play(lowAirOsc);
+    } else if (soundName === 'creatureGrowl') {
+      ensureStarted(creatureGrowlOsc); 
+      creatureGrowlOsc.freq(random(CREATURE_GROWL_MIN_FREQ, CREATURE_GROWL_MAX_FREQ)); 
+      creatureGrowlEnv.play(creatureGrowlOsc);
     } else if (soundName === 'gameOver') {
       ensureStarted(gameOverImpactNoise);
       gameOverImpactEnv.play(gameOverImpactNoise);
@@ -1048,6 +1070,7 @@ function initGameObjects() {
       enemyY = random(WORLD_HEIGHT * ENEMY_SPAWN_MIN_Y_WORLD_FACTOR, WORLD_HEIGHT * ENEMY_SPAWN_MAX_Y_WORLD_FACTOR); eAttempts++;
     } while (cave.isWall(enemyX, enemyY, ENEMY_SPAWN_WALL_CHECK_RADIUS) && eAttempts < MAX_ENEMY_SPAWN_ATTEMPTS);
     if (eAttempts < MAX_ENEMY_SPAWN_ATTEMPTS) enemies.push(new Enemy(enemyX, enemyY));
+
   }
 }
 
@@ -1124,7 +1147,7 @@ function startAudioRoutine() {
     function startAllSoundObjects() {
         const soundObjects = [
             sonarOsc, explosionNoise, explosionBoomOsc, bumpOsc, torpedoNoise, 
-            lowAirOsc, reactorHumOsc, gameOverImpactNoise, gameOverGroanOsc, gameOverFinalBoomNoise
+            lowAirOsc, reactorHumOsc, creatureGrowlOsc, gameOverImpactNoise, gameOverGroanOsc, gameOverFinalBoomNoise
         ];
         for (const soundObj of soundObjects) {
             if (soundObj && !soundObj.started && typeof soundObj.start === 'function') {
@@ -1172,7 +1195,7 @@ function keyPressed() {
     if (audioInitialized && reactorHumOsc && reactorHumOsc.started) {
       reactorHumOsc.amp(0, 0); // Start at zero volume, will be controlled by updateReactorHum
     }
-  } else if ((gameState === 'gameOver' || gameState === 'gameComplete') && keyCode === ENTER) {
+ }  else if ((gameState === 'gameOver' || gameState === 'gameComplete') && keyCode === ENTER) {
     resetGame();
   } else if (gameState === 'levelComplete' && keyCode === ENTER) {
     prepareNextLevel();
