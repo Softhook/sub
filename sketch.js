@@ -644,7 +644,8 @@ class Cave {
 
     const overallSymbolRadius = this.goalSize * 0.40; // Overall radius of the symbol
     const centerDiscRadius = overallSymbolRadius * 0.22; // Radius of the central filled circle
-    const bladeInnerRadius = centerDiscRadius; // Blades start from the edge of the central circle
+    // Adjusted bladeInnerRadius to create a gap around the center circle
+    const bladeInnerRadius = centerDiscRadius * 1.35; // Blades start further out from the center circle
     const bladeOuterRadius = overallSymbolRadius;  // Blades extend to the full symbol radius
     const bladeSweepAngle = PI / 3; // Each blade is 60 degrees wide (PI/3 radians)
     const angleStep = PI / 30; // Step for drawing arc segments (6 degrees per step)
