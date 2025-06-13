@@ -634,6 +634,31 @@ class Cave {
     noStroke();
     rectMode(CENTER);
     rect(this.goalPos.x - offsetX, this.goalPos.y - offsetY, this.goalSize, this.goalSize);
+    // Draw nuclear symbol
+    let cx = this.goalPos.x - offsetX;
+    let cy = this.goalPos.y - offsetY;
+    let r = this.goalSize * 0.28;
+    let triR = r * 0.85;
+    let triW = r * 0.55;
+    // let triH = r * 0.7; // triH is defined but not used, can be removed or kept for future use
+    fill(0); // Changed to black for testing
+    noStroke();
+    // Center circle
+    ellipse(cx, cy, r * 0.7);
+    // 3 blades
+    for (let i = 0; i < 3; i++) {
+      let angle = i * (TWO_PI / 3) - PI/2; // Adjusted initial angle for blades to point up/out
+      push();
+      translate(cx, cy);
+      rotate(angle);
+      beginShape();
+      // Adjusted vertices for the blades
+      vertex(0, -r * 0.5); // Start the triangle a bit away from the center
+      vertex(-triW / 1.5, -triR * 1.2); // Outer left point
+      vertex(triW / 1.5, -triR * 1.2);  // Outer right point
+      endShape(CLOSE);
+      pop();
+    }
     pop();
   }
 }
@@ -1350,7 +1375,7 @@ function drawLevelCompleteScreen() {
   text(`LEVEL ${currentLevel} CLEARED!`, width / 2, height / 2 + LEVEL_COMPLETE_TITLE_Y_OFFSET); 
   textSize(LEVEL_COMPLETE_INFO_TEXT_SIZE);
   let killsForNextLevel = getKillsRequiredForLevel(currentLevel+1);
-  text(`Next Level: Destroy ${killsForNextLevel} enemies`, width/2, height / 2 + LEVEL_COMPLETE_INFO_Y_OFFSET);
+  text(`Next Level: Destroy ${killsForNextLevel} enemies and reach the reactor`, width/2, height / 2 + LEVEL_COMPLETE_INFO_Y_OFFSET);
   text("Press ENTER to Continue", width / 2, height / 2 + LEVEL_COMPLETE_PROMPT_Y_OFFSET);
 }
 
