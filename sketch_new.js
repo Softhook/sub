@@ -217,7 +217,9 @@ function drawPlayingState() {
 
   // Render current areas (this will also spawn their bubbles)
   for (let area of currentAreas) {
-    area.spawnBubbles(); // Spawn bubbles for current area
+    if (cave) { // Only spawn bubbles if cave is initialized
+      area.spawnBubbles(cave); // Spawn bubbles for current area, only in open space
+    }
     //area.render(cameraOffsetX, cameraOffsetY);
   }
 

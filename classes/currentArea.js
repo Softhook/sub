@@ -17,7 +17,7 @@ class CurrentArea {
   }
 
   // Spawn bubbles within the area to indicate the current
-  spawnBubbles() {
+  spawnBubbles(cave) {
     // Density determines how many bubbles to try to spawn per frame
     let bubblesToSpawn = floor(this.width * this.height * CURRENT_BUBBLE_SPAWN_DENSITY);
     if (random() < (this.width * this.height * CURRENT_BUBBLE_SPAWN_DENSITY) % 1) {
@@ -28,21 +28,24 @@ class CurrentArea {
       let bubbleX = random(this.x, this.x + this.width);
       let bubbleY = random(this.y, this.y + this.height);
       
-      // Bubbles should generally move with the current, but with some randomness
-      let bubbleVel = p5.Vector.add(this.force, p5.Vector.random2D().mult(0.1)); // Slight random drift
-      bubbleVel.mult(CURRENT_BUBBLE_SPEED_MULTIPLIER);
+      // Only spawn bubble if the position is in open space (no cave walls)
+      if (!cave.isWall(bubbleX, bubbleY)) {
+        // Bubbles should generally move with the current, but with some randomness
+        let bubbleVel = p5.Vector.add(this.force, p5.Vector.random2D().mult(0.1)); // Slight random drift
+        bubbleVel.mult(CURRENT_BUBBLE_SPEED_MULTIPLIER);
 
-      // Create a sonar bubble instead of regular bubble
-      let newBubble = new SonarBubble(bubbleX, bubbleY);
-      
-      // Override the default sonar bubble velocity to move with the current
-      newBubble.vel = bubbleVel; // Override default upward movement
-      
-      // Adjust lifespan for current bubbles
-      newBubble.lifespan = BUBBLE_LIFESPAN_FRAMES * CURRENT_BUBBLE_LIFESPAN_FACTOR;
-      newBubble.initialLifespan = newBubble.lifespan;
-      
-      sonarBubbles.push(newBubble);
+        // Create a sonar bubble instead of regular bubble
+        let newBubble = new SonarBubble(bubbleX, bubbleY);
+        
+        // Override the default sonar bubble velocity to move with the current
+        newBubble.vel = bubbleVel; // Override default upward movement
+        
+        // Adjust lifespan for current bubbles
+        newBubble.lifespan = BUBBLE_LIFESPAN_FRAMES * CURRENT_BUBBLE_LIFESPAN_FACTOR;
+        newBubble.initialLifespan = newBubble.lifespan;
+        
+        sonarBubbles.push(newBubble);
+      }
     }
   }
 
