@@ -290,11 +290,11 @@ const HUD_LINE_SPACING = 25; // Was 25, derived from 35-10, 60-35 etc.
 const AIR_SUPPLY_FRAMES_TO_SECONDS_DIVISOR = 60; // Assuming 60fps for display
 
 const START_SCREEN_TITLE_COLOR_H = 50; const START_SCREEN_TITLE_COLOR_S = 100; const START_SCREEN_TITLE_COLOR_B = 100;
-const START_SCREEN_TITLE_TEXT_SIZE = 48;
+const START_SCREEN_TITLE_TEXT_SIZE = 60;
 const START_SCREEN_TITLE_Y_OFFSET = -140;
 const START_SCREEN_INFO_TEXT_SIZE = 20;
-const START_SCREEN_INFO_Y_OFFSET_1 = -80;
-const START_SCREEN_INFO_Y_OFFSET_2 = -50;
+const START_SCREEN_INFO_Y_OFFSET_1 = -50;
+const START_SCREEN_INFO_Y_OFFSET_2 = -10;
 const START_SCREEN_INFO_Y_OFFSET_3 = -20;
 const START_SCREEN_INFO_Y_OFFSET_4 = 10;
 const START_SCREEN_FULLSCREEN_Y_OFFSET = 40;
@@ -1395,9 +1395,9 @@ function drawStartScreen() {
   fill(START_SCREEN_TITLE_COLOR_H, START_SCREEN_TITLE_COLOR_S, START_SCREEN_TITLE_COLOR_B); textSize(START_SCREEN_TITLE_TEXT_SIZE);
   text(`Reactor Dive`, width / 2, height / 2 + START_SCREEN_TITLE_Y_OFFSET);
   textSize(START_SCREEN_INFO_TEXT_SIZE);
-  text("WASD/Arrows: Move. SPACE: Shoot.", width / 2, height / 2 + START_SCREEN_INFO_Y_OFFSET_1);
+  text("WASD/Arrows: Move. SPACE: Shoot.", width / 2, height / 2 + START_SCREEN_INFO_Y_OFFSET_2);
   let killsForLevel1 = getKillsRequiredForLevel(1);
-  text(`Destroy ${killsForLevel1} enemies and reach the flooded reactor`, width / 2, height / 2 + START_SCREEN_INFO_Y_OFFSET_3);
+  text(`Destroy ${killsForLevel1} creatures and reach the flooded reactor`, width / 2, height / 2 + START_SCREEN_INFO_Y_OFFSET_1);
   textSize(START_SCREEN_PROMPT_TEXT_SIZE); fill(START_SCREEN_PROMPT_COLOR_H, START_SCREEN_PROMPT_COLOR_S, START_SCREEN_PROMPT_COLOR_B);
   text("Press ENTER to Dive", width / 2, height / 2 + START_SCREEN_PROMPT_Y_OFFSET);
   if (!audioInitialized) {
@@ -1499,13 +1499,13 @@ function drawPlayingState() {
 
   // HUD
   fill(HUD_TEXT_COLOR_H, HUD_TEXT_COLOR_S, HUD_TEXT_COLOR_B); textSize(HUD_TEXT_SIZE); textAlign(LEFT, TOP);
-  text(`Hull: ${player.health}%`, HUD_MARGIN_X, HUD_MARGIN_Y + HUD_LINE_SPACING);
-  text(`Air: ${floor(player.airSupply / AIR_SUPPLY_FRAMES_TO_SECONDS_DIVISOR)} seconds `, HUD_MARGIN_X, HUD_MARGIN_Y + HUD_LINE_SPACING * 2);
+  text(`Hull: ${player.health}%`, HUD_MARGIN_X, HUD_MARGIN_Y);
+  text(`Air: ${floor(player.airSupply / AIR_SUPPLY_FRAMES_TO_SECONDS_DIVISOR)} seconds `, HUD_MARGIN_X, HUD_MARGIN_Y + HUD_LINE_SPACING);
   const killsRequired = getKillsRequiredForLevel(currentLevel);
   let killsStillNeeded = Math.max(0, killsRequired - enemiesKilledThisLevel);
-  text(`Kills Needed: ${killsStillNeeded}`, HUD_MARGIN_X, HUD_MARGIN_Y + HUD_LINE_SPACING * 3);
+  text(`Kills Needed: ${killsStillNeeded}`, HUD_MARGIN_X, HUD_MARGIN_Y + HUD_LINE_SPACING * 2);
   let distanceToGoal = dist(player.pos.x, player.pos.y, cave.goalPos.x, cave.goalPos.y);
-  text(`Distance to Reactor: ${floor(distanceToGoal)} meters`, HUD_MARGIN_X, HUD_MARGIN_Y + HUD_LINE_SPACING * 4);
+  text(`Distance to Reactor: ${floor(distanceToGoal)} meters`, HUD_MARGIN_X, HUD_MARGIN_Y + HUD_LINE_SPACING * 3);
 
   // Update reactor hum volume based on distance to goal (reactor)
   updateReactorHum(distanceToGoal);
