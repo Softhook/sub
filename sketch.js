@@ -1180,6 +1180,12 @@ function setup() {
   colorMode(HSB, 360, 100, 100, 255); // Max values for HSB and Alpha
   textAlign(CENTER, CENTER); textFont('monospace');
   initializeSounds(); resetGame();
+
+    if (customFont) {
+    textFont(customFont);
+  }
+  resetGame();
+  // Initialize audio after a user gesture (e.g., click or key press)
 }
 
 function initGameObjects() {
@@ -1350,6 +1356,10 @@ function startAudioRoutine() {
     }
 }
 
+function preload() {
+  customFont = loadFont('Berpatroli.otf');
+}
+
 function mousePressed() {
     if (!audioInitialized) { // If audio not started, mouse click can also start it
         startAudioRoutine();
@@ -1490,12 +1500,12 @@ function drawPlayingState() {
   // HUD
   fill(HUD_TEXT_COLOR_H, HUD_TEXT_COLOR_S, HUD_TEXT_COLOR_B); textSize(HUD_TEXT_SIZE); textAlign(LEFT, TOP);
   text(`Hull: ${player.health}%`, HUD_MARGIN_X, HUD_MARGIN_Y + HUD_LINE_SPACING);
-  text(`Air: ${floor(player.airSupply / AIR_SUPPLY_FRAMES_TO_SECONDS_DIVISOR)}s (${floor(player.airSupply)})`, HUD_MARGIN_X, HUD_MARGIN_Y + HUD_LINE_SPACING * 2);
+  text(`Air: ${floor(player.airSupply / AIR_SUPPLY_FRAMES_TO_SECONDS_DIVISOR)} seconds `, HUD_MARGIN_X, HUD_MARGIN_Y + HUD_LINE_SPACING * 2);
   const killsRequired = getKillsRequiredForLevel(currentLevel);
   let killsStillNeeded = Math.max(0, killsRequired - enemiesKilledThisLevel);
   text(`Kills Needed: ${killsStillNeeded}`, HUD_MARGIN_X, HUD_MARGIN_Y + HUD_LINE_SPACING * 3);
   let distanceToGoal = dist(player.pos.x, player.pos.y, cave.goalPos.x, cave.goalPos.y);
-  text(`Distance to Reactor: ${floor(distanceToGoal)}`, HUD_MARGIN_X, HUD_MARGIN_Y + HUD_LINE_SPACING * 4);
+  text(`Distance to Reactor: ${floor(distanceToGoal)} meters`, HUD_MARGIN_X, HUD_MARGIN_Y + HUD_LINE_SPACING * 4);
 
   // Update reactor hum volume based on distance to goal (reactor)
   updateReactorHum(distanceToGoal);
