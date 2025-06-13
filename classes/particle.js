@@ -3,13 +3,19 @@ class SonarBubble {
   constructor(x, y) {
     this.pos = createVector(x, y); // Position is now exact as passed
     this.velY = random(SONAR_BUBBLE_MIN_SPEED_Y, SONAR_BUBBLE_MAX_SPEED_Y);
+    this.vel = createVector(0, -this.velY); // Default velocity as vector (upward)
     this.lifespan = SONAR_BUBBLE_MAX_LIFESPAN_FRAMES;
     this.size = random(SONAR_BUBBLE_MIN_SIZE, SONAR_BUBBLE_MAX_SIZE);
     this.initialLifespan = this.lifespan;
   }
 
   update() {
-    this.pos.y -= this.velY; // Move upwards
+    // Use velocity vector if set, otherwise fall back to original upward movement
+    if (this.vel) {
+      this.pos.add(this.vel);
+    } else {
+      this.pos.y -= this.velY; // Original upward movement
+    }
     this.lifespan--;
   }
 

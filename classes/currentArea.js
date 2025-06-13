@@ -32,16 +32,17 @@ class CurrentArea {
       let bubbleVel = p5.Vector.add(this.force, p5.Vector.random2D().mult(0.1)); // Slight random drift
       bubbleVel.mult(CURRENT_BUBBLE_SPEED_MULTIPLIER);
 
-      let bubbleSize = random(CURRENT_BUBBLE_SIZE_MIN, CURRENT_BUBBLE_SIZE_MAX);
-      let bubbleColor = color(PLAYER_BUBBLE_COLOR_H, PLAYER_BUBBLE_COLOR_S, PLAYER_BUBBLE_COLOR_B, PLAYER_BUBBLE_ALPHA * 0.7); // Slightly dimmer/different alpha
-      let bubbleLifespan = BUBBLE_LIFESPAN_FRAMES * CURRENT_BUBBLE_LIFESPAN_FACTOR;
-
-      // Add to global bubbles array. We might need a new bubble type or flag if they behave very differently.
-      // For now, they'll use the existing Bubble class.
-      let newBubble = new Bubble(bubbleX, bubbleY, bubbleSize, bubbleColor);
-      newBubble.vel = bubbleVel; // Override default bubble velocity
-      newBubble.lifespan = bubbleLifespan; // Override default lifespan
-      bubbles.push(newBubble);
+      // Create a sonar bubble instead of regular bubble
+      let newBubble = new SonarBubble(bubbleX, bubbleY);
+      
+      // Override the default sonar bubble velocity to move with the current
+      newBubble.vel = bubbleVel; // Override default upward movement
+      
+      // Adjust lifespan for current bubbles
+      newBubble.lifespan = BUBBLE_LIFESPAN_FRAMES * CURRENT_BUBBLE_LIFESPAN_FACTOR;
+      newBubble.initialLifespan = newBubble.lifespan;
+      
+      sonarBubbles.push(newBubble);
     }
   }
 

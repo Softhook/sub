@@ -13,7 +13,6 @@ let sonarBubbles = [];
 let particles = [];
 let jellyfish = [];
 let currentAreas = [];
-let bubbles = []; // For current area bubbles
 
 // Audio variables
 let audioInitialized = false;
@@ -38,35 +37,6 @@ let customFont;
 
 // Start screen submarine animation
 let startScreenPropellerAngle = 0;
-
-// Bubble class for current areas
-class Bubble {
-  constructor(x, y, size, color) {
-    this.pos = createVector(x, y);
-    this.vel = createVector(0, -0.5); // Default upward movement
-    this.size = size;
-    this.color = color;
-    this.lifespan = BUBBLE_LIFESPAN_FRAMES;
-    this.initialLifespan = this.lifespan;
-  }
-
-  update() {
-    this.pos.add(this.vel);
-    this.lifespan--;
-  }
-
-  render(offsetX, offsetY) {
-    let ageRatio = this.lifespan / this.initialLifespan;
-    let currentAlpha = alpha(this.color) * ageRatio;
-    fill(red(this.color), green(this.color), blue(this.color), currentAlpha);
-    noStroke();
-    ellipse(this.pos.x - offsetX, this.pos.y - offsetY, this.size);
-  }
-
-  isOffscreen() {
-    return this.lifespan <= 0;
-  }
-}
 
 function preload() {
   customFont = loadFont('Berpatroli.otf');
@@ -227,7 +197,6 @@ function drawPlayingState() {
   cleanupOldObjects(projectiles);
   cleanupOldObjects(sonarBubbles);
   cleanupOldObjects(particles);
-  cleanupOldObjects(bubbles);
 
   for (let proj of projectiles) {
     proj.update(cave);
@@ -244,15 +213,10 @@ function drawPlayingState() {
     particle.render(cameraOffsetX, cameraOffsetY);
   }
 
-  for (let bubble of bubbles) {
-    bubble.update();
-    bubble.render(cameraOffsetX, cameraOffsetY);
-  }
-
   // Render current areas (this will also spawn their bubbles)
   for (let area of currentAreas) {
     area.spawnBubbles(); // Spawn bubbles for current area
-    area.render(cameraOffsetX, cameraOffsetY);
+    //area.render(cameraOffsetX, cameraOffsetY);
   }
 
   player.update(cave, enemies, currentAreas); // Pass currentAreas to player update

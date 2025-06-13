@@ -228,10 +228,10 @@ const CURRENT_AREA_SIZE_MIN = 80; // Minimum current area size in pixels
 const CURRENT_AREA_SIZE_MAX = 150; // Maximum current area size in pixels
 const CURRENT_FORCE_MAGNITUDE_MIN = 0.02; // Minimum force magnitude
 const CURRENT_FORCE_MAGNITUDE_MAX = 0.05; // Maximum force magnitude
-const CURRENT_BUBBLE_SPAWN_DENSITY = 0.0001; // Bubbles per pixel area, per frame
+const CURRENT_BUBBLE_SPAWN_DENSITY = 0.00005; // Bubbles per pixel area, per frame (increased for visibility)
 const CURRENT_BUBBLE_SPEED_MULTIPLIER = 2.0; // Speed multiplier for current bubbles
-const CURRENT_BUBBLE_SIZE_MIN = 1; // Minimum current bubble size
-const CURRENT_BUBBLE_SIZE_MAX = 3; // Maximum current bubble size
+const CURRENT_BUBBLE_SIZE_MIN = 2; // Minimum current bubble size (increased for visibility)
+const CURRENT_BUBBLE_SIZE_MAX = 5; // Maximum current bubble size (increased for visibility)
 const CURRENT_BUBBLE_LIFESPAN_FACTOR = 2; // Lifespan multiplier for current bubbles
 const BUBBLE_LIFESPAN_FRAMES = 60; // Base bubble lifespan in frames
 
@@ -301,7 +301,7 @@ const PLAYER_COLOR_PROPELLER_B = 70; // New Propeller Color
 const PLAYER_BUBBLE_COLOR_H = 190; // Light cyan/blue
 const PLAYER_BUBBLE_COLOR_S = 60;
 const PLAYER_BUBBLE_COLOR_B = 90;
-const PLAYER_BUBBLE_ALPHA = 0.6; // Semi-transparent
+const PLAYER_BUBBLE_ALPHA = 150; // Semi-transparent (out of 255 in HSB mode)
 
 // UI Text Sizes & Positions
 const HUD_TEXT_COLOR_H = 50; 
@@ -419,4 +419,4 @@ const KEY_CODE_S = 83;
 const KEY_CODE_D = 68;
 
 // Debug Mode
-const DEBUG_MODE = false; // Set to true to see debug visuals
+const DEBUG_MODE = true; // Set to true to see debug visuals (temporarily enabled to see current areas)
