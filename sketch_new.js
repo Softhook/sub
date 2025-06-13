@@ -84,27 +84,47 @@ function drawStartScreen() {
   
   // Animate submarine
   let subX = width / 2;
-  let subY = height / 2 + START_SCREEN_TITLE_Y_OFFSET  -100;
+  let subY = height / 2 + START_SCREEN_TITLE_Y_OFFSET - 100;
   
   push();
   translate(subX, subY);
   
-  // Submarine body
+  // Use the same rendering as the gameplay submarine
+  let subRadius = PLAYER_RADIUS; // Use actual player radius
+  
+  // Submarine body (same as _renderBody)
   fill(PLAYER_COLOR_BODY_H, PLAYER_COLOR_BODY_S, PLAYER_COLOR_BODY_B);
   noStroke();
-  ellipse(0, 0, 40, 20);
+  ellipse(0, 0, subRadius * PLAYER_BODY_WIDTH_FACTOR, subRadius * PLAYER_BODY_HEIGHT_FACTOR);
   
-  // Sail
+  // Sail (same as _renderSail)
   fill(PLAYER_COLOR_SAIL_H, PLAYER_COLOR_SAIL_S, PLAYER_COLOR_SAIL_B);
   rectMode(CENTER);
-  rect(2, 0, 12, 18, 2);
+  rect(subRadius * PLAYER_SAIL_OFFSET_X_FACTOR, 0, subRadius * PLAYER_SAIL_WIDTH_FACTOR, subRadius * PLAYER_SAIL_HEIGHT_FACTOR, subRadius * PLAYER_SAIL_CORNER_RADIUS_FACTOR);
+  rectMode(CORNER); // Reset rectMode
   
-  // Propeller
+  // Fin (same as _renderFin)
+  fill(PLAYER_COLOR_FIN_H, PLAYER_COLOR_FIN_S, PLAYER_COLOR_FIN_B);
+  beginShape();
+  vertex(-subRadius * PLAYER_FIN_X1_FACTOR, -subRadius * PLAYER_FIN_Y1_FACTOR);
+  vertex(-subRadius * PLAYER_FIN_X2_FACTOR, subRadius * PLAYER_FIN_Y2_FACTOR);
+  vertex(-subRadius * PLAYER_FIN_X3_FACTOR, subRadius * PLAYER_FIN_Y3_FACTOR);
+  vertex(-subRadius * PLAYER_FIN_X4_FACTOR, -subRadius * PLAYER_FIN_Y4_FACTOR);
+  endShape(CLOSE);
+  
+  // Propeller (same as _renderPropeller)
   push();
-  translate(-20, 0);
+  translate(subRadius * PLAYER_PROPELLER_X_OFFSET_FACTOR, 0); // Position propeller at the back
+  
   fill(PLAYER_COLOR_PROPELLER_H, PLAYER_COLOR_PROPELLER_S, PLAYER_COLOR_PROPELLER_B);
-  let propellerHeight = 12 * abs(sin(startScreenPropellerAngle));
-  rect(0, 0, 3, propellerHeight);
+  noStroke();
+  
+  let apparentHeight = subRadius * PLAYER_PROPELLER_MAX_SIDE_HEIGHT_FACTOR * abs(sin(startScreenPropellerAngle));
+  let thickness = subRadius * PLAYER_PROPELLER_THICKNESS_FACTOR;
+  
+  rectMode(CENTER);
+  rect(0, 0, thickness, apparentHeight);
+  rectMode(CORNER); // Reset rectMode
   pop();
   
   pop();
