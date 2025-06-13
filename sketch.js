@@ -1387,7 +1387,7 @@ function drawStartScreen() {
   textSize(START_SCREEN_INFO_TEXT_SIZE);
   text("WASD/Arrows: Move. SPACE: Shoot.", width / 2, height / 2 + START_SCREEN_INFO_Y_OFFSET_1);
   let killsForLevel1 = getKillsRequiredForLevel(1);
-  text(`Goal: Destroy ${killsForLevel1} enemies and reach the reactor`, width / 2, height / 2 + START_SCREEN_INFO_Y_OFFSET_3);
+  text(`Destroy ${killsForLevel1} enemies and reach the flooded reactor`, width / 2, height / 2 + START_SCREEN_INFO_Y_OFFSET_3);
   textSize(START_SCREEN_PROMPT_TEXT_SIZE); fill(START_SCREEN_PROMPT_COLOR_H, START_SCREEN_PROMPT_COLOR_S, START_SCREEN_PROMPT_COLOR_B);
   text("Press ENTER to Dive", width / 2, height / 2 + START_SCREEN_PROMPT_Y_OFFSET);
   if (!audioInitialized) {
@@ -1403,7 +1403,7 @@ function drawLevelCompleteScreen() {
   textSize(LEVEL_COMPLETE_INFO_TEXT_SIZE);
   let killsForNextLevel = getKillsRequiredForLevel(currentLevel+1);
   text(`Next Level: Destroy ${killsForNextLevel} enemies and reach the reactor`, width/2, height / 2 + LEVEL_COMPLETE_INFO_Y_OFFSET);
-  text("Press ENTER to Continue", width / 2, height / 2 + LEVEL_COMPLETE_PROMPT_Y_OFFSET);
+  text("ENTER to Continue", width / 2, height / 2 + LEVEL_COMPLETE_PROMPT_Y_OFFSET);
 }
 
 function drawGameCompleteScreen() {
