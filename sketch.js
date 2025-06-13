@@ -634,32 +634,58 @@ class Cave {
     noStroke();
     rectMode(CENTER);
     rect(this.goalPos.x - offsetX, this.goalPos.y - offsetY, this.goalSize, this.goalSize);
+
     // Draw nuclear symbol
     let cx = this.goalPos.x - offsetX;
     let cy = this.goalPos.y - offsetY;
-    let r = this.goalSize * 0.28;
-    let triR = r * 0.85;
-    let triW = r * 0.55;
-    // let triH = r * 0.7; // triH is defined but not used, can be removed or kept for future use
-    fill(0); // Changed to black for testing
+    
+    fill(0); // Black for the symbol
     noStroke();
-    // Center circle
-    ellipse(cx, cy, r * 0.7);
+
+    const overallSymbolRadius = this.goalSize * 0.40; // Overall radius of the symbol
+    const centerDiscRadius = overallSymbolRadius * 0.22; // Radius of the central filled circle
+    const bladeInnerRadius = centerDiscRadius; // Blades start from the edge of the central circle
+    const bladeOuterRadius = overallSymbolRadius;  // Blades extend to the full symbol radius
+    const bladeSweepAngle = PI / 3; // Each blade is 60 degrees wide (PI/3 radians)
+    const angleStep = PI / 30; // Step for drawing arc segments (6 degrees per step)
+
+    // Center solid circle
+    ellipse(cx, cy, centerDiscRadius * 2, centerDiscRadius * 2);
+
     // 3 blades
     for (let i = 0; i < 3; i++) {
-      let angle = i * (TWO_PI / 3) - PI/2; // Adjusted initial angle for blades to point up/out
       push();
-      translate(cx, cy);
-      rotate(angle);
+      translate(cx, cy); // Move origin to the center of the symbol
+      
+      // Calculate the central angle for this blade.
+      // Standard orientation: blades centered at 90 (PI/2), 210 (7PI/6), 330 (11PI/6) degrees.
+      let bladeCenterRotation = (PI / 2) + (i * TWO_PI / 3);
+      rotate(bladeCenterRotation);
+
+      // Define the blade shape symmetrically around the (new) positive X-axis.
+      // It will span from -30 degrees to +30 degrees relative to the rotated X-axis.
+      let startAng = -bladeSweepAngle / 2;
+      let endAng = bladeSweepAngle / 2;
+      
       beginShape();
-      // Adjusted vertices for the blades
-      vertex(0, -r * 0.5); // Start the triangle a bit away from the center
-      vertex(-triW / 1.5, -triR * 1.2); // Outer left point
-      vertex(triW / 1.5, -triR * 1.2);  // Outer right point
-      endShape(CLOSE);
-      pop();
+      // Outer arc vertices (drawn from startAng to endAng)
+      for (let a = startAng; a <= endAng; a += angleStep) {
+        vertex(cos(a) * bladeOuterRadius, sin(a) * bladeOuterRadius);
+      }
+      // Ensure the final point of the outer arc is at endAng
+      vertex(cos(endAng) * bladeOuterRadius, sin(endAng) * bladeOuterRadius);
+
+      // Inner arc vertices (drawn from endAng back to startAng)
+      for (let a = endAng; a >= startAng; a -= angleStep) {
+         vertex(cos(a) * bladeInnerRadius, sin(a) * bladeInnerRadius);
+      }
+      // Ensure the final point of the inner arc (which is the start point) is at startAng
+      vertex(cos(startAng) * bladeInnerRadius, sin(startAng) * bladeInnerRadius);
+      endShape(CLOSE); // Close the shape to form a filled segment
+
+      pop(); // Restore previous transformation state
     }
-    pop();
+    pop(); // Matches the initial push() at the start of renderGoal
   }
 }
 
