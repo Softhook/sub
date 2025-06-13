@@ -84,7 +84,7 @@ function drawStartScreen() {
   
   // Animate submarine
   let subX = width / 2;
-  let subY = height / 2 + START_SCREEN_TITLE_Y_OFFSET + 80;
+  let subY = height / 2 + START_SCREEN_TITLE_Y_OFFSET  -100;
   
   push();
   translate(subX, subY);
@@ -190,8 +190,10 @@ function drawPlayingState() {
     }
   }
 
-  // Goal
-  cave.renderGoal(cameraOffsetX, cameraOffsetY);
+  // Goal - only render when player is within the goal area
+  if (cave.isGoal(player.pos.x, player.pos.y)) {
+    cave.renderGoal(cameraOffsetX, cameraOffsetY);
+  }
 
   // Update and render objects
   cleanupOldObjects(projectiles);

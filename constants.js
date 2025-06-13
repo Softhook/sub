@@ -224,8 +224,8 @@ const NUCLEAR_SYMBOL_CENTER_RADIUS_FACTOR = 0.15; // Center circle size
 
 // Current Area Constants
 const CURRENT_AREAS_PER_LEVEL = 3; // Number of current areas to create per level
-const CURRENT_AREA_SIZE_MIN = 80; // Minimum current area size in pixels
-const CURRENT_AREA_SIZE_MAX = 150; // Maximum current area size in pixels
+const CURRENT_AREA_SIZE_MIN = 150; // Minimum current area size in pixels
+const CURRENT_AREA_SIZE_MAX = 650; // Maximum current area size in pixels
 const CURRENT_FORCE_MAGNITUDE_MIN = 0.02; // Minimum force magnitude
 const CURRENT_FORCE_MAGNITUDE_MAX = 0.05; // Maximum force magnitude
 const CURRENT_BUBBLE_SPAWN_DENSITY = 0.00005; // Bubbles per pixel area, per frame (increased for visibility)
