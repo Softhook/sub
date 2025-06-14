@@ -175,4 +175,33 @@ class Cave {
     }
     pop(); // Matches the initial push() at the start of renderGoal
   }
+
+  // Check if a world coordinate is on the main navigable path from player to goal
+  isOnMainPath(worldX, worldY, tolerance = 0) {
+    if (worldX < 0 || worldX >= this.worldWidth || worldY < 0 || worldY >= this.worldHeight) return false;
+    
+    let gridX = floor(worldX / this.cellSize);
+    gridX = constrain(gridX, 0, this.gridWidth - 1);
+    
+    // Recreate the path Y position at this X coordinate using the same noise function
+    let pathY = this.gridHeight / 2;
+    let pathMinRadius = CAVE_PATH_MIN_RADIUS_CELLS;
+    let pathMaxRadius = CAVE_PATH_MAX_RADIUS_CELLS;
+    
+    // Apply the same noise transformations used in generateCave()
+    for (let i = 0; i <= gridX; i++) {
+      if (i > 0) {
+        pathY += (noise(i * CAVE_PATH_Y_NOISE_FACTOR_1, CAVE_PATH_Y_NOISE_OFFSET_1 + currentLevel) - 0.5) * CAVE_PATH_Y_NOISE_MULT_1;
+        pathY = constrain(pathY, pathMaxRadius + 1, this.gridHeight - pathMaxRadius - 1);
+      }
+    }
+    
+    let currentPathRadius = map(noise(gridX * CAVE_PATH_RADIUS_NOISE_FACTOR, CAVE_PATH_RADIUS_NOISE_OFFSET + currentLevel), 0, 1, pathMinRadius, pathMaxRadius);
+    
+    // Convert world Y to grid Y
+    let gridY = floor(worldY / this.cellSize);
+    
+    // Check if the point is within the path radius (plus tolerance)
+    return abs(gridY - pathY) <= (currentPathRadius + tolerance);
+  }
 }

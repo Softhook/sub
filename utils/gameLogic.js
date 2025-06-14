@@ -49,11 +49,11 @@ function initGameObjects() {
   let enemyCount = ENEMIES_PER_LEVEL_BASE + (currentLevel-1) * ENEMIES_PER_LEVEL_INCREMENT;
   for (let i = 0; i < enemyCount; i++) {
     let enemyX, enemyY, eAttempts = 0;
-    do { // Try to spawn enemy in a clear area
+    do { // Try to spawn enemy in the main path
       enemyX = random(WORLD_WIDTH * 0.3, WORLD_WIDTH * 0.9);
       enemyY = random(WORLD_HEIGHT * 0.2, WORLD_HEIGHT * 0.8); 
       eAttempts++;
-    } while (cave.isWall(enemyX, enemyY, ENEMY_RADIUS + 10) && eAttempts < MAX_ENEMY_SPAWN_ATTEMPTS);
+    } while ((!cave.isOnMainPath(enemyX, enemyY, 2) || cave.isWall(enemyX, enemyY, ENEMY_RADIUS + 10)) && eAttempts < MAX_ENEMY_SPAWN_ATTEMPTS);
     if (eAttempts < MAX_ENEMY_SPAWN_ATTEMPTS) {
       // Check distance from player
       let distFromPlayer = dist(enemyX, enemyY, playerStartX, playerStartY);
@@ -69,11 +69,11 @@ function initGameObjects() {
     let jellyfishCount = JELLYFISH_PER_LEVEL_BASE + (currentLevel - JELLYFISH_START_LEVEL) * JELLYFISH_PER_LEVEL_INCREMENT;
     for (let i = 0; i < jellyfishCount; i++) {
       let jellyfishX, jellyfishY, jAttempts = 0;
-      do { // Try to spawn jellyfish in a clear area, away from player
+      do { // Try to spawn jellyfish on the main path, away from player
         jellyfishX = random(WORLD_WIDTH * 0.3, WORLD_WIDTH * 0.9); // Spawn in middle to right area
         jellyfishY = random(WORLD_HEIGHT * 0.2, WORLD_HEIGHT * 0.8);
         jAttempts++;
-      } while (cave.isWall(jellyfishX, jellyfishY, JELLYFISH_RADIUS + 10) && jAttempts < MAX_JELLYFISH_SPAWN_ATTEMPTS);
+      } while ((!cave.isOnMainPath(jellyfishX, jellyfishY, 3) || cave.isWall(jellyfishX, jellyfishY, JELLYFISH_RADIUS + 10)) && jAttempts < MAX_JELLYFISH_SPAWN_ATTEMPTS);
       
       if (jAttempts < MAX_JELLYFISH_SPAWN_ATTEMPTS) {
         // Make sure jellyfish isn't too close to player start
@@ -103,7 +103,7 @@ function createCurrentArea() {
     let areaW = random(CURRENT_AREA_SIZE_MIN, CURRENT_AREA_SIZE_MAX);
     let areaH = random(CURRENT_AREA_SIZE_MIN, CURRENT_AREA_SIZE_MAX);
     
-    // Check if area is in open cave space
+    // Check if area is in open cave space AND on the main path
     let validArea = true;
     let checkPoints = 8; // Number of points to check around the area
     
@@ -111,9 +111,14 @@ function createCurrentArea() {
       let checkX = areaX + (i % 2) * areaW;
       let checkY = areaY + floor(i / 2) * (areaH / 2);
       
-      if (cave.isWall(checkX, checkY, 10)) {
+      if (cave.isWall(checkX, checkY, 10) || !cave.isOnMainPath(checkX, checkY, 1)) {
         validArea = false;
       }
+    }
+    
+    // Additional check: ensure the center of the area is on the main path
+    if (!cave.isOnMainPath(areaX + areaW/2, areaY + areaH/2, 2)) {
+      validArea = false;
     }
     
     // Check distance from player spawn
