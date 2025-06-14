@@ -364,6 +364,7 @@ let cameraOffsetX, cameraOffsetY;
 let gameState = 'start';
 let currentLevel = 1;
 let enemiesKilledThisLevel = 0; // New variable to track enemies killed this level
+let startScreenPropellerAngle = 0; // Animation variable for start screen submarine propeller
 
 // Helper function to process game object arrays (update, render, remove offscreen)
 function processGameObjectArray(arr, offsetX, offsetY, caveContext = null) {
@@ -1391,13 +1392,83 @@ function keyPressed() {
 }
 
 function drawStartScreen() {
+
+  // Animate submarine
+  let subX = width / 2;
+  let subY = height / 2 + START_SCREEN_TITLE_Y_OFFSET - 80;
+  
+  push();
+  translate(subX, subY);
+  
+  // Use the same rendering as the gameplay submarine
+  let subRadius = PLAYER_RADIUS; // Use actual player radius
+  
+  // Submarine body (same as _renderBody)
+  fill(PLAYER_COLOR_BODY_H, PLAYER_COLOR_BODY_S, PLAYER_COLOR_BODY_B);
+  noStroke();
+  ellipse(0, 0, subRadius * PLAYER_BODY_WIDTH_FACTOR, subRadius * PLAYER_BODY_HEIGHT_FACTOR);
+  
+  // Sail (same as _renderSail)
+  fill(PLAYER_COLOR_SAIL_H, PLAYER_COLOR_SAIL_S, PLAYER_COLOR_SAIL_B);
+  rectMode(CENTER);
+  rect(subRadius * PLAYER_SAIL_OFFSET_X_FACTOR, 0, subRadius * PLAYER_SAIL_WIDTH_FACTOR, subRadius * PLAYER_SAIL_HEIGHT_FACTOR, subRadius * PLAYER_SAIL_CORNER_RADIUS_FACTOR);
+  rectMode(CORNER); // Reset rectMode
+  
+  // Fin (same as _renderFin)
+  fill(PLAYER_COLOR_FIN_H, PLAYER_COLOR_FIN_S, PLAYER_COLOR_FIN_B);
+  beginShape();
+  vertex(-subRadius * PLAYER_FIN_X1_FACTOR, -subRadius * PLAYER_FIN_Y1_FACTOR);
+  vertex(-subRadius * PLAYER_FIN_X2_FACTOR, subRadius * PLAYER_FIN_Y2_FACTOR);
+  vertex(-subRadius * PLAYER_FIN_X3_FACTOR, subRadius * PLAYER_FIN_Y3_FACTOR);
+  vertex(-subRadius * PLAYER_FIN_X4_FACTOR, -subRadius * PLAYER_FIN_Y4_FACTOR);
+  endShape(CLOSE);
+  
+  // Propeller (same as _renderPropeller)
+  push();
+  translate(subRadius * PLAYER_PROPELLER_X_OFFSET_FACTOR, 0); // Position propeller at the back
+  
+  fill(PLAYER_COLOR_PROPELLER_H, PLAYER_COLOR_PROPELLER_S, PLAYER_COLOR_PROPELLER_B);
+  noStroke();
+  
+  let apparentHeight = subRadius * PLAYER_PROPELLER_MAX_SIDE_HEIGHT_FACTOR * abs(sin(startScreenPropellerAngle));
+  let thickness = subRadius * PLAYER_PROPELLER_THICKNESS_FACTOR;
+  
+  rectMode(CENTER);
+  rect(0, 0, thickness, apparentHeight);
+  rectMode(CORNER); // Reset rectMode
+  pop();
+  
+  pop();
+  
+  // Update propeller animation
+  startScreenPropellerAngle += 0.3;
+  
+  // Spawn bubbles from propeller
+  if (frameCount % 10 === 0) {
+    sonarBubbles.push(new SonarBubble(subX - 20 + random(-5, 5), subY + random(-5, 5)));
+  }
+  
+  // Update and render bubbles
+  for (let i = sonarBubbles.length - 1; i >= 0; i--) {
+    sonarBubbles[i].update();
+    sonarBubbles[i].render(0, 0);
+    if (sonarBubbles[i].isOffscreen()) {
+      sonarBubbles.splice(i, 1);
+    }
+  }
+  
+
+
   textAlign(CENTER, CENTER);
   fill(START_SCREEN_TITLE_COLOR_H, START_SCREEN_TITLE_COLOR_S, START_SCREEN_TITLE_COLOR_B); textSize(START_SCREEN_TITLE_TEXT_SIZE);
   text(`Reactor Dive`, width / 2, height / 2 + START_SCREEN_TITLE_Y_OFFSET);
   textSize(START_SCREEN_INFO_TEXT_SIZE);
-  text("WASD/Arrows: Move. SPACE: Shoot.", width / 2, height / 2 + START_SCREEN_INFO_Y_OFFSET_2);
+  text("Christian Nold 2025", width / 2, height / 2 - 90);
+
   let killsForLevel1 = getKillsRequiredForLevel(1);
-  text(`Destroy ${killsForLevel1} mutated creatures and reach the flooded reactor`, width / 2, height / 2 + START_SCREEN_INFO_Y_OFFSET_1);
+  text(`Destroy ${killsForLevel1} mutated creatures and reach the flooded reactor`, width / 2, height / 2 -40);
+    text("WASD/Arrows: Move. SPACE: Shoot.", width / 2, height / 2 - 10);
+  
   textSize(START_SCREEN_PROMPT_TEXT_SIZE); fill(START_SCREEN_PROMPT_COLOR_H, START_SCREEN_PROMPT_COLOR_S, START_SCREEN_PROMPT_COLOR_B);
   text("Press ENTER to Dive", width / 2, height / 2 + START_SCREEN_PROMPT_Y_OFFSET);
   if (!audioInitialized) {
