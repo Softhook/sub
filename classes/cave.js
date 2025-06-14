@@ -55,6 +55,9 @@ class Cave {
       }
     }
 
+    // Find and connect isolated chambers to the main path
+    this.connectIsolatedChambers();
+
     // Ensure borders are walls
     for (let i = 0; i < this.gridWidth; i++) { 
       this.grid[i][0] = true; 
@@ -203,5 +206,250 @@ class Cave {
     
     // Check if the point is within the path radius (plus tolerance)
     return abs(gridY - pathY) <= (currentPathRadius + tolerance);
+  }
+
+  // Find isolated chambers and connect them to the main path with organic tunnels
+  connectIsolatedChambers() {
+    // Mark all connected areas starting from the main path
+    let connected = [];
+    for (let i = 0; i < this.gridWidth; i++) {
+      connected[i] = [];
+      for (let j = 0; j < this.gridHeight; j++) {
+        connected[i][j] = false;
+      }
+    }
+    
+    // Flood fill from the main path to mark all connected open areas
+    this.floodFillFromMainPath(connected);
+    
+    // Find isolated chambers (open areas not connected to main path)
+    let isolatedChambers = this.findIsolatedChambers(connected);
+    
+    // Connect each isolated chamber to the main path
+    for (let chamber of isolatedChambers) {
+      this.carveOrganicConnection(chamber, connected);
+    }
+  }
+  
+  // Flood fill algorithm starting from the main path
+  floodFillFromMainPath(connected) {
+    let queue = [];
+    
+    // Start flood fill from multiple points along the main path
+    for (let i = 0; i < this.gridWidth; i += 5) { // Sample every 5 cells along path
+      let pathY = this.getPathYAtGridX(i);
+      let pathRadius = this.getPathRadiusAtGridX(i);
+      
+      // Add points within the path radius as starting points
+      for (let j = Math.max(0, Math.floor(pathY - pathRadius)); j <= Math.min(this.gridHeight - 1, Math.ceil(pathY + pathRadius)); j++) {
+        if (!this.grid[i][j] && !connected[i][j]) {
+          connected[i][j] = true;
+          queue.push({x: i, y: j});
+        }
+      }
+    }
+    
+    // Flood fill to mark all connected areas
+    while (queue.length > 0) {
+      let current = queue.shift();
+      let neighbors = [
+        {x: current.x - 1, y: current.y},
+        {x: current.x + 1, y: current.y},
+        {x: current.x, y: current.y - 1},
+        {x: current.x, y: current.y + 1}
+      ];
+      
+      for (let neighbor of neighbors) {
+        if (neighbor.x >= 0 && neighbor.x < this.gridWidth && 
+            neighbor.y >= 0 && neighbor.y < this.gridHeight &&
+            !this.grid[neighbor.x][neighbor.y] && !connected[neighbor.x][neighbor.y]) {
+          connected[neighbor.x][neighbor.y] = true;
+          queue.push(neighbor);
+        }
+      }
+    }
+  }
+  
+  // Find isolated chambers (groups of connected open cells not connected to main path)
+  findIsolatedChambers(connected) {
+    let chambers = [];
+    let visited = [];
+    
+    // Initialize visited array
+    for (let i = 0; i < this.gridWidth; i++) {
+      visited[i] = [];
+      for (let j = 0; j < this.gridHeight; j++) {
+        visited[i][j] = false;
+      }
+    }
+    
+    // Find isolated chambers using flood fill
+    for (let i = 0; i < this.gridWidth; i++) {
+      for (let j = 0; j < this.gridHeight; j++) {
+        if (!this.grid[i][j] && !connected[i][j] && !visited[i][j]) {
+          // Found start of an isolated chamber
+          let chamber = this.findChamberExtent(i, j, connected, visited);
+          if (chamber.cells.length >= 10) { // Only connect chambers with at least 10 open cells
+            chambers.push(chamber);
+          }
+        }
+      }
+    }
+    
+    return chambers;
+  }
+  
+  // Find the extent of a chamber starting from a given point
+  findChamberExtent(startX, startY, connected, visited) {
+    let chamber = {
+      cells: [],
+      centerX: 0,
+      centerY: 0
+    };
+    
+    let queue = [{x: startX, y: startY}];
+    visited[startX][startY] = true;
+    
+    while (queue.length > 0) {
+      let current = queue.shift();
+      chamber.cells.push(current);
+      
+      let neighbors = [
+        {x: current.x - 1, y: current.y},
+        {x: current.x + 1, y: current.y},
+        {x: current.x, y: current.y - 1},
+        {x: current.x, y: current.y + 1}
+      ];
+      
+      for (let neighbor of neighbors) {
+        if (neighbor.x >= 0 && neighbor.x < this.gridWidth && 
+            neighbor.y >= 0 && neighbor.y < this.gridHeight &&
+            !this.grid[neighbor.x][neighbor.y] && !connected[neighbor.x][neighbor.y] && 
+            !visited[neighbor.x][neighbor.y]) {
+          visited[neighbor.x][neighbor.y] = true;
+          queue.push(neighbor);
+        }
+      }
+    }
+    
+    // Calculate chamber center
+    let sumX = 0, sumY = 0;
+    for (let cell of chamber.cells) {
+      sumX += cell.x;
+      sumY += cell.y;
+    }
+    chamber.centerX = Math.floor(sumX / chamber.cells.length);
+    chamber.centerY = Math.floor(sumY / chamber.cells.length);
+    
+    return chamber;
+  }
+  
+  // Carve an organic connection from isolated chamber to main path
+  carveOrganicConnection(chamber, connected) {
+    let startX = chamber.centerX;
+    let startY = chamber.centerY;
+    
+    // Find closest point on main path
+    let closestPathX = 0;
+    let closestPathY = 0;
+    let minDist = Infinity;
+    
+    for (let i = 0; i < this.gridWidth; i++) {
+      let pathY = this.getPathYAtGridX(i);
+      let dist = Math.sqrt((i - startX) * (i - startX) + (pathY - startY) * (pathY - startY));
+      if (dist < minDist) {
+        minDist = dist;
+        closestPathX = i;
+        closestPathY = Math.floor(pathY);
+      }
+    }
+    
+    // Carve organic tunnel from chamber to main path
+    this.carveOrganicTunnel(startX, startY, closestPathX, closestPathY, connected);
+  }
+  
+  // Carve an organic tunnel between two points with submarine-friendly width
+  carveOrganicTunnel(fromX, fromY, toX, toY, connected) {
+    let currentX = fromX;
+    let currentY = fromY;
+    let tunnelRadius = 2; // Wide enough for submarine (2 cells radius = 4 cell diameter)
+    
+    // Use noise to create organic path variation
+    let noiseOffsetX = random(1000);
+    let noiseOffsetY = random(1000);
+    let step = 0;
+    
+    while (Math.abs(currentX - toX) > 1 || Math.abs(currentY - toY) > 1) {
+      // Calculate general direction to target
+      let dirX = toX - currentX;
+      let dirY = toY - currentY;
+      let dist = Math.sqrt(dirX * dirX + dirY * dirY);
+      
+      if (dist > 0) {
+        dirX /= dist;
+        dirY /= dist;
+      }
+      
+      // Add organic variation using noise
+      let noiseInfluence = 0.3; // How much noise affects the path
+      let noiseFactor = 0.1;
+      let noiseX = (noise(step * noiseFactor, noiseOffsetX) - 0.5) * noiseInfluence;
+      let noiseY = (noise(step * noiseFactor, noiseOffsetY) - 0.5) * noiseInfluence;
+      
+      // Combine direction with noise
+      dirX = dirX * (1 - noiseInfluence) + noiseX;
+      dirY = dirY * (1 - noiseInfluence) + noiseY;
+      
+      // Move toward target with organic variation
+      currentX += dirX;
+      currentY += dirY;
+      
+      // Constrain to grid bounds
+      currentX = constrain(currentX, tunnelRadius, this.gridWidth - tunnelRadius - 1);
+      currentY = constrain(currentY, tunnelRadius, this.gridHeight - tunnelRadius - 1);
+      
+      // Carve out tunnel with submarine-friendly radius
+      for (let dx = -tunnelRadius; dx <= tunnelRadius; dx++) {
+        for (let dy = -tunnelRadius; dy <= tunnelRadius; dy++) {
+          let distance = Math.sqrt(dx * dx + dy * dy);
+          if (distance <= tunnelRadius) {
+            let cellX = Math.floor(currentX + dx);
+            let cellY = Math.floor(currentY + dy);
+            
+            if (cellX >= 0 && cellX < this.gridWidth && cellY >= 0 && cellY < this.gridHeight) {
+              this.grid[cellX][cellY] = false; // Carve open space
+              connected[cellX][cellY] = true; // Mark as connected
+            }
+          }
+        }
+      }
+      
+      step++;
+      
+      // Safety check to prevent infinite loops
+      if (step > 1000) break;
+    }
+  }
+  
+  // Helper method to get path Y position at a given grid X coordinate
+  getPathYAtGridX(gridX) {
+    let pathY = this.gridHeight / 2;
+    let pathMaxRadius = CAVE_PATH_MAX_RADIUS_CELLS;
+    
+    for (let i = 0; i <= gridX; i++) {
+      if (i > 0) {
+        pathY += (noise(i * CAVE_PATH_Y_NOISE_FACTOR_1, CAVE_PATH_Y_NOISE_OFFSET_1 + currentLevel) - 0.5) * CAVE_PATH_Y_NOISE_MULT_1;
+        pathY = constrain(pathY, pathMaxRadius + 1, this.gridHeight - pathMaxRadius - 1);
+      }
+    }
+    
+    return pathY;
+  }
+  
+  // Helper method to get path radius at a given grid X coordinate
+  getPathRadiusAtGridX(gridX) {
+    let pathMinRadius = CAVE_PATH_MIN_RADIUS_CELLS;
+    let pathMaxRadius = CAVE_PATH_MAX_RADIUS_CELLS;
+    return map(noise(gridX * CAVE_PATH_RADIUS_NOISE_FACTOR, CAVE_PATH_RADIUS_NOISE_OFFSET + currentLevel), 0, 1, pathMinRadius, pathMaxRadius);
   }
 }
