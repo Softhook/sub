@@ -9,7 +9,6 @@ const INITIAL_AIR_SUPPLY_BASE = 6000; // Base air supply in frames
 const AIR_SUPPLY_LEVEL_REDUCTION = 0; // Air reduction per level
 const MIN_AIR_SUPPLY_PER_LEVEL = 3000; // Minimum air supply
 const BASE_AIR_DEPLETION_RATE = 1; // Base air depletion per frame
-const AIR_DEPLETION_LEVEL_INCREASE = 0.1; // Additional depletion per level
 const LEVEL_EXIT_MAX_ENEMIES_THRESHOLD = 0; // Max enemies to exit level
 
 // Player Constants
@@ -209,9 +208,9 @@ const JELLYFISH_SPAWN_RADIUS_BUFFER_CELL_FACTOR = 2; // Multiplier of CELL_SIZE
 const MIN_JELLYFISH_DISTANCE_FROM_PLAYER_CELLS = 15; // Minimum distance from player spawn
 
 // Enemy/Jellyfish distribution
-const ENEMIES_PER_LEVEL_BASE = 4;
-const ENEMIES_PER_LEVEL_INCREMENT = 2;
-const JELLYFISH_PER_LEVEL_BASE = 0; // Start with no jellyfish
+const ENEMIES_PER_LEVEL_BASE = 7; // Adjusted so level 2 has 12 enemies
+const ENEMIES_PER_LEVEL_INCREMENT = 5;
+const JELLYFISH_PER_LEVEL_BASE = 1; // Start with 1 jellyfish when they first appear
 const JELLYFISH_PER_LEVEL_INCREMENT = 1; // Add 1 jellyfish every level after level 1
 const JELLYFISH_START_LEVEL = 2; // Jellyfish start appearing from level 2
 
@@ -226,9 +225,9 @@ const NUCLEAR_SYMBOL_CENTER_RADIUS_FACTOR = 0.15; // Center circle size
 const CURRENT_AREAS_PER_LEVEL = 3; // Number of current areas to create per level
 const CURRENT_AREA_SIZE_MIN = 150; // Minimum current area size in pixels
 const CURRENT_AREA_SIZE_MAX = 650; // Maximum current area size in pixels
-const CURRENT_FORCE_MAGNITUDE_MIN = 0.02; // Minimum force magnitude
-const CURRENT_FORCE_MAGNITUDE_MAX = 0.05; // Maximum force magnitude
-const CURRENT_BUBBLE_SPAWN_DENSITY = 0.00005; // Bubbles per pixel area, per frame (increased for visibility)
+const CURRENT_FORCE_MAGNITUDE_MIN = 0.04; // Minimum force magnitude
+const CURRENT_FORCE_MAGNITUDE_MAX = 0.1; // Maximum force magnitude
+const CURRENT_BUBBLE_SPAWN_DENSITY = 0.00002; // Bubbles per pixel area, per frame (increased for visibility)
 const CURRENT_BUBBLE_SPEED_MULTIPLIER = 2.0; // Speed multiplier for current bubbles
 const CURRENT_BUBBLE_SIZE_MIN = 2; // Minimum current bubble size (increased for visibility)
 const CURRENT_BUBBLE_SIZE_MAX = 5; // Maximum current bubble size (increased for visibility)
@@ -379,7 +378,7 @@ const LOW_AIR_ENV_LEVELS = { aL: 0.4, rL: 0 };
 const REACTOR_HUM_FREQ = 120;
 const REACTOR_HUM_ENV_ADSR = { aT: 0.5, dT: 0.3, sR: 0.8, rT: 1.0 };
 const REACTOR_HUM_ENV_LEVELS = { aL: 0.3, rL: 0.1 };
-const REACTOR_HUM_MAX_DISTANCE = 300;
+const REACTOR_HUM_MAX_DISTANCE = 2000;
 
 const CREATURE_GROWL_MIN_FREQ = 80;
 const CREATURE_GROWL_MAX_FREQ = 150;
@@ -419,4 +418,4 @@ const KEY_CODE_S = 83;
 const KEY_CODE_D = 68;
 
 // Debug Mode
-const DEBUG_MODE = true; // Set to true to see debug visuals (temporarily enabled to see current areas)
+const DEBUG_MODE = false; // Set to true to see debug visuals (temporarily enabled to see current areas)

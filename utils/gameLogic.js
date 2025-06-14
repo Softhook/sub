@@ -12,7 +12,7 @@ function initGameObjects() {
   let baseAir = INITIAL_AIR_SUPPLY_BASE;
   let airForLevel = baseAir; // Initialize airForLevel with baseAir
   airForLevel = max(airForLevel, MIN_AIR_SUPPLY_PER_LEVEL); // Ensure minimum air
-  let airDepletion = BASE_AIR_DEPLETION_RATE + (currentLevel - 1) * AIR_DEPLETION_LEVEL_INCREASE;
+  let airDepletion = BASE_AIR_DEPLETION_RATE;
   
   let playerStartX, playerStartY;
   let attempts = 0;
@@ -46,7 +46,7 @@ function initGameObjects() {
   particles = []; // Initialize global particles array
   currentAreas = []; // Initialize current areas array
   
-  let enemyCount = ENEMIES_PER_LEVEL_BASE + (currentLevel - 1) * ENEMIES_PER_LEVEL_INCREMENT;
+  let enemyCount = ENEMIES_PER_LEVEL_BASE + (currentLevel-1) * ENEMIES_PER_LEVEL_INCREMENT;
   for (let i = 0; i < enemyCount; i++) {
     let enemyX, enemyY, eAttempts = 0;
     do { // Try to spawn enemy in a clear area
