@@ -84,7 +84,7 @@ function drawStartScreen() {
   
   // Animate submarine
   let subX = width / 2;
-  let subY = height / 2 + START_SCREEN_TITLE_Y_OFFSET - 100;
+  let subY = height / 2 + START_SCREEN_TITLE_Y_OFFSET - 80;
   
   push();
   translate(subX, subY);
@@ -151,16 +151,13 @@ function drawStartScreen() {
   text(`Reactor Dive`, width / 2, height / 2 + START_SCREEN_TITLE_Y_OFFSET);
   
   textSize(START_SCREEN_INFO_TEXT_SIZE);
+text("Christian Nold 2025", width / 2, height / 2 + START_SCREEN_INFO_Y_OFFSET_3);
   text("WASD/Arrows: Move. SPACE: Shoot.", width / 2, height / 2 + START_SCREEN_INFO_Y_OFFSET_2);
   let killsForLevel1 = getKillsRequiredForLevel(1);
   text(`Destroy ${killsForLevel1} mutated creatures and reach the flooded reactor`, width / 2, height / 2 + START_SCREEN_INFO_Y_OFFSET_1);
   
   fill(START_SCREEN_PROMPT_COLOR_H, START_SCREEN_PROMPT_COLOR_S, START_SCREEN_PROMPT_COLOR_B);
   text("Press ENTER to start", width / 2, height / 2 + START_SCREEN_INFO_Y_OFFSET_4);
-  
-  fill(START_SCREEN_AUDIO_NOTE_COLOR_H, START_SCREEN_AUDIO_NOTE_COLOR_S, START_SCREEN_AUDIO_NOTE_COLOR_B);
-  textSize(14);
-  text("Turn on audio for the best experience", width / 2, height / 2 + START_SCREEN_INFO_Y_OFFSET_4 + 30);
 }
 
 function drawLevelCompleteScreen() {
