@@ -291,40 +291,40 @@ const AIR_SUPPLY_FRAMES_TO_SECONDS_DIVISOR = 60; // Assuming 60fps for display
 
 const START_SCREEN_TITLE_COLOR_H = 50; const START_SCREEN_TITLE_COLOR_S = 100; const START_SCREEN_TITLE_COLOR_B = 100;
 const START_SCREEN_TITLE_TEXT_SIZE = 60;
-const START_SCREEN_TITLE_Y_OFFSET = -140;
+const START_SCREEN_TITLE_Y_OFFSET = -180; // Title at top
 const START_SCREEN_INFO_TEXT_SIZE = 20;
-const START_SCREEN_INFO_Y_OFFSET_1 = -50;
-const START_SCREEN_INFO_Y_OFFSET_2 = -10;
-const START_SCREEN_INFO_Y_OFFSET_3 = -20;
-const START_SCREEN_INFO_Y_OFFSET_4 = 10;
+const START_SCREEN_INFO_Y_OFFSET_1 = -60; // Game objective
+const START_SCREEN_INFO_Y_OFFSET_2 = -30; // Controls
+const START_SCREEN_INFO_Y_OFFSET_3 = -90; // Credit
+const START_SCREEN_INFO_Y_OFFSET_4 = 10; // Not used
 const START_SCREEN_FULLSCREEN_Y_OFFSET = 40;
 const START_SCREEN_PROMPT_TEXT_SIZE = 28;
 const START_SCREEN_PROMPT_COLOR_H = 120; const START_SCREEN_PROMPT_COLOR_S = 100; const START_SCREEN_PROMPT_COLOR_B = 100;
-const START_SCREEN_PROMPT_Y_OFFSET = 80;
+const START_SCREEN_PROMPT_Y_OFFSET = 80; // Enter prompt
 const START_SCREEN_AUDIO_NOTE_TEXT_SIZE = 16;
 const START_SCREEN_AUDIO_NOTE_COLOR_H = 200; const START_SCREEN_AUDIO_NOTE_COLOR_S = 80; const START_SCREEN_AUDIO_NOTE_COLOR_B = 80;
 const START_SCREEN_AUDIO_NOTE_Y_OFFSET = 110;
 
 const LEVEL_COMPLETE_TITLE_COLOR_H = 100; const LEVEL_COMPLETE_TITLE_COLOR_S = 100; const LEVEL_COMPLETE_TITLE_COLOR_B = 100;
 const LEVEL_COMPLETE_TITLE_TEXT_SIZE = 48;
-const LEVEL_COMPLETE_TITLE_Y_OFFSET = -40;
+const LEVEL_COMPLETE_TITLE_Y_OFFSET = -80; // Title higher up
 const LEVEL_COMPLETE_INFO_TEXT_SIZE = 24;
-const LEVEL_COMPLETE_INFO_Y_OFFSET = 10;
-const LEVEL_COMPLETE_PROMPT_Y_OFFSET = 50;
+const LEVEL_COMPLETE_INFO_Y_OFFSET = -20; // Score info area
+const LEVEL_COMPLETE_PROMPT_Y_OFFSET = 80; // Enter prompt lower
 
 const GAME_COMPLETE_TITLE_COLOR_H = 120; const GAME_COMPLETE_TITLE_COLOR_S = 100; const GAME_COMPLETE_TITLE_COLOR_B = 100;
 const GAME_COMPLETE_TITLE_TEXT_SIZE = 60;
-const GAME_COMPLETE_TITLE_Y_OFFSET = -40;
+const GAME_COMPLETE_TITLE_Y_OFFSET = -80; // Title higher up
 const GAME_COMPLETE_INFO_TEXT_SIZE = 24;
-const GAME_COMPLETE_INFO_Y_OFFSET = 20;
-const GAME_COMPLETE_PROMPT_Y_OFFSET = 60;
+const GAME_COMPLETE_INFO_Y_OFFSET = -20; // Info area
+const GAME_COMPLETE_PROMPT_Y_OFFSET = 80; // Enter prompt lower
 
 const GAME_OVER_TITLE_COLOR_H = 0; const GAME_OVER_TITLE_COLOR_S = 80; const GAME_OVER_TITLE_COLOR_B = 70;
 const GAME_OVER_TITLE_TEXT_SIZE = 60;
-const GAME_OVER_TITLE_Y_OFFSET = -40;
+const GAME_OVER_TITLE_Y_OFFSET = -80; // Title higher up
 const GAME_OVER_INFO_TEXT_SIZE = 24;
-const GAME_OVER_INFO_Y_OFFSET = 10;
-const GAME_OVER_PROMPT_Y_OFFSET = 50;
+const GAME_OVER_INFO_Y_OFFSET = -20; // Info area
+const GAME_OVER_PROMPT_Y_OFFSET = 80; // Enter prompt lower
 
 // Key Codes
 const KEY_CODE_SPACE = 32;
@@ -365,6 +365,8 @@ let gameState = 'start';
 let currentLevel = 1;
 let enemiesKilledThisLevel = 0; // New variable to track enemies killed this level
 let startScreenPropellerAngle = 0; // Animation variable for start screen submarine propeller
+let totalScore = 0; // Total accumulated score across all completed levels
+let levelScore = 0; // Score for the current level
 
 // Helper function to process game object arrays (update, render, remove offscreen)
 function processGameObjectArray(arr, offsetX, offsetY, caveContext = null) {
@@ -1259,6 +1261,8 @@ function initGameObjects() {
 function resetGame() {
   currentLevel = 1;
   enemiesKilledThisLevel = 0; // Reset kills tracking
+  totalScore = 0; // Reset total score for new game
+  levelScore = 0; // Reset level score
   // currentCellSize will be set in initGameObjects based on currentLevel
   initGameObjects();
   player.health = PLAYER_INITIAL_HEALTH; player.airSupply = player.initialAirSupply; // Reset to full for new game
@@ -1312,6 +1316,7 @@ function createExplosion(x, y, type) {
 function prepareNextLevel() {
   currentLevel++;
   enemiesKilledThisLevel = 0; // Reset kills tracking
+  levelScore = 0; // Reset level score for new level
   initGameObjects(); // This will create new cave, player (with new air), enemies
   // Player position is set by initGameObjects to a safe start in the new cave
   player.vel = createVector(0,0); player.angle = 0; // Reset movement
@@ -1462,12 +1467,13 @@ function drawStartScreen() {
   textAlign(CENTER, CENTER);
   fill(START_SCREEN_TITLE_COLOR_H, START_SCREEN_TITLE_COLOR_S, START_SCREEN_TITLE_COLOR_B); textSize(START_SCREEN_TITLE_TEXT_SIZE);
   text(`Reactor Dive`, width / 2, height / 2 + START_SCREEN_TITLE_Y_OFFSET);
+  
   textSize(START_SCREEN_INFO_TEXT_SIZE);
-  text("Christian Nold 2025", width / 2, height / 2 - 90);
+  text("Christian Nold 2025", width / 2, height / 2 + START_SCREEN_INFO_Y_OFFSET_3);
 
   let killsForLevel1 = getKillsRequiredForLevel(1);
-  text(`Destroy ${killsForLevel1} mutated creatures and reach the flooded reactor`, width / 2, height / 2 -40);
-    text("WASD/Arrows: Move. SPACE: Shoot.", width / 2, height / 2 - 10);
+  text(`Destroy ${killsForLevel1} mutated creatures and reach the flooded reactor`, width / 2, height / 2 + START_SCREEN_INFO_Y_OFFSET_1);
+  text("WASD/Arrows: Move. SPACE: Shoot.", width / 2, height / 2 + START_SCREEN_INFO_Y_OFFSET_2);
   
   textSize(START_SCREEN_PROMPT_TEXT_SIZE); fill(START_SCREEN_PROMPT_COLOR_H, START_SCREEN_PROMPT_COLOR_S, START_SCREEN_PROMPT_COLOR_B);
   text("Press ENTER to Dive", width / 2, height / 2 + START_SCREEN_PROMPT_Y_OFFSET);
@@ -1481,9 +1487,13 @@ function drawLevelCompleteScreen() {
   textAlign(CENTER, CENTER); 
   fill(LEVEL_COMPLETE_TITLE_COLOR_H, LEVEL_COMPLETE_TITLE_COLOR_S, LEVEL_COMPLETE_TITLE_COLOR_B); textSize(LEVEL_COMPLETE_TITLE_TEXT_SIZE);
   text(`LEVEL ${currentLevel} CLEARED!`, width / 2, height / 2 + LEVEL_COMPLETE_TITLE_Y_OFFSET); 
+  
+  // Show score information
   textSize(LEVEL_COMPLETE_INFO_TEXT_SIZE);
+  let timeLeftInSeconds = Math.max(0, Math.floor(player.airSupply / 60));
+  text(`Time bonus: ${timeLeftInSeconds} seconds x 10 = ${levelScore} points`, width / 2, height / 2 + LEVEL_COMPLETE_INFO_Y_OFFSET);
   let killsForNextLevel = getKillsRequiredForLevel(currentLevel+1);
-  text(`Next Level: Destroy ${killsForNextLevel} enemies and reach the reactor`, width/2, height / 2 + LEVEL_COMPLETE_INFO_Y_OFFSET);
+  text(`Next Level: Destroy ${killsForNextLevel} enemies and reach the reactor`, width/2, height / 2 + LEVEL_COMPLETE_INFO_Y_OFFSET + 40);
   text("ENTER to Continue", width / 2, height / 2 + LEVEL_COMPLETE_PROMPT_Y_OFFSET);
 }
 
@@ -1493,14 +1503,17 @@ function drawGameCompleteScreen() {
   text("MISSION ACCOMPLISHED!", width / 2, height / 2 + GAME_COMPLETE_TITLE_Y_OFFSET);
   textSize(GAME_COMPLETE_INFO_TEXT_SIZE);
   text(`You cleared all ${MAX_LEVELS} levels!`, width/2, height/2 + GAME_COMPLETE_INFO_Y_OFFSET);
+  text(`Final Score: ${totalScore}`, width/2, height/2 + GAME_COMPLETE_INFO_Y_OFFSET + 30);
   text("Press ENTER to Play Again", width / 2, height / 2 + GAME_COMPLETE_PROMPT_Y_OFFSET);
 }
 
 function drawGameOverScreen() {
   textAlign(CENTER, CENTER);
   fill(GAME_OVER_TITLE_COLOR_H, GAME_OVER_TITLE_COLOR_S, GAME_OVER_TITLE_COLOR_B); textSize(GAME_OVER_TITLE_TEXT_SIZE);
+  text("MISSION FAILED", width/2, height/2 + GAME_OVER_TITLE_Y_OFFSET);
   textSize(GAME_OVER_INFO_TEXT_SIZE);
   text(player.health <= 0 ? "Submarine Destroyed!" : "Air Supply Depleted!", width/2, height/2 + GAME_OVER_INFO_Y_OFFSET);
+  text(`Total Score: ${totalScore}`, width/2, height/2 + GAME_OVER_INFO_Y_OFFSET + 30);
   text("Press ENTER to Restart", width / 2, height / 2 + GAME_OVER_PROMPT_Y_OFFSET);
 }
 
@@ -1583,9 +1596,18 @@ function drawPlayingState() {
 
   // Check Game Over / Level Complete Conditions
   if (player.health <= 0 || player.airSupply <= 0) {
-      if(gameState === 'playing') playSound('gameOver');
+      if(gameState === 'playing') {
+        // Player died - don't add level score to total, just calculate for display
+        let timeLeftInSeconds = Math.max(0, Math.floor(player.airSupply / 60)); // Convert frames to seconds (assuming 60 FPS)
+        levelScore = timeLeftInSeconds * 10;
+        playSound('gameOver');
+      }
       gameState = 'gameOver';
   } else if (cave.isGoal(player.pos.x, player.pos.y) && killsStillNeeded === 0) {
+    // Level completed successfully - calculate score and add to total
+    let timeLeftInSeconds = Math.max(0, Math.floor(player.airSupply / 60)); // Convert frames to seconds (assuming 60 FPS)
+    levelScore = timeLeftInSeconds * 10;
+    totalScore += levelScore;
     gameState = (currentLevel >= MAX_LEVELS) ? 'gameComplete' : 'levelComplete';
   }
 }
@@ -1615,7 +1637,7 @@ function draw() {
 function windowResized() { resizeCanvas(windowWidth, windowHeight); }
 
 // --- Dynamic Kills Requirement Constants ---
-const BASE_KILLS_REQUIRED = 5; // Kills required for the first level
+const BASE_KILLS_REQUIRED = 3; // Kills required for the first level
 const KILLS_INCREASE_PER_LEVEL = 3; // How many more kills needed each subsequent level
 function getKillsRequiredForLevel(level) {
   if (level <= 0) return 0;
