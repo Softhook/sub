@@ -589,8 +589,12 @@ class Cave {
       }
     }
     
+    // Find and connect all significant open spaces
+    this.connectAllSignificantSpaces();
+
     // Ensure the main path has guaranteed clearance for submarine passage
     this.ensureMainPathClearance(mainPath);
+    
     
     // Ensure borders are walls
     for (let i = 0; i < this.gridWidth; i++) { this.grid[i][0] = true; this.grid[i][this.gridHeight - 1] = true; }
@@ -665,6 +669,176 @@ class Cave {
               checkX >= 0 && checkX < this.gridWidth &&
               checkY >= 0 && checkY < this.gridHeight) {
             this.grid[checkX][checkY] = false; // Clear the space
+          }
+        }
+      }
+    }
+  }
+
+  // Find and connect all significant open spaces to ensure full exploration
+  connectAllSignificantSpaces() {
+    const MIN_SPACE_SIZE = 25; // Minimum cells for a "significant" space
+    const SUBMARINE_RADIUS_CELLS = Math.ceil(PLAYER_RADIUS / this.cellSize);
+    
+    // Find all open space groups
+    let visited = this.createVisitedGrid();
+    let openSpaces = [];
+    
+    for (let i = 1; i < this.gridWidth - 1; i++) {
+      for (let j = 1; j < this.gridHeight - 1; j++) {
+        if (!this.grid[i][j] && !visited[i][j]) {
+          let space = this.floodFillOpenSpace(i, j, visited);
+          if (space.length >= MIN_SPACE_SIZE) {
+            openSpaces.push(space);
+          }
+        }
+      }
+    }
+    
+    // Connect all significant spaces to the main path
+    if (openSpaces.length > 1) {
+      this.connectSpacesToMainPath(openSpaces);
+    }
+  }
+  
+  // Create a visited grid for flood fill operations
+  createVisitedGrid() {
+    let visited = [];
+    for (let i = 0; i < this.gridWidth; i++) {
+      visited[i] = [];
+      for (let j = 0; j < this.gridHeight; j++) {
+        visited[i][j] = false;
+      }
+    }
+    return visited;
+  }
+  
+  // Flood fill to find connected open space
+  floodFillOpenSpace(startX, startY, visited) {
+    let space = [];
+    let queue = [{x: startX, y: startY}];
+    visited[startX][startY] = true;
+    
+    while (queue.length > 0) {
+      let current = queue.shift();
+      space.push(current);
+      
+      // Check 4 directions (not diagonal for more natural spaces)
+      const directions = [{x: 0, y: 1}, {x: 0, y: -1}, {x: 1, y: 0}, {x: -1, y: 0}];
+      
+      for (let dir of directions) {
+        let newX = current.x + dir.x;
+        let newY = current.y + dir.y;
+        
+        if (newX >= 0 && newX < this.gridWidth && 
+            newY >= 0 && newY < this.gridHeight &&
+            !visited[newX][newY] && !this.grid[newX][newY]) {
+          visited[newX][newY] = true;
+          queue.push({x: newX, y: newY});
+        }
+      }
+    }
+    
+    return space;
+  }
+  
+  // Connect isolated spaces to the main path with organic tunnels
+  connectSpacesToMainPath(openSpaces) {
+    // Find the main path space (largest connected component containing the center)
+    let mainSpaceIndex = this.findMainPathSpace(openSpaces);
+    
+    if (mainSpaceIndex === -1) return; // No main space found
+    
+    let mainSpace = openSpaces[mainSpaceIndex];
+    
+    // Connect all other spaces to the main space
+    for (let i = 0; i < openSpaces.length; i++) {
+      if (i !== mainSpaceIndex) {
+        this.carveOrganicTunnel(openSpaces[i], mainSpace);
+      }
+    }
+  }
+  
+  // Find the space that contains the main path
+  findMainPathSpace(openSpaces) {
+    let centerX = Math.floor(this.gridWidth / 4); // Near start area
+    let centerY = Math.floor(this.gridHeight / 2);
+    
+    for (let i = 0; i < openSpaces.length; i++) {
+      for (let cell of openSpaces[i]) {
+        if (dist(cell.x, cell.y, centerX, centerY) < 10) {
+          return i;
+        }
+      }
+    }
+    
+    // If not found, return the largest space
+    let largestIndex = 0;
+    for (let i = 1; i < openSpaces.length; i++) {
+      if (openSpaces[i].length > openSpaces[largestIndex].length) {
+        largestIndex = i;
+      }
+    }
+    
+    return largestIndex;
+  }
+  
+  // Carve an organic tunnel between two spaces
+  carveOrganicTunnel(fromSpace, toSpace) {
+    // Find closest points between the two spaces
+    let minDist = Infinity;
+    let startPoint = null;
+    let endPoint = null;
+    
+    for (let fromCell of fromSpace) {
+      for (let toCell of toSpace) {
+        let d = dist(fromCell.x, fromCell.y, toCell.x, toCell.y);
+        if (d < minDist) {
+          minDist = d;
+          startPoint = fromCell;
+          endPoint = toCell;
+        }
+      }
+    }
+    
+    if (!startPoint || !endPoint) return;
+    
+    // Carve organic path using noise-based curve
+    this.carveNoisyPath(startPoint.x, startPoint.y, endPoint.x, endPoint.y);
+  }
+  
+  // Carve a noisy, organic-looking path between two points
+  carveNoisyPath(x1, y1, x2, y2) {
+    let steps = Math.floor(dist(x1, y1, x2, y2)) + 5;
+    let tunnelWidth = Math.ceil(PLAYER_RADIUS / this.cellSize) + 1;
+    
+    for (let i = 0; i <= steps; i++) {
+      let t = i / steps;
+      
+      // Base interpolation
+      let baseX = lerp(x1, x2, t);
+      let baseY = lerp(y1, y2, t);
+      
+      // Add organic noise to the path
+      let noiseScale = 0.1;
+      let noiseAmplitude = 3;
+      let offsetX = (noise(baseX * noiseScale, baseY * noiseScale, 100) - 0.5) * noiseAmplitude;
+      let offsetY = (noise(baseX * noiseScale, baseY * noiseScale, 200) - 0.5) * noiseAmplitude;
+      
+      let currentX = Math.round(baseX + offsetX);
+      let currentY = Math.round(baseY + offsetY);
+      
+      // Carve tunnel with appropriate width
+      for (let dx = -tunnelWidth; dx <= tunnelWidth; dx++) {
+        for (let dy = -tunnelWidth; dy <= tunnelWidth; dy++) {
+          if (dist(0, 0, dx, dy) <= tunnelWidth) {
+            let carveX = currentX + dx;
+            let carveY = currentY + dy;
+            
+            if (carveX >= 1 && carveX < this.gridWidth - 1 &&
+                carveY >= 1 && carveY < this.gridHeight - 1) {
+              this.grid[carveX][carveY] = false;
+            }
           }
         }
       }
