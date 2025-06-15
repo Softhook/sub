@@ -589,12 +589,11 @@ class Cave {
       }
     }
     
-    // Find and connect all significant open spaces
-    this.connectAllSignificantSpaces();
-
     // Ensure the main path has guaranteed clearance for submarine passage
     this.ensureMainPathClearance(mainPath);
     
+    // Find and connect all significant open spaces
+    this.connectAllSignificantSpaces();
     
     // Ensure borders are walls
     for (let i = 0; i < this.gridWidth; i++) { this.grid[i][0] = true; this.grid[i][this.gridHeight - 1] = true; }
