@@ -541,16 +541,36 @@ const highScoreManager = new JSONBinHighScores();
 
 // Helper function to process game object arrays (update, render, remove offscreen)
 function processGameObjectArray(arr, offsetX, offsetY, caveContext = null) {
+  let margin = 50; // Margin for objects slightly off-screen
+  
   for (let i = arr.length - 1; i >= 0; i--) {
     let obj = arr[i];
+    
+    // Always update object logic
     if (obj.update) {
-        if (caveContext && obj instanceof Projectile) { // Pass cave only if needed (e.g. Projectile)
+        if (caveContext && obj instanceof Projectile) {
             obj.update(caveContext);
         } else {
             obj.update(); 
         }
     }
-    if (obj.render) obj.render(offsetX, offsetY);
+    
+    // Only render if object is near the viewport
+    if (obj.render && obj.pos) {
+      let objRadius = obj.radius || obj.size || 10; // Default radius if not specified
+      
+      if (obj.pos.x + objRadius >= offsetX - margin &&
+          obj.pos.x - objRadius <= offsetX + width + margin &&
+          obj.pos.y + objRadius >= offsetY - margin &&
+          obj.pos.y - objRadius <= offsetY + height + margin) {
+        obj.render(offsetX, offsetY);
+      }
+    } else if (obj.render) {
+      // Fallback for objects without position (render anyway)
+      obj.render(offsetX, offsetY);
+    }
+    
+    // Remove dead objects
     if (obj.isOffscreen && obj.isOffscreen()) {
       arr.splice(i, 1);
     }
@@ -718,18 +738,42 @@ class CurrentArea {
   }
 
   // Spawn bubbles within the area to indicate the current
-  spawnBubbles(cave) {
+  spawnBubbles(cave, cameraOffsetX, cameraOffsetY) {
     if (!cave) return; // Safety check
     
-    // Density determines how many bubbles to try to spawn per frame
-    let bubblesToSpawn = floor(this.width * this.height * CURRENT_BUBBLE_SPAWN_DENSITY);
-    if (random() < (this.width * this.height * CURRENT_BUBBLE_SPAWN_DENSITY) % 1) {
+    // Only spawn bubbles if current area is visible on screen (with some margin)
+    let margin = 100; // Extra margin to spawn bubbles just off-screen
+    let screenLeft = cameraOffsetX - margin;
+    let screenRight = cameraOffsetX + width + margin;
+    let screenTop = cameraOffsetY - margin;
+    let screenBottom = cameraOffsetY + height + margin;
+    
+    // Check if current area intersects with visible screen area
+    if (this.x + this.width < screenLeft || this.x > screenRight ||
+        this.y + this.height < screenTop || this.y > screenBottom) {
+      return; // Current area not visible, skip bubble spawning
+    }
+    
+    // Only calculate spawning for the visible portion of the current area
+    let visibleLeft = Math.max(this.x, screenLeft);
+    let visibleRight = Math.min(this.x + this.width, screenRight);
+    let visibleTop = Math.max(this.y, screenTop);
+    let visibleBottom = Math.min(this.y + this.height, screenBottom);
+    
+    let visibleWidth = visibleRight - visibleLeft;
+    let visibleHeight = visibleBottom - visibleTop;
+    
+    if (visibleWidth <= 0 || visibleHeight <= 0) return;
+    
+    // Density determines how many bubbles to try to spawn per frame (based on visible area)
+    let bubblesToSpawn = floor(visibleWidth * visibleHeight * CURRENT_BUBBLE_SPAWN_DENSITY);
+    if (random() < (visibleWidth * visibleHeight * CURRENT_BUBBLE_SPAWN_DENSITY) % 1) {
         bubblesToSpawn++; // Probabilistically add one more bubble for fractional parts
     }
 
     for (let i = 0; i < bubblesToSpawn; i++) {
-      let bubbleX = random(this.x, this.x + this.width);
-      let bubbleY = random(this.y, this.y + this.height);
+      let bubbleX = random(visibleLeft, visibleRight);
+      let bubbleY = random(visibleTop, visibleBottom);
       
       // Only spawn bubbles in open water (not in walls)
       if (cave.isWall(bubbleX, bubbleY)) {
@@ -756,36 +800,48 @@ class CurrentArea {
 
   // Render the current area (with debug visuals if enabled)
   render(offsetX, offsetY) {
-    if (debugShowWalls) {
-      // Debug visualization of current area
-      push();
-      stroke(255, 0, 0, 100); // Red border with transparency
-      strokeWeight(2);
-      noFill();
-      rect(this.x - offsetX, this.y - offsetY, this.width, this.height);
-      
-      // Draw force direction arrow
-      let centerX = this.x + this.width / 2 - offsetX;
-      let centerY = this.y + this.height / 2 - offsetY;
-      let arrowLength = 30;
-      let arrowEndX = centerX + this.forceDirection.x * arrowLength;
-      let arrowEndY = centerY + this.forceDirection.y * arrowLength;
-      
-      stroke(255, 255, 0, 150); // Yellow arrow
-      strokeWeight(3);
-      line(centerX, centerY, arrowEndX, arrowEndY);
-      
-      // Arrow head
-      push();
-      translate(arrowEndX, arrowEndY);
-      rotate(atan2(this.forceDirection.y, this.forceDirection.x));
-      noStroke();
-      fill(255, 255, 0, 150);
-      triangle(0, 0, -8, -3, -8, 3);
-      pop();
-      
-      pop();
+    if (!debugShowWalls) return; // Early exit if debug mode is off
+    
+    // Only render if current area is visible on screen
+    let screenLeft = offsetX;
+    let screenRight = offsetX + width;
+    let screenTop = offsetY;
+    let screenBottom = offsetY + height;
+    
+    // Check if current area intersects with visible screen area
+    if (this.x + this.width < screenLeft || this.x > screenRight ||
+        this.y + this.height < screenTop || this.y > screenBottom) {
+      return; // Current area not visible, skip rendering
     }
+    
+    // Debug visualization of current area
+    push();
+    stroke(255, 0, 0, 100); // Red border with transparency
+    strokeWeight(2);
+    noFill();
+    rect(this.x - offsetX, this.y - offsetY, this.width, this.height);
+    
+    // Draw force direction arrow
+    let centerX = this.x + this.width / 2 - offsetX;
+    let centerY = this.y + this.height / 2 - offsetY;
+    let arrowLength = 30;
+    let arrowEndX = centerX + this.forceDirection.x * arrowLength;
+    let arrowEndY = centerY + this.forceDirection.y * arrowLength;
+    
+    stroke(255, 255, 0, 150); // Yellow arrow
+    strokeWeight(3);
+    line(centerX, centerY, arrowEndX, arrowEndY);
+    
+    // Arrow head
+    push();
+    translate(arrowEndX, arrowEndY);
+    rotate(atan2(this.forceDirection.y, this.forceDirection.x));
+    noStroke();
+    fill(255, 255, 0, 150);
+    triangle(0, 0, -8, -3, -8, 3);
+    pop();
+    
+    pop();
   }
 }
 
@@ -2259,7 +2315,7 @@ function drawPlayingState() {
 
   // Process current areas - spawn bubbles and render debug visuals
   for (let area of currentAreas) {
-    area.spawnBubbles(cave);
+    area.spawnBubbles(cave, cameraOffsetX, cameraOffsetY);
     area.render(cameraOffsetX, cameraOffsetY);
   }
 
@@ -2269,7 +2325,23 @@ function drawPlayingState() {
   processGameObjectArray(projectiles, cameraOffsetX, cameraOffsetY, cave); // Projectiles need cave context
 
   player.update(cave, enemies);
-  for (let enemy of enemies) enemy.update(cave, player);
+  
+  // Update and render enemies - only process those near the screen
+  let margin = 100; // Extra margin for off-screen enemies
+  for (let enemy of enemies) {
+    // Always update enemy logic (AI, movement) but only render if visible
+    enemy.update(cave, player);
+    
+    // Check if enemy is near the viewport for rendering
+    if (enemy.pos.x + enemy.radius >= cameraOffsetX - margin &&
+        enemy.pos.x - enemy.radius <= cameraOffsetX + width + margin &&
+        enemy.pos.y + enemy.radius >= cameraOffsetY - margin &&
+        enemy.pos.y - enemy.radius <= cameraOffsetY + height + margin) {
+      enemy.render(cameraOffsetX, cameraOffsetY);
+    }
+  }
+  
+  // Update jellyfish (they don't render directly, only through sonar)
   for (let jelly of jellyfish) jelly.update(cave, player);
   
   // Note: Jellyfish are not rendered directly - only visible through sonar hits
