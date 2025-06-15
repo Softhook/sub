@@ -60,6 +60,9 @@ const SONAR_BUBBLE_MAX_SIZE = 2;
 const SONAR_BUBBLE_COLOR_H = 180; const SONAR_BUBBLE_COLOR_S = 70; const SONAR_BUBBLE_COLOR_B = 95;
 const SONAR_BUBBLE_ALPHA_MAX = 180;
 
+// General Bubble Constants
+const BUBBLE_LIFESPAN_FRAMES = 180; // 3 seconds at 60fps - for current area bubbles
+
 // Propeller Bubble Constants
 const PLAYER_PROPELLER_X_OFFSET_FACTOR = -1.2; // Offset from player center, behind the body
 const PLAYER_PROPELLER_MAX_SIDE_HEIGHT_FACTOR = 0.8; // New: Max apparent height from side view (relative to player radius)
@@ -190,6 +193,20 @@ const CAVE_CLEARING_NOISE_FACTOR = 0.08;
 const CAVE_CLEARING_NOISE_OFFSET = 40; // Base offset, currentLevel added
 const CAVE_CLEARING_THRESHOLD = 0.35;
 const CAVE_WALL_CHECK_POINTS = 8; // Number of points to check around an object for wall collision
+
+// Current Area Constants
+const CURRENT_AREAS_PER_LEVEL = 3;
+const CURRENT_AREA_MIN_WIDTH = 80;
+const CURRENT_AREA_MAX_WIDTH = 200;
+const CURRENT_AREA_MIN_HEIGHT = 60;
+const CURRENT_AREA_MAX_HEIGHT = 150;
+const CURRENT_FORCE_MAGNITUDE_MIN = 0.1;
+const CURRENT_FORCE_MAGNITUDE_MAX = 0.5;
+const CURRENT_BUBBLE_SPAWN_DENSITY = 0.00002; // Reduced from 0.002 for better performance
+const CURRENT_BUBBLE_SPEED_MULTIPLIER = 0.8;
+const CURRENT_BUBBLE_LIFESPAN_FACTOR = 1.5;
+const CURRENT_AREA_PADDING_FROM_PLAYER_START = 100;
+const CURRENT_AREA_PADDING_FROM_GOAL = 80;
 
 // Spawning
 const MAX_PLAYER_SPAWN_ATTEMPTS = 50;
@@ -360,6 +377,7 @@ let jellyfish = []; // Array for jellyfish creatures
 let projectiles = [];
 let sonarBubbles = [];
 let particles = []; // New global array for torpedo trail particles
+let currentAreas = []; // Array for underwater current areas
 let cameraOffsetX, cameraOffsetY;
 let gameState = 'start';
 let currentLevel = 1;
@@ -368,6 +386,158 @@ let startScreenPropellerAngle = 0; // Animation variable for start screen submar
 let totalScore = 0; // Total accumulated score across all completed levels
 let levelScore = 0; // Score for the current level
 let debugShowWalls = false; // Debug mode to show all cave walls
+
+// --- JSONBin HighScore Manager ---
+class JSONBinHighScores {
+  constructor() {
+    this.apiKey = '$2a$10$7wznneBgwFUQbnCsNIQ.eO/O9UBheBQomVH6oNlSv7voOtxDaawFW';
+    this.binId = null;
+    this.baseUrl = 'https://api.jsonbin.io/v3/b';
+    this.binName = 'SUBMARINE';
+  }
+
+  async initializeBin() {
+    try {
+      const existingBin = await this.findExistingBin();
+      if (existingBin) {
+        this.binId = existingBin;
+        console.log('Found existing SUBMARINE highscore bin:', this.binId);
+        return true;
+      }
+
+      const response = await fetch('https://api.jsonbin.io/v3/b', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Master-Key': this.apiKey,
+          'X-Bin-Name': this.binName
+        },
+        body: JSON.stringify({
+          scores: [],
+          gameInfo: {
+            name: 'Submarine Cave Explorer',
+            created: new Date().toISOString(),
+            version: '1.0',
+            description: 'High scores for the submarine cave exploration game'
+          }
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        this.binId = data.metadata.id;
+        console.log('Created new SUBMARINE highscore bin:', this.binId);
+        localStorage.setItem('submarine-highscore-bin-id', this.binId);
+        return true;
+      } else {
+        console.error('Failed to create bin:', response.status);
+        return false;
+      }
+    } catch (error) {
+      console.error('Error initializing bin:', error);
+      return false;
+    }
+  }
+
+  async findExistingBin() {
+    const savedBinId = localStorage.getItem('submarine-highscore-bin-id');
+    if (savedBinId) {
+      try {
+        const response = await fetch(`${this.baseUrl}/${savedBinId}`, {
+          headers: { 'X-Master-Key': this.apiKey }
+        });
+        if (response.ok) {
+          return savedBinId;
+        }
+      } catch (error) {
+        localStorage.removeItem('submarine-highscore-bin-id');
+      }
+    }
+    return null;
+  }
+
+  async getHighScores() {
+    if (!this.binId) {
+      const initialized = await this.initializeBin();
+      if (!initialized) return [];
+    }
+
+    try {
+      const response = await fetch(`${this.baseUrl}/${this.binId}/latest`, {
+        headers: { 'X-Master-Key': this.apiKey }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const scores = data.record.scores || [];
+        return scores.sort((a, b) => b.score - a.score).slice(0, 10);
+      }
+      return [];
+    } catch (error) {
+      console.error('Error fetching scores:', error);
+      return [];
+    }
+  }
+
+  async submitScore(playerName, score) {
+    if (!this.binId) {
+      const initialized = await this.initializeBin();
+      if (!initialized) return false;
+    }
+
+    try {
+      const currentData = await this.getCurrentBinData();
+      if (!currentData) return false;
+
+      const newScore = {
+        name: playerName.substring(0, 20),
+        score: score,
+        date: new Date().toISOString().split('T')[0],
+        timestamp: Date.now(),
+        gameVersion: '1.0'
+      };
+
+      if (!currentData.scores) currentData.scores = [];
+      currentData.scores.push(newScore);
+      currentData.scores = currentData.scores
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 50);
+
+      const response = await fetch(`${this.baseUrl}/${this.binId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Master-Key': this.apiKey
+        },
+        body: JSON.stringify(currentData)
+      });
+
+      return response.ok;
+    } catch (error) {
+      console.error('Error submitting score:', error);
+      return false;
+    }
+  }
+
+  async getCurrentBinData() {
+    try {
+      const response = await fetch(`${this.baseUrl}/${this.binId}/latest`, {
+        headers: { 'X-Master-Key': this.apiKey }
+      });
+      return response.ok ? (await response.json()).record : null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  async isHighScore(score) {
+    const scores = await this.getHighScores();
+    return scores.length < 10 || score > (scores[scores.length - 1]?.score || 0);
+  }
+}
+
+// Initialize the highscore manager
+const highScoreManager = new JSONBinHighScores();
 
 // Helper function to process game object arrays (update, render, remove offscreen)
 function processGameObjectArray(arr, offsetX, offsetY, caveContext = null) {
@@ -526,6 +696,96 @@ class Particle {
 
   isOffscreen() {
     return this.lifespan <= 0;
+  }
+}
+
+// --- CurrentArea Class ---
+class CurrentArea {
+  constructor(x, y, w, h, forceDirection, forceMagnitude) {
+    this.x = x;
+    this.y = y;
+    this.width = w;
+    this.height = h;
+    this.forceDirection = forceDirection; // p5.Vector
+    this.forceMagnitude = forceMagnitude;
+    this.force = p5.Vector.mult(this.forceDirection, this.forceMagnitude);
+  }
+
+  // Check if a point (px, py) is inside this current area
+  contains(px, py) {
+    return px >= this.x && px <= this.x + this.width &&
+           py >= this.y && py <= this.y + this.height;
+  }
+
+  // Spawn bubbles within the area to indicate the current
+  spawnBubbles(cave) {
+    if (!cave) return; // Safety check
+    
+    // Density determines how many bubbles to try to spawn per frame
+    let bubblesToSpawn = floor(this.width * this.height * CURRENT_BUBBLE_SPAWN_DENSITY);
+    if (random() < (this.width * this.height * CURRENT_BUBBLE_SPAWN_DENSITY) % 1) {
+        bubblesToSpawn++; // Probabilistically add one more bubble for fractional parts
+    }
+
+    for (let i = 0; i < bubblesToSpawn; i++) {
+      let bubbleX = random(this.x, this.x + this.width);
+      let bubbleY = random(this.y, this.y + this.height);
+      
+      // Only spawn bubbles in open water (not in walls)
+      if (cave.isWall(bubbleX, bubbleY)) {
+        continue; // Skip this bubble if it would spawn in a wall
+      }
+      
+      // Bubbles should generally move with the current, but with some randomness
+      let bubbleVel = p5.Vector.add(this.force, p5.Vector.random2D().mult(0.1)); // Slight random drift
+      bubbleVel.mult(CURRENT_BUBBLE_SPEED_MULTIPLIER);
+
+      // Create a sonar bubble instead of regular bubble
+      let newBubble = new SonarBubble(bubbleX, bubbleY);
+      
+      // Override the default sonar bubble velocity to move with the current
+      newBubble.vel = bubbleVel; // Override default upward movement
+      
+      // Adjust lifespan for current bubbles
+      newBubble.lifespan = BUBBLE_LIFESPAN_FRAMES * CURRENT_BUBBLE_LIFESPAN_FACTOR;
+      newBubble.initialLifespan = newBubble.lifespan;
+      
+      sonarBubbles.push(newBubble);
+    }
+  }
+
+  // Render the current area (with debug visuals if enabled)
+  render(offsetX, offsetY) {
+    if (debugShowWalls) {
+      // Debug visualization of current area
+      push();
+      stroke(255, 0, 0, 100); // Red border with transparency
+      strokeWeight(2);
+      noFill();
+      rect(this.x - offsetX, this.y - offsetY, this.width, this.height);
+      
+      // Draw force direction arrow
+      let centerX = this.x + this.width / 2 - offsetX;
+      let centerY = this.y + this.height / 2 - offsetY;
+      let arrowLength = 30;
+      let arrowEndX = centerX + this.forceDirection.x * arrowLength;
+      let arrowEndY = centerY + this.forceDirection.y * arrowLength;
+      
+      stroke(255, 255, 0, 150); // Yellow arrow
+      strokeWeight(3);
+      line(centerX, centerY, arrowEndX, arrowEndY);
+      
+      // Arrow head
+      push();
+      translate(arrowEndX, arrowEndY);
+      rotate(atan2(this.forceDirection.y, this.forceDirection.x));
+      noStroke();
+      fill(255, 255, 0, 150);
+      triangle(0, 0, -8, -3, -8, 3);
+      pop();
+      
+      pop();
+    }
   }
 }
 
@@ -1089,6 +1349,13 @@ class PlayerSub {
     if (keyIsDown(RIGHT_ARROW) || keyIsDown(KEY_CODE_D)) this.angle += this.turnSpeed;
     // Removed keyIsDown(32) for shooting from here, as it\'s handled in keyPressed for single press
 
+    // Apply current area forces
+    for (let area of currentAreas) {
+      if (area.contains(this.pos.x, this.pos.y)) {
+        this.vel.add(area.force);
+      }
+    }
+
     // Update propeller angle based on movement
     if (this.vel.magSq() > 0.01) { // Check if moving (magSq is cheaper than mag)
         this.propellerAngle += this.vel.mag() * PLAYER_PROPELLER_SPIN_SPEED_FACTOR;
@@ -1567,6 +1834,61 @@ function initGameObjects() {
       }
     }
   }
+  
+  // Spawn current areas
+  spawnCurrentAreas();
+}
+
+function spawnCurrentAreas() {
+  currentAreas = []; // Clear existing areas
+  
+  for (let i = 0; i < CURRENT_AREAS_PER_LEVEL; i++) {
+    let attempts = 0;
+    let areaX, areaY, areaWidth, areaHeight;
+    let validArea = false;
+    
+    while (!validArea && attempts < 50) {
+      // Random dimensions
+      areaWidth = random(CURRENT_AREA_MIN_WIDTH, CURRENT_AREA_MAX_WIDTH);
+      areaHeight = random(CURRENT_AREA_MIN_HEIGHT, CURRENT_AREA_MAX_HEIGHT);
+      
+      // Random position, avoiding player start and goal areas
+      areaX = random(CURRENT_AREA_PADDING_FROM_PLAYER_START, 
+                    WORLD_WIDTH - areaWidth - CURRENT_AREA_PADDING_FROM_GOAL);
+      areaY = random(areaHeight / 2, WORLD_HEIGHT - areaHeight / 2);
+      
+      // Check if the area is mostly in open water
+      let openCells = 0;
+      let totalCells = 0;
+      let checkStep = 20; // Check every 20 pixels for performance
+      
+      for (let checkX = areaX; checkX < areaX + areaWidth; checkX += checkStep) {
+        for (let checkY = areaY; checkY < areaY + areaHeight; checkY += checkStep) {
+          totalCells++;
+          if (!cave.isWall(checkX, checkY)) {
+            openCells++;
+          }
+        }
+      }
+      
+      // Area is valid if at least 70% is open water
+      if (totalCells > 0 && (openCells / totalCells) > 0.7) {
+        validArea = true;
+      }
+      
+      attempts++;
+    }
+    
+    if (validArea) {
+      // Create random force direction
+      let forceDirection = p5.Vector.random2D();
+      let forceMagnitude = random(CURRENT_FORCE_MAGNITUDE_MIN, CURRENT_FORCE_MAGNITUDE_MAX);
+      
+      currentAreas.push(new CurrentArea(areaX, areaY, areaWidth, areaHeight, forceDirection, forceMagnitude));
+    }
+  }
+  
+  console.log(`Spawned ${currentAreas.length} current areas for level ${currentLevel}`);
 }
 
 function resetGame() {
@@ -1933,6 +2255,12 @@ function drawPlayingState() {
   // Render the goal square if player is inside it
   if (cave.isGoal(player.pos.x, player.pos.y)) {
     cave.renderGoal(cameraOffsetX, cameraOffsetY);
+  }
+
+  // Process current areas - spawn bubbles and render debug visuals
+  for (let area of currentAreas) {
+    area.spawnBubbles(cave);
+    area.render(cameraOffsetX, cameraOffsetY);
   }
 
   // Process sonar bubbles, particles, and projectiles
