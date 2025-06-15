@@ -253,6 +253,14 @@ const BUMP_FREQ = 100;
 const TORPEDO_ENV_ADSR = { aT: 0.02, dT: 0.3, sR: 0, rT: 0.2 };
 const TORPEDO_ENV_LEVELS = { aL: 0.3, rL: 0 };
 
+// Current Flow Sound Constants
+const CURRENT_FLOW_NOISE_ENV_ADSR = { aT: 0.2, dT: 0.4, sR: 0.7, rT: 0.6 };
+const CURRENT_FLOW_NOISE_ENV_LEVELS = { aL: 0.25, rL: 0 };
+const CURRENT_FLOW_BASS_ENV_ADSR = { aT: 0.15, dT: 0.3, sR: 0.6, rT: 0.5 };
+const CURRENT_FLOW_BASS_ENV_LEVELS = { aL: 0.35, rL: 0 };
+const CURRENT_FLOW_BASS_MIN_FREQ = 30;
+const CURRENT_FLOW_BASS_MAX_FREQ = 60;
+
 // Creature Growl/Scream Constants
 const CREATURE_GROWL_ENV_ADSR = { aT: 0.05, dT: 0.2, sR: 0.3, rT: 0.4 };
 const CREATURE_GROWL_ENV_LEVELS = { aL: 0.25, rL: 0 };
@@ -362,6 +370,9 @@ var bumpOsc, bumpEnv;
 var torpedoNoise, torpedoEnv; // Changed from Osc to Noise for woosh
 var lowAirOsc, lowAirEnv;
 var gameOverImpactNoise, gameOverImpactEnv, gameOverGroanOsc, gameOverGroanEnv, gameOverFinalBoomNoise, gameOverFinalBoomEnv; // Sub Destruction
+
+// Current Flow Audio
+var currentFlowNoise, currentFlowNoiseEnv, currentFlowBassOsc, currentFlowBassEnv;
 
 // Reactor Hum Audio
 let reactorHumOsc, reactorHumEnv;
@@ -1376,6 +1387,7 @@ class PlayerSub {
     this.airDepletionRate = airDepletionRatePerFrame;
     this.shotCooldown = PLAYER_SHOT_COOLDOWN_FRAMES; this.lastShotTime = -this.shotCooldown; // Allow immediate first shot
     this.propellerAngle = 0; // For propeller animation
+    this.wasInCurrent = false; // Track if player was in current area last frame
     // No need to store bubbles in player, they will be global
   }
   fireSonar(cave, enemies, jellyfish) {
@@ -1447,6 +1459,21 @@ class PlayerSub {
     if (keyIsDown(LEFT_ARROW) || keyIsDown(KEY_CODE_A)) this.angle -= this.turnSpeed;
     if (keyIsDown(RIGHT_ARROW) || keyIsDown(KEY_CODE_D)) this.angle += this.turnSpeed;
     // Removed keyIsDown(32) for shooting from here, as it\'s handled in keyPressed for single press
+
+    // Check if player is in any current area and play sound
+    let inCurrentArea = false;
+    for (let area of currentAreas) {
+      if (area.contains(this.pos.x, this.pos.y)) {
+        inCurrentArea = true;
+        break;
+      }
+    }
+
+    // Play current flow sound when entering current (track state to avoid spam)
+    if (inCurrentArea && !this.wasInCurrent) {
+      playSound('current_flow');
+    }
+    this.wasInCurrent = inCurrentArea;
 
     // Apply current area forces
     for (let area of currentAreas) {
@@ -1765,6 +1792,12 @@ function initializeSounds() {
   let torpedoSound = setupSound('noise', 'pink', TORPEDO_ENV_ADSR, TORPEDO_ENV_LEVELS);
   torpedoNoise = torpedoSound.sound; torpedoEnv = torpedoSound.envelope;
 
+  // Initialize current flow sounds
+  let currentFlowNoiseSound = setupSound('noise', 'brown', CURRENT_FLOW_NOISE_ENV_ADSR, CURRENT_FLOW_NOISE_ENV_LEVELS);
+  currentFlowNoise = currentFlowNoiseSound.sound; currentFlowNoiseEnv = currentFlowNoiseSound.envelope;
+  let currentFlowBassSound = setupSound('osc', 'sine', CURRENT_FLOW_BASS_ENV_ADSR, CURRENT_FLOW_BASS_ENV_LEVELS);
+  currentFlowBassOsc = currentFlowBassSound.sound; currentFlowBassEnv = currentFlowBassSound.envelope;
+
   let lowAirSound = setupSound('osc', 'square', LOW_AIR_ENV_ADSR, LOW_AIR_ENV_LEVELS);
   lowAirOsc = lowAirSound.sound; lowAirEnv = lowAirSound.envelope;
 
@@ -1809,6 +1842,12 @@ function playSound(soundName) {
       ensureStarted(bumpOsc); bumpOsc.freq(BUMP_FREQ); bumpEnv.play(bumpOsc);
     } else if (soundName === 'torpedo') {
       ensureStarted(torpedoNoise); torpedoEnv.play(torpedoNoise);
+    } else if (soundName === 'current_flow') {
+      // Current flow rushing water sound
+      ensureStarted(currentFlowNoise); currentFlowNoiseEnv.play(currentFlowNoise);
+      ensureStarted(currentFlowBassOsc); 
+      currentFlowBassOsc.freq(random(CURRENT_FLOW_BASS_MIN_FREQ, CURRENT_FLOW_BASS_MAX_FREQ)); 
+      currentFlowBassEnv.play(currentFlowBassOsc);
     } else if (soundName === 'lowAir') {
       ensureStarted(lowAirOsc); lowAirOsc.freq(LOW_AIR_FREQ); lowAirEnv.play(lowAirOsc);
     } else if (soundName === 'creatureGrowl') {
@@ -2072,6 +2111,7 @@ function startAudioRoutine() {
     function startAllSoundObjects() {
         const soundObjects = [
             sonarOsc, explosionNoise, explosionBoomOsc, explosionBassOsc, bumpOsc, torpedoNoise, 
+            currentFlowNoise, currentFlowBassOsc,
             lowAirOsc, reactorHumOsc, creatureGrowlOsc, gameOverImpactNoise, gameOverGroanOsc, gameOverFinalBoomNoise
         ];
         for (const soundObj of soundObjects) {
