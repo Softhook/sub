@@ -235,12 +235,16 @@ const SONAR_ENV_ADSR = { aT: 0.01, dT: 0.1, sR: 0, rT: 0.1 };
 const SONAR_ENV_LEVELS = { aL: 0.3, rL: 0 };
 const SONAR_FREQ = 800;
 
-const EXPLOSION_NOISE_ENV_ADSR = { aT: 0.01, dT: 0.25, sR: 0, rT: 0.15 };
-const EXPLOSION_NOISE_ENV_LEVELS = { aL: 0.4, rL: 0 };
-const EXPLOSION_BOOM_ENV_ADSR = { aT: 0.01, dT: 0.3, sR: 0, rT: 0.2 };
-const EXPLOSION_BOOM_ENV_LEVELS = { aL: 0.5, rL: 0 };
-const EXPLOSION_BOOM_MIN_FREQ = 60;
-const EXPLOSION_BOOM_MAX_FREQ = 90;
+const EXPLOSION_NOISE_ENV_ADSR = { aT: 0.001, dT: 1.2, sR: 0, rT: 0.8 };
+const EXPLOSION_NOISE_ENV_LEVELS = { aL: 0.9, rL: 0 };
+const EXPLOSION_BOOM_ENV_ADSR = { aT: 0.001, dT: 1.5, sR: 0, rT: 1.0 };
+const EXPLOSION_BOOM_ENV_LEVELS = { aL: 0.8, rL: 0 };
+const EXPLOSION_BOOM_MIN_FREQ = 40;
+const EXPLOSION_BOOM_MAX_FREQ = 80;
+const EXPLOSION_BASS_ENV_ADSR = { aT: 0.002, dT: 2.0, sR: 0, rT: 1.5 };
+const EXPLOSION_BASS_ENV_LEVELS = { aL: 1.0, rL: 0 };
+const EXPLOSION_BASS_MIN_FREQ = 15;
+const EXPLOSION_BASS_MAX_FREQ = 30;
 
 const BUMP_ENV_ADSR = { aT: 0.005, dT: 0.15, sR: 0, rT: 0.1 };
 const BUMP_ENV_LEVELS = { aL: 0.4, rL: 0 };
@@ -353,7 +357,7 @@ const KEY_CODE_D = 68;
 
 // Sound objects
 var sonarOsc, sonarEnv;
-var explosionNoise, explosionEnv, explosionBoomOsc, explosionBoomEnv; // Enemy Explosion
+var explosionNoise, explosionEnv, explosionBoomOsc, explosionBoomEnv, explosionBassOsc, explosionBassEnv; // Enemy Explosion
 var bumpOsc, bumpEnv;
 var torpedoNoise, torpedoEnv; // Changed from Osc to Noise for woosh
 var lowAirOsc, lowAirEnv;
@@ -1748,10 +1752,12 @@ function initializeSounds() {
   let sonarSound = setupSound('osc', 'sine', SONAR_ENV_ADSR, SONAR_ENV_LEVELS);
   sonarOsc = sonarSound.sound; sonarEnv = sonarSound.envelope;
 
-  let explosionNoiseSound = setupSound('noise', 'white', EXPLOSION_NOISE_ENV_ADSR, EXPLOSION_NOISE_ENV_LEVELS);
+  let explosionNoiseSound = setupSound('noise', 'brown', EXPLOSION_NOISE_ENV_ADSR, EXPLOSION_NOISE_ENV_LEVELS);
   explosionNoise = explosionNoiseSound.sound; explosionEnv = explosionNoiseSound.envelope;
-  let explosionBoomSound = setupSound('osc', 'triangle', EXPLOSION_BOOM_ENV_ADSR, EXPLOSION_BOOM_ENV_LEVELS);
+  let explosionBoomSound = setupSound('osc', 'sine', EXPLOSION_BOOM_ENV_ADSR, EXPLOSION_BOOM_ENV_LEVELS);
   explosionBoomOsc = explosionBoomSound.sound; explosionBoomEnv = explosionBoomSound.envelope;
+  let explosionBassSound = setupSound('osc', 'sine', EXPLOSION_BASS_ENV_ADSR, EXPLOSION_BASS_ENV_LEVELS);
+  explosionBassOsc = explosionBassSound.sound; explosionBassEnv = explosionBassSound.envelope;
 
   let bumpSound = setupSound('osc', 'triangle', BUMP_ENV_ADSR, BUMP_ENV_LEVELS);
   bumpOsc = bumpSound.sound; bumpEnv = bumpSound.envelope;
@@ -1798,6 +1804,7 @@ function playSound(soundName) {
     } else if (soundName === 'explosion') {
       ensureStarted(explosionNoise); explosionEnv.play(explosionNoise);
       ensureStarted(explosionBoomOsc); explosionBoomOsc.freq(random(EXPLOSION_BOOM_MIN_FREQ, EXPLOSION_BOOM_MAX_FREQ)); explosionBoomEnv.play(explosionBoomOsc);
+      ensureStarted(explosionBassOsc); explosionBassOsc.freq(random(EXPLOSION_BASS_MIN_FREQ, EXPLOSION_BASS_MAX_FREQ)); explosionBassEnv.play(explosionBassOsc);
     } else if (soundName === 'bump') {
       ensureStarted(bumpOsc); bumpOsc.freq(BUMP_FREQ); bumpEnv.play(bumpOsc);
     } else if (soundName === 'torpedo') {
@@ -2064,7 +2071,7 @@ function prepareNextLevel() {
 function startAudioRoutine() {
     function startAllSoundObjects() {
         const soundObjects = [
-            sonarOsc, explosionNoise, explosionBoomOsc, bumpOsc, torpedoNoise, 
+            sonarOsc, explosionNoise, explosionBoomOsc, explosionBassOsc, bumpOsc, torpedoNoise, 
             lowAirOsc, reactorHumOsc, creatureGrowlOsc, gameOverImpactNoise, gameOverGroanOsc, gameOverFinalBoomNoise
         ];
         for (const soundObj of soundObjects) {
