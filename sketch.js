@@ -670,7 +670,12 @@ class SonarBubble {
   }
 
   update() {
-    this.pos.y -= this.velY; // Move upwards
+    // Check if this bubble has custom velocity (from current areas)
+    if (this.vel) {
+      this.pos.add(this.vel); // Use vector velocity for current bubbles
+    } else {
+      this.pos.y -= this.velY; // Use default upward movement for regular sonar bubbles
+    }
     this.lifespan--;
   }
 
