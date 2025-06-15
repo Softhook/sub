@@ -1754,6 +1754,54 @@ function drawDebugCaveWalls(offsetX, offsetY) {
     }
   }
   
+  // Draw enemies as filled shapes
+  fill(255, 0, 255); // Magenta for enemies
+  noStroke();
+  for (let enemy of enemies) {
+    let enemyX = enemy.pos.x - offsetX;
+    let enemyY = enemy.pos.y - offsetY;
+    // Only draw if enemy is visible on screen
+    if (enemyX >= -enemy.radius && enemyX <= width + enemy.radius &&
+        enemyY >= -enemy.radius && enemyY <= height + enemy.radius) {
+      ellipse(enemyX, enemyY, enemy.radius * 2, enemy.radius * 2);
+      
+      // Add enemy info text
+      fill(255, 255, 255); // White text
+      textAlign(CENTER, CENTER);
+      textSize(10);
+      text("E", enemyX, enemyY);
+      fill(255, 0, 255); // Back to magenta
+    }
+  }
+  
+  // Draw jellyfish as filled shapes
+  fill(0, 255, 255); // Cyan for jellyfish
+  noStroke();
+  for (let jelly of jellyfish) {
+    let jellyX = jelly.pos.x - offsetX;
+    let jellyY = jelly.pos.y - offsetY;
+    // Only draw if jellyfish is visible on screen
+    if (jellyX >= -jelly.radius && jellyX <= width + jelly.radius &&
+        jellyY >= -jelly.radius && jellyY <= height + jelly.radius) {
+      ellipse(jellyX, jellyY, jelly.radius * 2, jelly.radius * 2);
+      
+      // Add jellyfish info text with health
+      fill(255, 255, 255); // White text
+      textAlign(CENTER, CENTER);
+      textSize(10);
+      text(`J${jelly.health}`, jellyX, jellyY);
+      fill(0, 255, 255); // Back to cyan
+    }
+  }
+  
+  // Add debug info text
+  fill(255, 255, 0); // Yellow text
+  noStroke();
+  textAlign(RIGHT, TOP);
+  textSize(16);
+  text("DEBUG: Cave Walls & Enemies (Press ] to toggle)", width - 10, 10);
+  text(`Grid: ${cave.gridWidth}x${cave.gridHeight}, Cell: ${cave.cellSize}px`, width - 10, 30);
+  text(`Enemies: ${enemies.length}, Jellyfish: ${jellyfish.length}`, width - 10, 50);
 
   pop();
 }
