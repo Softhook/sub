@@ -549,36 +549,76 @@ class Cave {
     }
     let pathY = this.gridHeight / 2; let currentPathRadius = 0;
     let pathMinRadius = CAVE_PATH_MIN_RADIUS_CELLS; let pathMaxRadius = CAVE_PATH_MAX_RADIUS_CELLS;
+    
+    // Store the main path for later validation
+    let mainPath = [];
+    
     noiseSeed(millis() + currentLevel * 1000); // Seed for consistent cave per level, varied by run
     for (let i = 0; i < this.gridWidth; i++) {
       pathY += (noise(i * CAVE_PATH_Y_NOISE_FACTOR_1, CAVE_PATH_Y_NOISE_OFFSET_1 + currentLevel) - 0.5) * CAVE_PATH_Y_NOISE_MULT_1;
       pathY = constrain(pathY, pathMaxRadius + 1, this.gridHeight - pathMaxRadius - 1); // Keep path within bounds
       currentPathRadius = map(noise(i * CAVE_PATH_RADIUS_NOISE_FACTOR, CAVE_PATH_RADIUS_NOISE_OFFSET + currentLevel), 0, 1, pathMinRadius, pathMaxRadius);
+      
+      // Store main path data for validation
+      mainPath.push({x: i, y: pathY, radius: currentPathRadius});
+      
       for (let j = 0; j < this.gridHeight; j++) {
         if (abs(j - pathY) > currentPathRadius) this.grid[i][j] = true; // Mark as wall
       }
       if (i === this.gridWidth - 1) { this.exitPathY = pathY; this.exitPathRadius = currentPathRadius; } // Store exit path details
     }
-    // Add some random obstacles and clearings
+    
+    // Add some random obstacles and clearings, but ensure main path remains clear
     for (let i = 1; i < this.gridWidth - 1; i++) {
       for (let j = 1; j < this.gridHeight - 1; j++) {
-        if (!this.grid[i][j]) { // If it\'s currently open path
-          if (noise(i * CAVE_OBSTACLE_NOISE_FACTOR_1, j * CAVE_OBSTACLE_NOISE_FACTOR_1, CAVE_OBSTACLE_NOISE_OFFSET_1 + currentLevel) > CAVE_OBSTACLE_THRESHOLD_1 && dist(i, j, i, pathY) > currentPathRadius + CAVE_OBSTACLE_DIST_BUFFER_1) {
+        if (!this.grid[i][j]) { // If it's currently open path
+          // Only add obstacles if they don't block the guaranteed main path
+          let pathPoint = mainPath[i];
+          let minClearanceFromPath = (PLAYER_RADIUS / this.cellSize) + 1; // Ensure submarine can pass
+          
+          if (noise(i * CAVE_OBSTACLE_NOISE_FACTOR_1, j * CAVE_OBSTACLE_NOISE_FACTOR_1, CAVE_OBSTACLE_NOISE_OFFSET_1 + currentLevel) > CAVE_OBSTACLE_THRESHOLD_1 && 
+              abs(j - pathPoint.y) > pathPoint.radius + CAVE_OBSTACLE_DIST_BUFFER_1 &&
+              abs(j - pathPoint.y) > minClearanceFromPath) {
             this.grid[i][j] = true; // Add an obstacle
           }
-        } else { // If it\'s currently a wall
+        } else { // If it's currently a wall
           if (noise(i * CAVE_CLEARING_NOISE_FACTOR, j * CAVE_CLEARING_NOISE_FACTOR, CAVE_CLEARING_NOISE_OFFSET + currentLevel) < CAVE_CLEARING_THRESHOLD) {
             this.grid[i][j] = false; // Carve a clearing
           }
         }
       }
     }
+    
+    // Ensure the main path has guaranteed clearance for submarine passage
+    this.ensureMainPathClearance(mainPath);
+    
     // Ensure borders are walls
     for (let i = 0; i < this.gridWidth; i++) { this.grid[i][0] = true; this.grid[i][this.gridHeight - 1] = true; }
     for (let j = 0; j < this.gridHeight; j++) this.grid[0][j] = true;
     for (let j = 0; j < this.gridHeight; j++) {
       if (abs(j - this.exitPathY) > this.exitPathRadius) this.grid[this.gridWidth - 1][j] = true;
       else this.grid[this.gridWidth - 1][j] = false;
+    }
+    
+    // Validate path connectivity and regenerate if needed (max 3 attempts)
+    let attempts = 0;
+    while (!this.validatePathConnectivity() && attempts < 3) {
+      console.log("Path validation failed, regenerating cave...");
+      attempts++;
+      // Clear and regenerate with slightly different parameters
+      this.ensureMainPathClearance(mainPath);
+      // Reduce obstacle threshold to make more open space
+      for (let i = 1; i < this.gridWidth - 1; i++) {
+        for (let j = 1; j < this.gridHeight - 1; j++) {
+          if (this.grid[i][j] && !this.grid[0][j] && !this.grid[this.gridWidth-1][j] && j !== 0 && j !== this.gridHeight-1) {
+            // Clear some walls to improve connectivity
+            if (noise(i * 0.2, j * 0.2, attempts * 100) > 0.6) {
+              this.grid[i][j] = false;
+            }
+          }
+        }
+      }
+      this.ensureMainPathClearance(mainPath);
     }
     // Ensure the goal area itself is not a wall in the grid, if it falls within the last column
     // This is more for logical consistency as direct drawing handles its appearance.
@@ -603,6 +643,103 @@ class Cave {
         }
       }
     }
+  }
+
+  // Ensure the main path has guaranteed clearance for submarine passage
+  ensureMainPathClearance(mainPath) {
+    let submarineRadiusInCells = PLAYER_RADIUS / this.cellSize;
+    let requiredClearance = Math.ceil(submarineRadiusInCells) + 1; // Extra buffer for safety
+    
+    for (let pathPoint of mainPath) {
+      let centerX = Math.round(pathPoint.x);
+      let centerY = Math.round(pathPoint.y);
+      
+      // Ensure clearance around each path point
+      for (let dx = -requiredClearance; dx <= requiredClearance; dx++) {
+        for (let dy = -requiredClearance; dy <= requiredClearance; dy++) {
+          let checkX = centerX + dx;
+          let checkY = centerY + dy;
+          
+          // Check if this point is within the required clearance distance
+          if (dist(0, 0, dx, dy) <= requiredClearance &&
+              checkX >= 0 && checkX < this.gridWidth &&
+              checkY >= 0 && checkY < this.gridHeight) {
+            this.grid[checkX][checkY] = false; // Clear the space
+          }
+        }
+      }
+    }
+  }
+
+  // Validate that there's a connected path from start to goal that the submarine can traverse
+  validatePathConnectivity() {
+    let submarineRadiusInCells = Math.ceil(PLAYER_RADIUS / this.cellSize);
+    let startX = Math.floor(this.cellSize * 5 / this.cellSize); // Approximate player start
+    let startY = Math.floor(this.gridHeight / 2);
+    let goalX = Math.floor(this.exitX / this.cellSize);
+    let goalY = Math.floor(this.exitPathY);
+    
+    // Use a simple flood fill to check connectivity
+    let visited = [];
+    for (let i = 0; i < this.gridWidth; i++) {
+      visited[i] = [];
+      for (let j = 0; j < this.gridHeight; j++) {
+        visited[i][j] = false;
+      }
+    }
+    
+    // BFS to check if goal is reachable from start
+    let queue = [{x: startX, y: startY}];
+    visited[startX][startY] = true;
+    
+    while (queue.length > 0) {
+      let current = queue.shift();
+      
+      // Check if we reached the goal area
+      if (dist(current.x, current.y, goalX, goalY) < 3) {
+        return true; // Path found
+      }
+      
+      // Check 8 directions for movement
+      for (let dx = -1; dx <= 1; dx++) {
+        for (let dy = -1; dy <= 1; dy++) {
+          if (dx === 0 && dy === 0) continue;
+          
+          let newX = current.x + dx;
+          let newY = current.y + dy;
+          
+          if (newX >= 0 && newX < this.gridWidth && 
+              newY >= 0 && newY < this.gridHeight && 
+              !visited[newX][newY] && 
+              this.canSubmarinePassThrough(newX, newY, submarineRadiusInCells)) {
+            visited[newX][newY] = true;
+            queue.push({x: newX, y: newY});
+          }
+        }
+      }
+    }
+    
+    return false; // No path found
+  }
+  
+  // Check if submarine can pass through a given grid cell
+  canSubmarinePassThrough(gridX, gridY, submarineRadiusInCells) {
+    // Check if submarine can fit at this position
+    for (let dx = -submarineRadiusInCells; dx <= submarineRadiusInCells; dx++) {
+      for (let dy = -submarineRadiusInCells; dy <= submarineRadiusInCells; dy++) {
+        if (dist(0, 0, dx, dy) <= submarineRadiusInCells) {
+          let checkX = gridX + dx;
+          let checkY = gridY + dy;
+          
+          if (checkX < 0 || checkX >= this.gridWidth || 
+              checkY < 0 || checkY >= this.gridHeight ||
+              (this.grid[checkX] && this.grid[checkX][checkY])) {
+            return false; // Blocked
+          }
+        }
+      }
+    }
+    return true; // Can pass through
   }
 
   isWall(worldX, worldY, objectRadius = 0) {
