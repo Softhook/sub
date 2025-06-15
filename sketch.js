@@ -367,6 +367,7 @@ let enemiesKilledThisLevel = 0; // New variable to track enemies killed this lev
 let startScreenPropellerAngle = 0; // Animation variable for start screen submarine propeller
 let totalScore = 0; // Total accumulated score across all completed levels
 let levelScore = 0; // Score for the current level
+let debugShowWalls = false; // Debug mode to show all cave walls
 
 // Helper function to process game object arrays (update, render, remove offscreen)
 function processGameObjectArray(arr, offsetX, offsetY, caveContext = null) {
@@ -1692,7 +1693,15 @@ function keyPressed() {
 
   if (gameState === 'playing') {
     if (keyCode === KEY_CODE_SPACE) player.shoot(); // Use constant for space key
-  } else if (gameState === 'start' && keyCode === ENTER) {
+  }
+  
+  // Debug toggle for showing cave walls (works in any state)
+  if (key === ']') {
+    debugShowWalls = !debugShowWalls;
+    console.log("Debug wall view:", debugShowWalls ? "ON" : "OFF");
+  }
+  
+  if (gameState === 'start' && keyCode === ENTER) {
     gameState = 'playing';
     player.lastSonarTime = frameCount - player.sonarCooldown; // Ensure sonar is ready
     // Reactor hum is continuously playing, just needs to be started if not already
@@ -1704,6 +1713,49 @@ function keyPressed() {
   } else if (gameState === 'levelComplete' && keyCode === ENTER) {
     prepareNextLevel();
   }
+}
+
+function drawDebugCaveWalls(offsetX, offsetY) {
+  push();
+  
+  // Set up drawing style for walls
+  //stroke(255, 0, 0); // Red outline for walls
+  //strokeWeight(1);
+  noFill();
+  
+  // Calculate which grid cells are visible on screen
+  let startGridX = Math.max(0, Math.floor(offsetX / cave.cellSize));
+  let endGridX = Math.min(cave.gridWidth - 1, Math.floor((offsetX + width) / cave.cellSize) + 1);
+  let startGridY = Math.max(0, Math.floor(offsetY / cave.cellSize));
+  let endGridY = Math.min(cave.gridHeight - 1, Math.floor((offsetY + height) / cave.cellSize) + 1);
+  
+  // Draw wall cells as red rectangles
+  for (let i = startGridX; i <= endGridX; i++) {
+    for (let j = startGridY; j <= endGridY; j++) {
+      if (cave.grid[i] && cave.grid[i][j]) {
+        let worldX = i * cave.cellSize - offsetX;
+        let worldY = j * cave.cellSize - offsetY;
+        rect(worldX, worldY, cave.cellSize, cave.cellSize);
+      }
+    }
+  }
+  
+  // Also draw open spaces as green rectangles with transparency
+  fill(255,100); // Semi-transparent green for open spaces
+ // stroke(0, 255, 0); // Green outline
+  
+  for (let i = startGridX; i <= endGridX; i++) {
+    for (let j = startGridY; j <= endGridY; j++) {
+      if (cave.grid[i] && !cave.grid[i][j]) {
+        let worldX = i * cave.cellSize - offsetX;
+        let worldY = j * cave.cellSize - offsetY;
+        rect(worldX, worldY, cave.cellSize, cave.cellSize);
+      }
+    }
+  }
+  
+
+  pop();
 }
 
 function drawStartScreen() {
@@ -1890,6 +1942,11 @@ function drawPlayingState() {
   }
 
   player.render(cameraOffsetX, cameraOffsetY);
+
+  // Debug: Show cave walls
+  if (debugShowWalls) {
+    drawDebugCaveWalls(cameraOffsetX, cameraOffsetY);
+  }
 
   // HUD
   fill(HUD_TEXT_COLOR_H, HUD_TEXT_COLOR_S, HUD_TEXT_COLOR_B); textSize(HUD_TEXT_SIZE); textAlign(LEFT, TOP);
