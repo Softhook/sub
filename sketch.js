@@ -620,6 +620,10 @@ class Projectile {
     // Check collision with a smaller radius for projectiles to feel more accurate
     if (cave.isWall(this.pos.x, this.pos.y, this.radius * PROJECTILE_WALL_COLLISION_RADIUS_FACTOR)) {
         this.life = 0;
+        
+        // Destroy cave blocks around the impact point
+        cave.destroyBlocks(this.pos.x, this.pos.y, 25); // 25 pixel radius destruction
+        
         createExplosion(this.pos.x, this.pos.y, 'wall');
         playSound('explosion'); // Play explosion sound for wall hit
     }
@@ -1322,6 +1326,36 @@ class Cave {
       pop(); // Restore previous transformation state
     }
     pop(); // Matches the initial push() at the start of renderGoal
+  }
+  
+  // Destroy cave blocks in a radius around the impact point
+  destroyBlocks(worldX, worldY, radius = 30) {
+    // Convert world coordinates to grid coordinates
+    let centerGridX = Math.floor(worldX / this.cellSize);
+    let centerGridY = Math.floor(worldY / this.cellSize);
+    
+    // Calculate grid radius
+    let gridRadius = Math.ceil(radius / this.cellSize);
+    
+    // Destroy blocks in a circular area
+    for (let dx = -gridRadius; dx <= gridRadius; dx++) {
+      for (let dy = -gridRadius; dy <= gridRadius; dy++) {
+        let gridX = centerGridX + dx;
+        let gridY = centerGridY + dy;
+        
+        // Check if within bounds
+        if (gridX >= 1 && gridX < this.gridWidth - 1 && 
+            gridY >= 1 && gridY < this.gridHeight - 1) {
+          
+          // Check if within circular radius
+          let distance = Math.sqrt(dx * dx + dy * dy) * this.cellSize;
+          if (distance <= radius) {
+            // Destroy the block (set to false = open space)
+            this.grid[gridX][gridY] = false;
+          }
+        }
+      }
+    }
   }
 }
 
