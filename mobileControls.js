@@ -132,16 +132,27 @@ class MobileControls {
   updatePositions() {
     if (!this.enabled) return;
     
+    // Get canvas dimensions
+    const canvasWidth = window.innerWidth;
+    const canvasHeight = window.innerHeight;
+    
+    console.log('Updating mobile control positions. Canvas size:', canvasWidth, 'x', canvasHeight);
+    
     // Update joystick position (bottom left)
-    MOBILE_CONTROLS_CONFIG.joystick.y = height - 120;
+    MOBILE_CONTROLS_CONFIG.joystick.y = canvasHeight - 120;
     
     // Update fire button position (bottom right)
-    MOBILE_CONTROLS_CONFIG.fireButton.x = width - 100;
-    MOBILE_CONTROLS_CONFIG.fireButton.y = height - 120;
+    MOBILE_CONTROLS_CONFIG.fireButton.x = canvasWidth - 100;
+    MOBILE_CONTROLS_CONFIG.fireButton.y = canvasHeight - 120;
     
     // Update sonar button position (above fire button)
-    MOBILE_CONTROLS_CONFIG.sonarButton.x = width - 100;
-    MOBILE_CONTROLS_CONFIG.sonarButton.y = height - 220;
+    MOBILE_CONTROLS_CONFIG.sonarButton.x = canvasWidth - 100;
+    MOBILE_CONTROLS_CONFIG.sonarButton.y = canvasHeight - 220;
+    
+    console.log('Control positions updated:', {
+      joystick: { x: MOBILE_CONTROLS_CONFIG.joystick.x, y: MOBILE_CONTROLS_CONFIG.joystick.y },
+      fireButton: { x: MOBILE_CONTROLS_CONFIG.fireButton.x, y: MOBILE_CONTROLS_CONFIG.fireButton.y }
+    });
   }
   
   setupTouchEvents() {
@@ -149,31 +160,26 @@ class MobileControls {
     
     console.log('Setting up touch events for mobile controls');
     
-    // Prevent default touch behaviors that might interfere
-    document.addEventListener('touchstart', (e) => {
-      // During gameplay, only prevent default for control touches
-      if (typeof gameState !== 'undefined' && gameState === 'playing') {
-        if (this.isTouchOnControls(e.touches[0])) {
-          e.preventDefault();
-        }
-      }
-      // For other game states, we'll let the touch through to be handled by our touch handlers
-    }, { passive: false });
-    
+    // Minimal touch event setup - let p5.js handle most of it
+    // Only prevent default when absolutely necessary
     document.addEventListener('touchmove', (e) => {
+      // Only prevent scrolling if we're actively using controls
       if (this.joystickActive || this.fireButtonPressed || this.sonarButtonPressed) {
         e.preventDefault();
       }
     }, { passive: false });
     
-    document.addEventListener('touchend', (e) => {
-      if (this.joystickActive || this.fireButtonPressed || this.sonarButtonPressed) {
+    // Prevent zoom on double tap
+    document.addEventListener('touchstart', (e) => {
+      if (e.touches.length > 1) {
         e.preventDefault();
       }
     }, { passive: false });
     
-    // Additional setup for iOS Safari to handle touch events properly
+    // Additional setup for iOS Safari
     document.body.style.touchAction = 'manipulation';
+    
+    console.log('Touch events setup complete');
   }
   
   isTouchOnControls(touch) {
@@ -191,10 +197,32 @@ class MobileControls {
   handleTouchStart(touches) {
     if (!this.enabled) return;
     
+    console.log('Touch start detected, touches:', touches.length);
+    
     for (let i = 0; i < touches.length; i++) {
       const touch = touches[i];
-      const touchX = touch.clientX;
-      const touchY = touch.clientY;
+      
+      // p5.js touch events have x and y properties directly
+      let touchX, touchY;
+      
+      if (touch.x !== undefined && touch.y !== undefined) {
+        // p5.js touch object - coordinates are already in canvas space
+        touchX = touch.x;
+        touchY = touch.y;
+      } else if (touch.clientX !== undefined && touch.clientY !== undefined) {
+        // Fallback to client coordinates
+        touchX = touch.clientX;
+        touchY = touch.clientY;
+      } else {
+        console.log('Touch object missing coordinates:', touch);
+        continue;
+      }
+      
+      console.log(`Touch ${i}: x=${touchX}, y=${touchY}, identifier=${touch.identifier}`);
+      console.log('Game state:', typeof gameState !== 'undefined' ? gameState : 'undefined');
+      
+      // Update positions to ensure they're current
+      this.updatePositions();
       
       // Handle start screen and other non-gameplay screens - tap anywhere to continue
       if (typeof gameState !== 'undefined' && 
@@ -204,7 +232,7 @@ class MobileControls {
         console.log('Touch detected on non-gameplay screen, simulating ENTER key');
         
         // Simulate ENTER key press for non-gameplay screens
-        if (typeof keyCode !== 'undefined' && typeof keyPressed === 'function') {
+        if (typeof keyPressed === 'function') {
           // Set the global keyCode variable that p5.js uses
           window.keyCode = 13; // ENTER key code
           try {
@@ -218,29 +246,47 @@ class MobileControls {
       
       // Only handle control touches during gameplay
       if (typeof gameState === 'undefined' || gameState !== 'playing') {
+        console.log('Not in playing state, ignoring touch');
         return;
       }
       
+      console.log('Checking control positions:');
+      console.log('Joystick at:', MOBILE_CONTROLS_CONFIG.joystick.x, MOBILE_CONTROLS_CONFIG.joystick.y);
+      console.log('Fire button at:', MOBILE_CONTROLS_CONFIG.fireButton.x, MOBILE_CONTROLS_CONFIG.fireButton.y);
+      
       // Check joystick
       if (this.isPointInJoystick(touchX, touchY)) {
+        console.log('Joystick touch detected! Touch at:', touchX, touchY, 'Joystick at:', MOBILE_CONTROLS_CONFIG.joystick.x, MOBILE_CONTROLS_CONFIG.joystick.y);
         this.joystickActive = true;
-        this.touches.set(touch.identifier, { type: 'joystick', x: touchX, y: touchY });
+        const touchId = touch.identifier !== undefined ? touch.identifier : i;
+        this.touches.set(touchId, { type: 'joystick', x: touchX, y: touchY });
         this.updateJoystick(touchX, touchY);
-        console.log('Joystick activated');
       }
       // Check fire button
       else if (this.isPointInFireButton(touchX, touchY)) {
+        console.log('Fire button touch detected! Touch at:', touchX, touchY, 'Fire button at:', MOBILE_CONTROLS_CONFIG.fireButton.x, MOBILE_CONTROLS_CONFIG.fireButton.y);
         this.fireButtonPressed = true;
-        this.touches.set(touch.identifier, { type: 'fire', x: touchX, y: touchY });
+        const touchId = touch.identifier !== undefined ? touch.identifier : i;
+        this.touches.set(touchId, { type: 'fire', x: touchX, y: touchY });
         this.handleFire();
-        console.log('Fire button pressed');
       }
       // Check sonar button
       else if (MOBILE_CONTROLS_CONFIG.sonarButton.enabled && this.isPointInSonarButton(touchX, touchY)) {
+        console.log('Sonar button touch detected!');
         this.sonarButtonPressed = true;
-        this.touches.set(touch.identifier, { type: 'sonar', x: touchX, y: touchY });
+        const touchId = touch.identifier !== undefined ? touch.identifier : i;
+        this.touches.set(touchId, { type: 'sonar', x: touchX, y: touchY });
         this.handleSonar();
-        console.log('Sonar button pressed');
+      } else {
+        console.log('Touch not on any control - touch at:', touchX, touchY);
+        console.log('Joystick bounds check:', 
+          'Distance to joystick center:', 
+          Math.sqrt(Math.pow(touchX - MOBILE_CONTROLS_CONFIG.joystick.x, 2) + Math.pow(touchY - MOBILE_CONTROLS_CONFIG.joystick.y, 2)),
+          'vs joystick radius:', MOBILE_CONTROLS_CONFIG.joystick.outerRadius);
+        console.log('Fire button bounds check:', 
+          'Distance to fire button center:', 
+          Math.sqrt(Math.pow(touchX - MOBILE_CONTROLS_CONFIG.fireButton.x, 2) + Math.pow(touchY - MOBILE_CONTROLS_CONFIG.fireButton.y, 2)),
+          'vs fire button radius:', MOBILE_CONTROLS_CONFIG.fireButton.radius);
       }
     }
   }
@@ -250,10 +296,24 @@ class MobileControls {
     
     for (let i = 0; i < touches.length; i++) {
       const touch = touches[i];
-      const storedTouch = this.touches.get(touch.identifier);
+      const touchId = touch.identifier !== undefined ? touch.identifier : i;
+      const storedTouch = this.touches.get(touchId);
       
       if (storedTouch && storedTouch.type === 'joystick') {
-        this.updateJoystick(touch.clientX, touch.clientY);
+        // Get touch coordinates
+        let touchX, touchY;
+        
+        if (touch.x !== undefined && touch.y !== undefined) {
+          touchX = touch.x;
+          touchY = touch.y;
+        } else if (touch.clientX !== undefined && touch.clientY !== undefined) {
+          touchX = touch.clientX;
+          touchY = touch.clientY;
+        } else {
+          continue;
+        }
+        
+        this.updateJoystick(touchX, touchY);
       }
     }
   }
@@ -263,7 +323,8 @@ class MobileControls {
     
     for (let i = 0; i < touches.length; i++) {
       const touch = touches[i];
-      const storedTouch = this.touches.get(touch.identifier);
+      const touchId = touch.identifier !== undefined ? touch.identifier : i;
+      const storedTouch = this.touches.get(touchId);
       
       if (storedTouch) {
         if (storedTouch.type === 'joystick') {
@@ -276,7 +337,7 @@ class MobileControls {
           this.sonarButtonPressed = false;
         }
         
-        this.touches.delete(touch.identifier);
+        this.touches.delete(touchId);
       }
     }
   }
@@ -394,6 +455,14 @@ class MobileControls {
     // Draw sonar button if enabled
     if (MOBILE_CONTROLS_CONFIG.sonarButton.enabled) {
       this.renderSonarButton();
+    }
+    
+    // Add debug info at top of screen
+    if (typeof fill === 'function' && typeof text === 'function') {
+      fill(255, 255, 255, 150);
+      textAlign(LEFT, TOP);
+      textSize(12);
+      text(`Mobile: ${this.enabled ? 'ON' : 'OFF'} | Touch: ${this.joystickActive ? 'JOY' : ''}${this.fireButtonPressed ? 'FIRE' : ''}`, 10, 10);
     }
   }
   
