@@ -1,64 +1,73 @@
 // Mobile and iPad Touch Controls for Submarine Game
 // Refactored for better organization and maintainability
 
-// ==================== CONSTANTS & CONFIGURATION ====================
+// Mobile Controls Configuration
+const MOBILE_CONTROLS_CONFIG = {
+  // Joystick settings
+  joystick: {
+    x: 120,           // Position from left edge
+    y: null,          // Will be set to screen height - 120
+    outerRadius: 80,  // Outer circle radius
+    innerRadius: 25,  // Inner knob radius
+    maxDistance: 55,  // Maximum distance inner can move from center
+    sensitivity: 0.8, // Movement sensitivity multiplier
+  },
+  
+  // Fire button settings
+  fireButton: {
+    x: null,          // Will be set to screen width - 100
+    y: null,          // Will be set to screen height - 120
+    radius: 60,       // Button radius
+    cooldownDisplay: true, // Show cooldown indicator
+  },
+  
+  // Sonar button (optional - sonar is automatic but manual trigger can be useful)
+  sonarButton: {
+    x: null,          // Will be set to screen width - 100
+    y: null,          // Will be set to screen height - 220
+    radius: 45,       // Smaller than fire button
+    enabled: false,   // Disabled by default since sonar is automatic
+  },
 
-const MOBILE_CONFIG = {
-  // Button dimensions and layout
-  DPAD: {
-    BUTTON_SIZE: 70,
-    CENTER_X: 120,
-    LEFT_X: 50,
-    RIGHT_X: 190,
-    TOP_OFFSET: 200,     // from bottom
-    MIDDLE_OFFSET: 150,  // from bottom
-    BOTTOM_OFFSET: 100   // from bottom
-  },
-  
-  FIRE_BUTTON: {
-    RADIUS: 60,
-    RIGHT_MARGIN: 100,   // from right edge
-    BOTTOM_MARGIN: 120   // from bottom
-  },
-  
   // Visual styling
-  STYLE: {
-    STROKE_WEIGHT: 3,
-    ALPHA: {
-      NORMAL: 180,
-      PRESSED: 220,
-      OUTER: 120
-    },
-    TEXT_SIZE: 24,
-    CORNER_RADIUS: 10,
-    COLORS: {
-      CONTROL: { h: 180, s: 50, b: 70 },
-      FIRE: { h: 0, s: 80, b: 85 },
-      PRESSED: { h: 60, s: 90, b: 95 }
-    }
-  },
-  
-  // Timing
-  TIMING: {
-    FIRE_COOLDOWN: 200,      // ms between shots
-    BUTTON_TIMEOUT: 5000,    // ms max button press
-    ORIENTATION_DELAY: 100   // ms delay after orientation change
+  style: {
+    strokeWeight: 3,
+    outerAlpha: 120,  // Transparency for outer elements
+    innerAlpha: 180,  // Transparency for inner elements
+    pressedAlpha: 220, // Transparency when pressed
+    textSize: 16,
+    
+    // Colors (HSB values to match game's color scheme)
+    joystickColor: { h: 180, s: 50, b: 70 },
+    joystickKnobColor: { h: 180, s: 70, b: 90 },
+    fireButtonColor: { h: 0, s: 80, b: 85 },
+    sonarButtonColor: { h: 120, s: 70, b: 80 },
+    pressedColor: { h: 60, s: 90, b: 95 },
   }
 };
 
-// Button type enumeration for cleaner code
-const BUTTON_TYPES = {
-  THRUST: 'thrust',
-  REVERSE: 'reverse', 
-  TURN_LEFT: 'turnLeft',
-  TURN_RIGHT: 'turnRight',
-  FIRE: 'fire'
-};
-
-// ==================== UTILITY CLASSES ====================
-
-class DeviceDetector {
-  static isMobile() {
+class MobileControls {
+  constructor() {
+    this.enabled = this.isMobileDevice();
+    this.touches = new Map(); // Track multiple touches
+    this.joystickActive = false;
+    this.joystickOffset = { x: 0, y: 0 };
+    this.fireButtonPressed = false;
+    this.sonarButtonPressed = false;
+    this.lastFireTime = 0;
+    this.lastSonarTime = 0;
+    
+    // Movement state
+    this.movementVector = { x: 0, y: 0 };
+    
+    if (this.enabled) {
+      this.initializeControls();
+      console.log("Mobile controls enabled");
+    }
+  }
+  
+  isMobileDevice() {
+    // Detect mobile devices and tablets
     const userAgent = navigator.userAgent.toLowerCase();
     const patterns = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i;
     const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
@@ -70,126 +79,88 @@ class DeviceDetector {
     const screenSize = Math.max(window.screen.width, window.screen.height);
     const isTabletSize = screenSize >= 768 && screenSize <= 1366;
     
-    const result = patterns.test(userAgent) || isIPad || (hasTouch && isTabletSize);
+    // Additional checks for modern iPadOS (Safari might report as Mac)
+    const isProbablyIPad = navigator.platform === 'MacIntel' && 
+                          navigator.maxTouchPoints > 1 && 
+                          !window.MSStream;
     
-    if (result) {
-      console.log('Mobile device detected:', {
-        userAgent: userAgent.substring(0, 50) + '...',
-        hasTouch,
-        isIPad,
-        screenSize,
-        platform: navigator.platform
-      });
-    }
-    
-    return result;
-  }
-}
-
-class TouchTracker {
-  constructor() {
-    this.activeTouches = new Map();
-  }
-  
-  addTouch(touchId, buttonType, position) {
-    this.activeTouches.set(touchId, {
-      type: buttonType,
-      startTime: millis(),
-      position
+    // Debug logging
+    console.log('Device detection:', {
+      userAgent,
+      isMobile,
+      hasTouch,
+      isIPad,
+      isProbablyIPad,
+      screenSize,
+      isTabletSize,
+      platform: navigator.platform,
+      maxTouchPoints: navigator.maxTouchPoints
     });
-  }
-  
-  removeTouch(touchId) {
-    return this.activeTouches.delete(touchId);
-  }
-  
-  getTouch(touchId) {
-    return this.activeTouches.get(touchId);
-  }
-  
-  clear() {
-    this.activeTouches.clear();
-  }
-  
-  get size() {
-    return this.activeTouches.size;
-  }
-  
-  entries() {
-    return this.activeTouches.entries();
-  }
-}
-
-class ButtonState {
-  constructor() {
-    this.reset();
-  }
-  
-  reset() {
-    this.thrust = false;
-    this.reverse = false;
-    this.turnLeft = false;
-    this.turnRight = false;
-    this.fire = false;
-  }
-  
-  set(buttonType, pressed) {
-    this[buttonType] = pressed;
-  }
-  
-  get(buttonType) {
-    return this[buttonType];
-  }
-}
-
-// ==================== MAIN MOBILE CONTROLS CLASS ====================
-
-class MobileControls {
-  constructor() {
-    this.enabled = DeviceDetector.isMobile();
-    this.touchTracker = new TouchTracker();
-    this.buttonState = new ButtonState();
-    this.buttonTimestamps = new Map();
-    this.lastFireTime = 0;
-    this.buttonPositions = this._initializeButtonPositions();
     
-    if (this.enabled) {
-      this._initialize();
-      console.log("Mobile controls enabled with refactored D-pad");
-    }
-  }
-
-  // ==================== INITIALIZATION ====================
-  
-  _initialize() {
-    this._updateButtonPositions();
-    this._setupTouchEvents();
-    this._setupResizeListeners();
+    // Return true if any mobile/tablet indicator is present
+    return isMobile || isIPad || isProbablyIPad || (hasTouch && isTabletSize);
   }
   
-  _initializeButtonPositions() {
-    return {
-      thrust: { x: 0, y: 0, width: MOBILE_CONFIG.DPAD.BUTTON_SIZE, height: MOBILE_CONFIG.DPAD.BUTTON_SIZE, label: "↑" },
-      reverse: { x: 0, y: 0, width: MOBILE_CONFIG.DPAD.BUTTON_SIZE, height: MOBILE_CONFIG.DPAD.BUTTON_SIZE, label: "↓" },
-      turnLeft: { x: 0, y: 0, width: MOBILE_CONFIG.DPAD.BUTTON_SIZE, height: MOBILE_CONFIG.DPAD.BUTTON_SIZE, label: "←" },
-      turnRight: { x: 0, y: 0, width: MOBILE_CONFIG.DPAD.BUTTON_SIZE, height: MOBILE_CONFIG.DPAD.BUTTON_SIZE, label: "→" },
-      fire: { x: 0, y: 0, radius: MOBILE_CONFIG.FIRE_BUTTON.RADIUS }
-    };
+  isDesktop() {
+    // Simplified desktop detection - if it's not clearly mobile, don't force disable
+    const userAgent = navigator.userAgent.toLowerCase();
+    const hasNoTouch = !('ontouchstart' in window) && navigator.maxTouchPoints === 0;
+    const isWindows = /windows/i.test(userAgent) && hasNoTouch;
+    const isLinux = /linux/i.test(userAgent) && hasNoTouch && !/android/i.test(userAgent);
+    
+    return (isWindows || isLinux) && !/mobile|tablet|ipad|iphone/i.test(userAgent);
   }
   
-  _setupResizeListeners() {
-    window.addEventListener('resize', () => this._updateButtonPositions());
+  initializeControls() {
+    // Set up responsive positioning
+    this.updatePositions();
+    
+    // Add touch event listeners
+    this.setupTouchEvents();
+    
+    // Update positions on resize
+    window.addEventListener('resize', () => this.updatePositions());
     window.addEventListener('orientationchange', () => {
-      setTimeout(() => this._updateButtonPositions(), MOBILE_CONFIG.TIMING.ORIENTATION_DELAY);
+      setTimeout(() => this.updatePositions(), 100);
     });
   }
   
-  _setupTouchEvents() {
+  updatePositions() {
     if (!this.enabled) return;
-
-    // Prevent scrolling when touching control areas
+    
+    // Get canvas dimensions
+    const canvasWidth = window.innerWidth;
+    const canvasHeight = window.innerHeight;
+    
+    console.log('Updating mobile control positions. Canvas size:', canvasWidth, 'x', canvasHeight);
+    
+    // Update joystick position (bottom left)
+    MOBILE_CONTROLS_CONFIG.joystick.y = canvasHeight - 120;
+    
+    // Update fire button position (bottom right)
+    MOBILE_CONTROLS_CONFIG.fireButton.x = canvasWidth - 100;
+    MOBILE_CONTROLS_CONFIG.fireButton.y = canvasHeight - 120;
+    
+    // Update sonar button position (above fire button)
+    MOBILE_CONTROLS_CONFIG.sonarButton.x = canvasWidth - 100;
+    MOBILE_CONTROLS_CONFIG.sonarButton.y = canvasHeight - 220;
+    
+    console.log('Control positions updated:', {
+      joystick: { x: MOBILE_CONTROLS_CONFIG.joystick.x, y: MOBILE_CONTROLS_CONFIG.joystick.y },
+      fireButton: { x: MOBILE_CONTROLS_CONFIG.fireButton.x, y: MOBILE_CONTROLS_CONFIG.fireButton.y }
+    });
+  }
+  
+  setupTouchEvents() {
+    if (!this.enabled) return;
+    
+    console.log('Setting up touch events for mobile controls');
+    
+    // Minimal touch event setup - let p5.js handle most of it
+    // Only prevent default when absolutely necessary
     document.addEventListener('touchmove', (e) => {
-      if (this._anyButtonPressed()) {
+      // Only prevent scrolling if we're actively using controls
+      if (this.joystickActive || this.fireButtonPressed || this.sonarButtonPressed) {
         e.preventDefault();
       }
     }, { passive: false });
@@ -202,220 +173,196 @@ class MobileControls {
     }, { passive: false });
     
     document.body.style.touchAction = 'manipulation';
-    console.log('Touch events configured');
-  }
-
-  // ==================== BUTTON POSITIONING ====================
-  
-  _updateButtonPositions() {
-    if (!this.enabled) return;
-
-    const { innerWidth: width, innerHeight: height } = window;
-    const { DPAD, FIRE_BUTTON } = MOBILE_CONFIG;
     
-    // D-pad positioning
-    this.buttonPositions.thrust.x = DPAD.CENTER_X;
-    this.buttonPositions.thrust.y = height - DPAD.TOP_OFFSET;
+    console.log('Touch events setup complete');
+  }
+  
+  isTouchOnControls(touch) {
+    if (!touch) return false;
     
-    this.buttonPositions.reverse.x = DPAD.CENTER_X;
-    this.buttonPositions.reverse.y = height - DPAD.BOTTOM_OFFSET;
+    const touchX = touch.clientX;
+    const touchY = touch.clientY;
     
-    this.buttonPositions.turnLeft.x = DPAD.LEFT_X;
-    this.buttonPositions.turnLeft.y = height - DPAD.MIDDLE_OFFSET;
-    
-    this.buttonPositions.turnRight.x = DPAD.RIGHT_X;
-    this.buttonPositions.turnRight.y = height - DPAD.MIDDLE_OFFSET;
-    
-    // Fire button positioning
-    this.buttonPositions.fire.x = width - FIRE_BUTTON.RIGHT_MARGIN;
-    this.buttonPositions.fire.y = height - FIRE_BUTTON.BOTTOM_MARGIN;
-  }
-
-  // ==================== BUTTON STATE MANAGEMENT ====================
-  
-  _anyButtonPressed() {
-    return this.buttonState.thrust || this.buttonState.reverse || 
-           this.buttonState.turnLeft || this.buttonState.turnRight || 
-           this.buttonState.fire;
-  }
-  
-  _setButtonState(buttonType, pressed) {
-    this.buttonState.set(buttonType, pressed);
-    if (pressed) {
-      this.buttonTimestamps.set(buttonType, millis());
-    }
-  }
-  
-  _resetAllButtons() {
-    this.buttonState.reset();
-    this.touchTracker.clear();
-    this.buttonTimestamps.clear();
-    console.log('All buttons reset');
-  }
-  
-  _checkButtonTimeouts() {
-    const currentTime = millis();
-    const timeout = MOBILE_CONFIG.TIMING.BUTTON_TIMEOUT;
-    
-    for (const [buttonType, timestamp] of this.buttonTimestamps.entries()) {
-      if (this.buttonState.get(buttonType) && currentTime - timestamp > timeout) {
-        console.log(`${buttonType} button timeout, releasing`);
-        this.buttonState.set(buttonType, false);
-        this.buttonTimestamps.delete(buttonType);
-      }
-    }
-  }
-
-  // ==================== COLLISION DETECTION ====================
-  
-  _getButtonType(x, y) {
-    // Check rectangular buttons (D-pad)
-    for (const [type, button] of Object.entries(this.buttonPositions)) {
-      if (type === 'fire') continue; // Handle fire button separately
-      
-      if (this._isPointInRect(x, y, button)) {
-        return type;
-      }
-    }
-    
-    // Check circular fire button
-    if (this._isPointInCircle(x, y, this.buttonPositions.fire)) {
-      return BUTTON_TYPES.FIRE;
-    }
-    
-    return null;
-  }
-  
-  _isPointInRect(x, y, button) {
-    const halfWidth = button.width / 2;
-    const halfHeight = button.height / 2;
-    return x >= button.x - halfWidth && x <= button.x + halfWidth &&
-           y >= button.y - halfHeight && y <= button.y + halfHeight;
-  }
-  
-  _isPointInCircle(x, y, button) {
-    const distance = Math.sqrt(Math.pow(x - button.x, 2) + Math.pow(y - button.y, 2));
-    return distance <= button.radius;
-  }
-
-  // ==================== TOUCH EVENT HANDLING ====================
-  
-  _extractTouchCoordinates(touch) {
-    if (touch.x !== undefined && touch.y !== undefined) {
-      return { x: touch.x, y: touch.y };
-    }
-    if (touch.clientX !== undefined && touch.clientY !== undefined) {
-      return { x: touch.clientX, y: touch.clientY };
-    }
-    return null;
-  }
-  
-  _shouldIgnoreTouch() {
-    return typeof gameState !== 'undefined' && gameState !== 'playing';
-  }
-  
-  _handleMenuTouch() {
-    if (typeof gameState !== 'undefined' &&
-        (gameState === 'start' || gameState === 'levelComplete' ||
-         gameState === 'gameOver' || gameState === 'gameComplete')) {
-      if (typeof keyPressed === 'function') {
-        window.keyCode = 13; // ENTER
-        try { keyPressed(); } catch (e) { console.log('Error calling keyPressed:', e); }
-      }
-    }
+    // Check if touch is on any control element
+    return this.isPointInJoystick(touchX, touchY) ||
+           this.isPointInFireButton(touchX, touchY) ||
+           (MOBILE_CONTROLS_CONFIG.sonarButton.enabled && this.isPointInSonarButton(touchX, touchY));
   }
 
   handleTouchStart(touches) {
     if (!this.enabled) return;
-
+    
+    console.log('Touch start detected, touches:', touches.length);
+    
     for (let i = 0; i < touches.length; i++) {
       const touch = touches[i];
-      const coords = this._extractTouchCoordinates(touch);
-      if (!coords) continue;
-
-      this._updateButtonPositions();
-
-      // Handle menu navigation
-      if (this._shouldIgnoreTouch()) {
-        this._handleMenuTouch();
+      
+      // p5.js touch events have x and y properties directly
+      let touchX, touchY;
+      
+      if (touch.x !== undefined && touch.y !== undefined) {
+        // p5.js touch object - coordinates are already in canvas space
+        touchX = touch.x;
+        touchY = touch.y;
+      } else if (touch.clientX !== undefined && touch.clientY !== undefined) {
+        // Fallback to client coordinates
+        touchX = touch.clientX;
+        touchY = touch.clientY;
+      } else {
+        console.log('Touch object missing coordinates:', touch);
+        continue;
+      }
+      
+      console.log(`Touch ${i}: x=${touchX}, y=${touchY}, identifier=${touch.identifier}`);
+      console.log('Game state:', typeof gameState !== 'undefined' ? gameState : 'undefined');
+      
+      // Update positions to ensure they're current
+      this.updatePositions();
+      
+      // Handle start screen and other non-gameplay screens - tap anywhere to continue
+      if (typeof gameState !== 'undefined' && 
+          (gameState === 'start' || gameState === 'levelComplete' || 
+           gameState === 'gameOver' || gameState === 'gameComplete')) {
+        
+        console.log('Touch detected on non-gameplay screen, simulating ENTER key');
+        
+        // Simulate ENTER key press for non-gameplay screens
+        if (typeof keyPressed === 'function') {
+          // Set the global keyCode variable that p5.js uses
+          window.keyCode = 13; // ENTER key code
+          try {
+            keyPressed(); // Call the keyPressed function
+          } catch (e) {
+            console.log('Error calling keyPressed:', e);
+          }
+        }
         return;
       }
-
-      const touchId = touch.identifier !== undefined ? touch.identifier : i;
-      const buttonType = this._getButtonType(coords.x, coords.y);
       
-      if (buttonType) {
-        this._setButtonState(buttonType, true);
-        this.touchTracker.addTouch(touchId, buttonType, coords);
-        
-        if (buttonType === BUTTON_TYPES.FIRE) {
-          this._handleFire();
-        }
-        
-        console.log(`${buttonType} button pressed`);
+      // Only handle control touches during gameplay
+      if (typeof gameState === 'undefined' || gameState !== 'playing') {
+        console.log('Not in playing state, ignoring touch');
+        return;
+      }
+      
+      console.log('Checking control positions:');
+      console.log('Joystick at:', MOBILE_CONTROLS_CONFIG.joystick.x, MOBILE_CONTROLS_CONFIG.joystick.y);
+      console.log('Fire button at:', MOBILE_CONTROLS_CONFIG.fireButton.x, MOBILE_CONTROLS_CONFIG.fireButton.y);
+      
+      // Check joystick
+      if (this.isPointInJoystick(touchX, touchY)) {
+        console.log('Joystick touch detected! Touch at:', touchX, touchY, 'Joystick at:', MOBILE_CONTROLS_CONFIG.joystick.x, MOBILE_CONTROLS_CONFIG.joystick.y);
+        this.joystickActive = true;
+        const touchId = touch.identifier !== undefined ? touch.identifier : i;
+        this.touches.set(touchId, { type: 'joystick', x: touchX, y: touchY });
+        this.updateJoystick(touchX, touchY);
+      }
+      // Check fire button
+      else if (this.isPointInFireButton(touchX, touchY)) {
+        console.log('Fire button touch detected! Touch at:', touchX, touchY, 'Fire button at:', MOBILE_CONTROLS_CONFIG.fireButton.x, MOBILE_CONTROLS_CONFIG.fireButton.y);
+        this.fireButtonPressed = true;
+        const touchId = touch.identifier !== undefined ? touch.identifier : i;
+        this.touches.set(touchId, { type: 'fire', x: touchX, y: touchY });
+        this.handleFire();
+      }
+      // Check sonar button
+      else if (MOBILE_CONTROLS_CONFIG.sonarButton.enabled && this.isPointInSonarButton(touchX, touchY)) {
+        console.log('Sonar button touch detected!');
+        this.sonarButtonPressed = true;
+        const touchId = touch.identifier !== undefined ? touch.identifier : i;
+        this.touches.set(touchId, { type: 'sonar', x: touchX, y: touchY });
+        this.handleSonar();
+      } else {
+        console.log('Touch not on any control - touch at:', touchX, touchY);
+        console.log('Joystick bounds check:', 
+          'Distance to joystick center:', 
+          Math.sqrt(Math.pow(touchX - MOBILE_CONTROLS_CONFIG.joystick.x, 2) + Math.pow(touchY - MOBILE_CONTROLS_CONFIG.joystick.y, 2)),
+          'vs joystick radius:', MOBILE_CONTROLS_CONFIG.joystick.outerRadius);
+        console.log('Fire button bounds check:', 
+          'Distance to fire button center:', 
+          Math.sqrt(Math.pow(touchX - MOBILE_CONTROLS_CONFIG.fireButton.x, 2) + Math.pow(touchY - MOBILE_CONTROLS_CONFIG.fireButton.y, 2)),
+          'vs fire button radius:', MOBILE_CONTROLS_CONFIG.fireButton.radius);
       }
     }
   }
 
   handleTouchMove(touches) {
     if (!this.enabled) return;
-
-    // Check if tracked touches are still within their buttons
-    for (const [touchId, touchData] of this.touchTracker.entries()) {
-      let touchFound = false;
+    
+    for (let i = 0; i < touches.length; i++) {
+      const touch = touches[i];
+      const touchId = touch.identifier !== undefined ? touch.identifier : i;
+      const storedTouch = this.touches.get(touchId);
       
-      for (const touch of touches) {
-        const currentTouchId = touch.identifier !== undefined ? touch.identifier : touches.indexOf(touch);
+      if (storedTouch && storedTouch.type === 'joystick') {
+        // Get touch coordinates
+        let touchX, touchY;
         
-        if (currentTouchId === touchId) {
-          touchFound = true;
-          const coords = this._extractTouchCoordinates(touch);
-          if (!coords) continue;
-
-          const currentButtonType = this._getButtonType(coords.x, coords.y);
-          
-          // If touch moved outside the original button, release it
-          if (currentButtonType !== touchData.type) {
-            this._setButtonState(touchData.type, false);
-            this.touchTracker.removeTouch(touchId);
-            console.log(`Touch moved outside ${touchData.type} button, releasing`);
-          }
-          break;
+        if (touch.x !== undefined && touch.y !== undefined) {
+          touchX = touch.x;
+          touchY = touch.y;
+        } else if (touch.clientX !== undefined && touch.clientY !== undefined) {
+          touchX = touch.clientX;
+          touchY = touch.clientY;
+        } else {
+          continue;
         }
-      }
-
-      // If touch disappeared, release the button
-      if (!touchFound) {
-        this._setButtonState(touchData.type, false);
-        this.touchTracker.removeTouch(touchId);
-        console.log(`Touch ${touchId} disappeared, releasing ${touchData.type} button`);
+        
+        this.updateJoystick(touchX, touchY);
       }
     }
   }
 
   handleTouchEnd(touches) {
     if (!this.enabled) return;
-
-    for (const touch of touches) {
-      const touchId = touch.identifier !== undefined ? touch.identifier : touches.indexOf(touch);
-      const touchData = this.touchTracker.getTouch(touchId);
-
-      if (touchData) {
-        this._setButtonState(touchData.type, false);
-        this.touchTracker.removeTouch(touchId);
-        console.log(`${touchData.type} button released`);
+    
+    for (let i = 0; i < touches.length; i++) {
+      const touch = touches[i];
+      const touchId = touch.identifier !== undefined ? touch.identifier : i;
+      const storedTouch = this.touches.get(touchId);
+      
+      if (storedTouch) {
+        if (storedTouch.type === 'joystick') {
+          this.joystickActive = false;
+          this.joystickOffset = { x: 0, y: 0 };
+          this.movementVector = { x: 0, y: 0 };
+        } else if (storedTouch.type === 'fire') {
+          this.fireButtonPressed = false;
+        } else if (storedTouch.type === 'sonar') {
+          this.sonarButtonPressed = false;
+        }
+        
+        this.touches.delete(touchId);
       }
     }
-
-    // Safety check: if no touches remain, reset all buttons
-    if (this.touchTracker.size === 0) {
-      this._resetAllButtons();
-    }
   }
-
-  // ==================== GAME INTEGRATION ====================
   
-  _handleFire() {
+  updateJoystick(touchX, touchY) {
+    const joystick = MOBILE_CONTROLS_CONFIG.joystick;
+    const centerX = joystick.x;
+    const centerY = joystick.y;
+    
+    // Calculate offset from center
+    let offsetX = touchX - centerX;
+    let offsetY = touchY - centerY;
+    
+    // Limit to maximum distance
+    const distance = Math.sqrt(offsetX * offsetX + offsetY * offsetY);
+    if (distance > joystick.maxDistance) {
+      offsetX = (offsetX / distance) * joystick.maxDistance;
+      offsetY = (offsetY / distance) * joystick.maxDistance;
+    }
+    
+    this.joystickOffset = { x: offsetX, y: offsetY };
+    
+    // Convert to movement vector (-1 to 1 range)
+    this.movementVector = {
+      x: offsetX / joystick.maxDistance,
+      y: offsetY / joystick.maxDistance
+    };
+  }
+  
+  handleFire() {
     const currentTime = millis();
     if (currentTime - this.lastFireTime > MOBILE_CONFIG.TIMING.FIRE_COOLDOWN) {
       this.lastFireTime = currentTime;
@@ -425,79 +372,130 @@ class MobileControls {
       }
     }
   }
-
-  applyMovement() {
-    if (!this.enabled || typeof player === 'undefined' || !player || gameState !== 'playing') {
-      return;
-    }
-
-    if (this.buttonState.thrust) {
-      player.vel.add(p5.Vector.fromAngle(player.angle).mult(PLAYER_THRUST_POWER));
-    }
-    if (this.buttonState.reverse) {
-      player.vel.add(p5.Vector.fromAngle(player.angle).mult(-PLAYER_THRUST_POWER * PLAYER_REVERSE_THRUST_FACTOR));
-    }
-    if (this.buttonState.turnLeft) {
-      player.angle -= PLAYER_TURN_SPEED;
-    }
-    if (this.buttonState.turnRight) {
-      player.angle += PLAYER_TURN_SPEED;
+  
+  handleSonar() {
+    const currentTime = millis();
+    if (currentTime - this.lastSonarTime > 500) { // Minimum 500ms between sonar pulses
+      this.lastSonarTime = currentTime;
+      
+      // Trigger manual sonar if player exists and game is playing
+      if (typeof player !== 'undefined' && player && gameState === 'playing') {
+        player.fireSonar(cave, enemies, jellyfish);
+      }
     }
   }
-
-  // ==================== RENDERING ====================
-
+  
+  // Collision detection methods
+  isPointInJoystick(x, y) {
+    const joystick = MOBILE_CONTROLS_CONFIG.joystick;
+    const distance = Math.sqrt(Math.pow(x - joystick.x, 2) + Math.pow(y - joystick.y, 2));
+    return distance <= joystick.outerRadius;
+  }
+  
+  isPointInFireButton(x, y) {
+    const button = MOBILE_CONTROLS_CONFIG.fireButton;
+    const distance = Math.sqrt(Math.pow(x - button.x, 2) + Math.pow(y - button.y, 2));
+    return distance <= button.radius;
+  }
+  
+  isPointInSonarButton(x, y) {
+    const button = MOBILE_CONTROLS_CONFIG.sonarButton;
+    const distance = Math.sqrt(Math.pow(x - button.x, 2) + Math.pow(y - button.y, 2));
+    return distance <= button.radius;
+  }
+  
+  // Apply movement to player
+  applyMovement() {
+    if (!this.enabled || !this.joystickActive) return;
+    if (typeof player === 'undefined' || !player || gameState !== 'playing') return;
+    
+    const sensitivity = MOBILE_CONTROLS_CONFIG.joystick.sensitivity;
+    const moveX = this.movementVector.x * sensitivity;
+    const moveY = this.movementVector.y * sensitivity;
+    
+    // Apply movement as velocity adjustments
+    if (Math.abs(moveX) > 0.1) {
+      // Horizontal movement affects turning
+      player.angle += moveX * PLAYER_TURN_SPEED * 1.5; // Slightly faster turning for touch
+    }
+    
+    if (moveY < -0.1) {
+      // Forward movement (touch up)
+      player.vel.add(p5.Vector.fromAngle(player.angle).mult(PLAYER_THRUST_POWER * Math.abs(moveY)));
+    } else if (moveY > 0.1) {
+      // Backward movement (touch down)
+      player.vel.add(p5.Vector.fromAngle(player.angle).mult(-PLAYER_THRUST_POWER * PLAYER_REVERSE_THRUST_FACTOR * moveY));
+    }
+  }
+  
+  // Render the mobile controls
   render() {
-    if (!this.enabled || typeof gameState === 'undefined' || gameState !== 'playing') {
+    if (!this.enabled) return;
+    
+    // Only show controls during gameplay
+    if (typeof gameState === 'undefined' || gameState !== 'playing') {
       return;
     }
     
-    this._updateButtonPositions();
-    this._checkButtonTimeouts();
-
-    // Render D-pad buttons
-    this._renderDPadButton(BUTTON_TYPES.THRUST);
-    this._renderDPadButton(BUTTON_TYPES.REVERSE);
-    this._renderDPadButton(BUTTON_TYPES.TURN_LEFT);
-    this._renderDPadButton(BUTTON_TYPES.TURN_RIGHT);
-
-    // Render fire button
-    this._renderFireButton();
-
-    // Debug info
-    this._renderDebugInfo();
+    // Update positions in case of screen size changes
+    this.updatePositions();
+    
+    // Draw joystick
+    this.renderJoystick();
+    
+    // Draw fire button
+    this.renderFireButton();
+    
+    // Draw sonar button if enabled
+    if (MOBILE_CONTROLS_CONFIG.sonarButton.enabled) {
+      this.renderSonarButton();
+    }
+    
+    // Add debug info at top of screen
+    if (typeof fill === 'function' && typeof text === 'function') {
+      fill(255, 255, 255, 150);
+      textAlign(LEFT, TOP);
+      textSize(12);
+      text(`Mobile: ${this.enabled ? 'ON' : 'OFF'} | Touch: ${this.joystickActive ? 'JOY' : ''}${this.fireButtonPressed ? 'FIRE' : ''}`, 10, 10);
+    }
   }
-
-  _renderDPadButton(buttonType) {
-    const button = this.buttonPositions[buttonType];
-    const isPressed = this.buttonState.get(buttonType);
-    const { STYLE } = MOBILE_CONFIG;
+  
+  renderJoystick() {
+    const joystick = MOBILE_CONTROLS_CONFIG.joystick;
+    const style = MOBILE_CONTROLS_CONFIG.style;
     
     push();
-    rectMode(CENTER);
     
-    const alpha = isPressed ? STYLE.ALPHA.PRESSED : STYLE.ALPHA.NORMAL;
-    const color = isPressed ? STYLE.COLORS.PRESSED : STYLE.COLORS.CONTROL;
-
-    strokeWeight(STYLE.STROKE_WEIGHT);
-    stroke(color.h, color.s, color.b + 20, alpha);
-    fill(color.h, color.s, color.b, alpha * 0.7);
-    rect(button.x, button.y, button.width, button.height, STYLE.CORNER_RADIUS);
-
-    // Button label
-    fill(color.h, color.s, color.b + 40, alpha + 30);
-    noStroke();
-    textAlign(CENTER, CENTER);
-    textSize(STYLE.TEXT_SIZE);
-    text(button.label, button.x, button.y);
+    // Outer circle - make it more visible
+    strokeWeight(style.strokeWeight + 1);
+    stroke(style.joystickColor.h, style.joystickColor.s, style.joystickColor.b, style.outerAlpha + 50);
+    fill(style.joystickColor.h, style.joystickColor.s, style.joystickColor.b, style.outerAlpha * 0.5);
+    ellipse(joystick.x, joystick.y, joystick.outerRadius * 2);
+    
+    // Inner knob - more prominent when active
+    const knobX = joystick.x + this.joystickOffset.x;
+    const knobY = joystick.y + this.joystickOffset.y;
+    const knobAlpha = this.joystickActive ? style.pressedAlpha : style.innerAlpha;
+    const knobColor = this.joystickActive ? style.pressedColor : style.joystickKnobColor;
+    
+    fill(knobColor.h, knobColor.s, knobColor.b, knobAlpha);
+    stroke(knobColor.h, knobColor.s, knobColor.b + 20, knobAlpha);
+    strokeWeight(style.strokeWeight);
+    ellipse(knobX, knobY, joystick.innerRadius * 2);
+    
+    // Direction indicator lines - more visible
+    if (this.joystickActive) {
+      stroke(knobColor.h, knobColor.s, knobColor.b + 30, knobAlpha);
+      strokeWeight(style.strokeWeight + 1);
+      line(joystick.x, joystick.y, knobX, knobY);
+    }
     
     pop();
   }
-
-  _renderFireButton() {
-    const button = this.buttonPositions.fire;
-    const isPressed = this.buttonState.fire;
-    const { STYLE } = MOBILE_CONFIG;
+  
+  renderFireButton() {
+    const button = MOBILE_CONTROLS_CONFIG.fireButton;
+    const style = MOBILE_CONTROLS_CONFIG.style;
     
     push();
     
