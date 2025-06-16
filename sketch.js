@@ -2383,10 +2383,22 @@ function drawStartScreen() {
 
   let killsForLevel1 = getKillsRequiredForLevel(1);
   text(`Destroy ${killsForLevel1} mutated creatures and reach the flooded reactor`, width / 2, height / 2 + START_SCREEN_INFO_Y_OFFSET_1);
-  text("WASD/Arrows: Move. SPACE: Shoot.", width / 2, height / 2 + START_SCREEN_INFO_Y_OFFSET_2);
+  
+  // Show different control instructions based on device
+  if (typeof isMobileControlsEnabled === 'function' && isMobileControlsEnabled()) {
+    text("Touch controls: Joystick (left) and Fire button (right)", width / 2, height / 2 + START_SCREEN_INFO_Y_OFFSET_2);
+  } else {
+    text("WASD/Arrows: Move. SPACE: Shoot.", width / 2, height / 2 + START_SCREEN_INFO_Y_OFFSET_2);
+  }
   
   textSize(START_SCREEN_PROMPT_TEXT_SIZE); fill(START_SCREEN_PROMPT_COLOR_H, START_SCREEN_PROMPT_COLOR_S, START_SCREEN_PROMPT_COLOR_B);
-  text("Press ENTER to Dive", width / 2, height / 2 + START_SCREEN_PROMPT_Y_OFFSET);
+  
+  // Show different instructions based on whether mobile controls are active
+  if (typeof isMobileControlsEnabled === 'function' && isMobileControlsEnabled()) {
+    text("Tap anywhere to Dive", width / 2, height / 2 + START_SCREEN_PROMPT_Y_OFFSET);
+  } else {
+    text("Press ENTER to Dive", width / 2, height / 2 + START_SCREEN_PROMPT_Y_OFFSET);
+  }
   if (!audioInitialized) {
       textSize(START_SCREEN_AUDIO_NOTE_TEXT_SIZE); fill(START_SCREEN_AUDIO_NOTE_COLOR_H, START_SCREEN_AUDIO_NOTE_COLOR_S, START_SCREEN_AUDIO_NOTE_COLOR_B);
       //text("(Sound will enable after you press Enter or Click)", width/2, height/2 + START_SCREEN_AUDIO_NOTE_Y_OFFSET);
@@ -2404,7 +2416,13 @@ function drawLevelCompleteScreen() {
   text(`Time bonus: ${timeLeftInSeconds} seconds x 10 = ${levelScore} points`, width / 2, height / 2 + LEVEL_COMPLETE_INFO_Y_OFFSET);
   let killsForNextLevel = getKillsRequiredForLevel(currentLevel+1);
   text(`Next Level: Destroy ${killsForNextLevel} enemies and reach the reactor`, width/2, height / 2 + LEVEL_COMPLETE_INFO_Y_OFFSET + 40);
-  text("ENTER to Continue", width / 2, height / 2 + LEVEL_COMPLETE_PROMPT_Y_OFFSET);
+  
+  // Show appropriate continue instruction
+  if (typeof isMobileControlsEnabled === 'function' && isMobileControlsEnabled()) {
+    text("Tap to Continue", width / 2, height / 2 + LEVEL_COMPLETE_PROMPT_Y_OFFSET);
+  } else {
+    text("ENTER to Continue", width / 2, height / 2 + LEVEL_COMPLETE_PROMPT_Y_OFFSET);
+  }
 }
 
 function drawGameCompleteScreen() {
@@ -2414,7 +2432,13 @@ function drawGameCompleteScreen() {
   textSize(GAME_COMPLETE_INFO_TEXT_SIZE);
   text(`You cleared all ${MAX_LEVELS} levels!`, width/2, height/2 + GAME_COMPLETE_INFO_Y_OFFSET);
   text(`Final Score: ${totalScore}`, width/2, height/2 + GAME_COMPLETE_INFO_Y_OFFSET + 30);
-  text("Press ENTER to Play Again", width / 2, height / 2 + GAME_COMPLETE_PROMPT_Y_OFFSET);
+  
+  // Show appropriate restart instruction
+  if (typeof isMobileControlsEnabled === 'function' && isMobileControlsEnabled()) {
+    text("Tap to Play Again", width / 2, height / 2 + GAME_COMPLETE_PROMPT_Y_OFFSET);
+  } else {
+    text("Press ENTER to Play Again", width / 2, height / 2 + GAME_COMPLETE_PROMPT_Y_OFFSET);
+  }
 }
 
 function drawGameOverScreen() {
@@ -2424,7 +2448,13 @@ function drawGameOverScreen() {
   textSize(GAME_OVER_INFO_TEXT_SIZE);
   text(player.health <= 0 ? "Submarine Destroyed!" : "Air Supply Depleted!", width/2, height/2 + GAME_OVER_INFO_Y_OFFSET);
   text(`Total Score: ${totalScore}`, width/2, height/2 + GAME_OVER_INFO_Y_OFFSET + 30);
-  text("Press ENTER to Restart", width / 2, height / 2 + GAME_OVER_PROMPT_Y_OFFSET);
+  
+  // Show appropriate restart instruction
+  if (typeof isMobileControlsEnabled === 'function' && isMobileControlsEnabled()) {
+    text("Tap to Restart", width / 2, height / 2 + GAME_OVER_PROMPT_Y_OFFSET);
+  } else {
+    text("Press ENTER to Restart", width / 2, height / 2 + GAME_OVER_PROMPT_Y_OFFSET);
+  }
 }
 
 function drawPlayingState() {

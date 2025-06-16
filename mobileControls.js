@@ -69,18 +69,50 @@ class MobileControls {
   isMobileDevice() {
     // Detect mobile devices and tablets
     const userAgent = navigator.userAgent.toLowerCase();
+    
+    // Check for specific mobile/tablet patterns
     const isMobile = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent);
     const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-    const screenSize = Math.max(window.screen.width, window.screen.height);
-    const isTabletSize = screenSize >= 768 && screenSize <= 1366; // Typical tablet range
     
-    return (isMobile || hasTouch || isTabletSize) && !this.isDesktop();
+    // Improved iPad detection - iPad can report as desktop in some cases
+    const isIPad = /ipad/i.test(userAgent) || 
+                   (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) ||
+                   (userAgent.includes('mac') && hasTouch && navigator.maxTouchPoints > 0);
+    
+    // Screen size detection for tablets
+    const screenSize = Math.max(window.screen.width, window.screen.height);
+    const isTabletSize = screenSize >= 768 && screenSize <= 1366;
+    
+    // Additional checks for modern iPadOS (Safari might report as Mac)
+    const isProbablyIPad = navigator.platform === 'MacIntel' && 
+                          navigator.maxTouchPoints > 1 && 
+                          !window.MSStream;
+    
+    // Debug logging
+    console.log('Device detection:', {
+      userAgent,
+      isMobile,
+      hasTouch,
+      isIPad,
+      isProbablyIPad,
+      screenSize,
+      isTabletSize,
+      platform: navigator.platform,
+      maxTouchPoints: navigator.maxTouchPoints
+    });
+    
+    // Return true if any mobile/tablet indicator is present
+    return isMobile || isIPad || isProbablyIPad || (hasTouch && isTabletSize);
   }
   
   isDesktop() {
-    // Try to detect actual desktop devices to avoid false positives
+    // Simplified desktop detection - if it's not clearly mobile, don't force disable
     const userAgent = navigator.userAgent.toLowerCase();
-    return /windows|macintosh|linux/i.test(userAgent) && !/mobile|tablet/i.test(userAgent);
+    const hasNoTouch = !('ontouchstart' in window) && navigator.maxTouchPoints === 0;
+    const isWindows = /windows/i.test(userAgent) && hasNoTouch;
+    const isLinux = /linux/i.test(userAgent) && hasNoTouch && !/android/i.test(userAgent);
+    
+    return (isWindows || isLinux) && !/mobile|tablet|ipad|iphone/i.test(userAgent);
   }
   
   initializeControls() {
@@ -115,11 +147,17 @@ class MobileControls {
   setupTouchEvents() {
     if (!this.enabled) return;
     
+    console.log('Setting up touch events for mobile controls');
+    
     // Prevent default touch behaviors that might interfere
     document.addEventListener('touchstart', (e) => {
-      if (this.isTouchOnControls(e.touches[0])) {
-        e.preventDefault();
+      // During gameplay, only prevent default for control touches
+      if (typeof gameState !== 'undefined' && gameState === 'playing') {
+        if (this.isTouchOnControls(e.touches[0])) {
+          e.preventDefault();
+        }
       }
+      // For other game states, we'll let the touch through to be handled by our touch handlers
     }, { passive: false });
     
     document.addEventListener('touchmove', (e) => {
@@ -133,6 +171,9 @@ class MobileControls {
         e.preventDefault();
       }
     }, { passive: false });
+    
+    // Additional setup for iOS Safari to handle touch events properly
+    document.body.style.touchAction = 'manipulation';
   }
   
   isTouchOnControls(touch) {
@@ -155,23 +196,51 @@ class MobileControls {
       const touchX = touch.clientX;
       const touchY = touch.clientY;
       
+      // Handle start screen and other non-gameplay screens - tap anywhere to continue
+      if (typeof gameState !== 'undefined' && 
+          (gameState === 'start' || gameState === 'levelComplete' || 
+           gameState === 'gameOver' || gameState === 'gameComplete')) {
+        
+        console.log('Touch detected on non-gameplay screen, simulating ENTER key');
+        
+        // Simulate ENTER key press for non-gameplay screens
+        if (typeof keyCode !== 'undefined' && typeof keyPressed === 'function') {
+          // Set the global keyCode variable that p5.js uses
+          window.keyCode = 13; // ENTER key code
+          try {
+            keyPressed(); // Call the keyPressed function
+          } catch (e) {
+            console.log('Error calling keyPressed:', e);
+          }
+        }
+        return;
+      }
+      
+      // Only handle control touches during gameplay
+      if (typeof gameState === 'undefined' || gameState !== 'playing') {
+        return;
+      }
+      
       // Check joystick
       if (this.isPointInJoystick(touchX, touchY)) {
         this.joystickActive = true;
         this.touches.set(touch.identifier, { type: 'joystick', x: touchX, y: touchY });
         this.updateJoystick(touchX, touchY);
+        console.log('Joystick activated');
       }
       // Check fire button
       else if (this.isPointInFireButton(touchX, touchY)) {
         this.fireButtonPressed = true;
         this.touches.set(touch.identifier, { type: 'fire', x: touchX, y: touchY });
         this.handleFire();
+        console.log('Fire button pressed');
       }
       // Check sonar button
       else if (MOBILE_CONTROLS_CONFIG.sonarButton.enabled && this.isPointInSonarButton(touchX, touchY)) {
         this.sonarButtonPressed = true;
         this.touches.set(touch.identifier, { type: 'sonar', x: touchX, y: touchY });
         this.handleSonar();
+        console.log('Sonar button pressed');
       }
     }
   }
@@ -308,6 +377,11 @@ class MobileControls {
   render() {
     if (!this.enabled) return;
     
+    // Only show controls during gameplay
+    if (typeof gameState === 'undefined' || gameState !== 'playing') {
+      return;
+    }
+    
     // Update positions in case of screen size changes
     this.updatePositions();
     
@@ -329,25 +403,27 @@ class MobileControls {
     
     push();
     
-    // Outer circle
-    strokeWeight(style.strokeWeight);
-    stroke(style.joystickColor.h, style.joystickColor.s, style.joystickColor.b, style.outerAlpha);
-    fill(style.joystickColor.h, style.joystickColor.s, style.joystickColor.b, style.outerAlpha * 0.3);
+    // Outer circle - make it more visible
+    strokeWeight(style.strokeWeight + 1);
+    stroke(style.joystickColor.h, style.joystickColor.s, style.joystickColor.b, style.outerAlpha + 50);
+    fill(style.joystickColor.h, style.joystickColor.s, style.joystickColor.b, style.outerAlpha * 0.5);
     ellipse(joystick.x, joystick.y, joystick.outerRadius * 2);
     
-    // Inner knob
+    // Inner knob - more prominent when active
     const knobX = joystick.x + this.joystickOffset.x;
     const knobY = joystick.y + this.joystickOffset.y;
     const knobAlpha = this.joystickActive ? style.pressedAlpha : style.innerAlpha;
+    const knobColor = this.joystickActive ? style.pressedColor : style.joystickKnobColor;
     
-    fill(style.joystickKnobColor.h, style.joystickKnobColor.s, style.joystickKnobColor.b, knobAlpha);
-    stroke(style.joystickKnobColor.h, style.joystickKnobColor.s, style.joystickKnobColor.b + 20, knobAlpha);
+    fill(knobColor.h, knobColor.s, knobColor.b, knobAlpha);
+    stroke(knobColor.h, knobColor.s, knobColor.b + 20, knobAlpha);
+    strokeWeight(style.strokeWeight);
     ellipse(knobX, knobY, joystick.innerRadius * 2);
     
-    // Direction indicator lines
+    // Direction indicator lines - more visible
     if (this.joystickActive) {
-      stroke(style.joystickKnobColor.h, style.joystickKnobColor.s, style.joystickKnobColor.b + 30, knobAlpha);
-      strokeWeight(style.strokeWeight - 1);
+      stroke(knobColor.h, knobColor.s, knobColor.b + 30, knobAlpha);
+      strokeWeight(style.strokeWeight + 1);
       line(joystick.x, joystick.y, knobX, knobY);
     }
     
@@ -360,19 +436,19 @@ class MobileControls {
     
     push();
     
-    // Main button
-    const buttonAlpha = this.fireButtonPressed ? style.pressedAlpha : style.innerAlpha;
+    // Main button - more prominent when pressed
+    const buttonAlpha = this.fireButtonPressed ? style.pressedAlpha + 50 : style.innerAlpha + 30;
     const buttonColor = this.fireButtonPressed ? style.pressedColor : style.fireButtonColor;
     
-    strokeWeight(style.strokeWeight);
+    strokeWeight(style.strokeWeight + 1);
     stroke(buttonColor.h, buttonColor.s, buttonColor.b + 20, buttonAlpha);
-    fill(buttonColor.h, buttonColor.s, buttonColor.b, buttonAlpha * 0.7);
+    fill(buttonColor.h, buttonColor.s, buttonColor.b, buttonAlpha * 0.8);
     ellipse(button.x, button.y, button.radius * 2);
     
-    // Fire icon (simple triangle/arrow)
-    fill(buttonColor.h, buttonColor.s, buttonColor.b + 30, buttonAlpha);
+    // Fire icon (simple triangle/arrow) - more prominent
+    fill(buttonColor.h, buttonColor.s, buttonColor.b + 30, buttonAlpha + 50);
     noStroke();
-    const iconSize = button.radius * 0.4;
+    const iconSize = button.radius * 0.5; // Slightly larger icon
     triangle(
       button.x + iconSize * 0.8, button.y,
       button.x - iconSize * 0.4, button.y - iconSize * 0.6,
@@ -383,7 +459,7 @@ class MobileControls {
     if (button.cooldownDisplay && typeof player !== 'undefined' && player) {
       const cooldownProgress = Math.max(0, (millis() - this.lastFireTime) / 200);
       if (cooldownProgress < 1) {
-        stroke(60, 100, 100, 150);
+        stroke(60, 100, 100, 200);
         strokeWeight(style.strokeWeight + 2);
         noFill();
         arc(button.x, button.y, button.radius * 2.2, button.radius * 2.2, 
@@ -391,12 +467,12 @@ class MobileControls {
       }
     }
     
-    // Label
-    fill(buttonColor.h, buttonColor.s, buttonColor.b + 40, buttonAlpha);
+    // Label - more visible
+    fill(buttonColor.h, buttonColor.s, buttonColor.b + 40, buttonAlpha + 30);
     noStroke();
     textAlign(CENTER, CENTER);
-    textSize(style.textSize * 0.8);
-    text("FIRE", button.x, button.y + button.radius + 20);
+    textSize(style.textSize * 0.9);
+    text("FIRE", button.x, button.y + button.radius + 25);
     
     pop();
   }
