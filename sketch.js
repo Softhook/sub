@@ -1926,9 +1926,12 @@ function setup() {
   createCanvas(windowWidth, windowHeight);
   colorMode(HSB, 360, 100, 100, 255); // Max values for HSB and Alpha
   textAlign(CENTER, CENTER); textFont('monospace');
-  initializeSounds(); resetGame();
-
-    if (customFont) {
+  initializeSounds(); 
+  
+  // Initialize mobile controls
+  initMobileControls();
+  
+  if (customFont) {
     textFont(customFont);
   }
   resetGame();
@@ -2445,6 +2448,9 @@ function drawPlayingState() {
 
   player.update(cave, enemies);
   
+  // Apply mobile controls movement if enabled
+  applyMobileMovement();
+  
   // Update and render enemies - only process those near the screen
   let margin = 100; // Extra margin for off-screen enemies
   for (let enemy of enemies) {
@@ -2525,6 +2531,9 @@ function drawPlayingState() {
   let distanceToGoal = dist(player.pos.x, player.pos.y, cave.goalPos.x, cave.goalPos.y);
   text(`Distance to Reactor: ${floor(distanceToGoal)} meters`, HUD_MARGIN_X, HUD_MARGIN_Y + HUD_LINE_SPACING * 3);
 
+  // Render mobile controls after HUD
+  renderMobileControls();
+
   // Update reactor hum volume based on distance to goal (reactor)
   updateReactorHum(distanceToGoal);
 
@@ -2576,5 +2585,30 @@ const KILLS_INCREASE_PER_LEVEL = 3; // How many more kills needed each subsequen
 function getKillsRequiredForLevel(level) {
   if (level <= 0) return 0;
   return BASE_KILLS_REQUIRED + (level - 1) * KILLS_INCREASE_PER_LEVEL;
+}
+
+// --- Touch Event Forwarding for Mobile Controls ---
+function touchStarted() {
+  if (typeof handleMobileTouchStart === 'function') {
+    handleMobileTouchStart(touches);
+  }
+  // Prevent default to avoid issues on mobile
+  return false;
+}
+
+function touchMoved() {
+  if (typeof handleMobileTouchMove === 'function') {
+    handleMobileTouchMove(touches);
+  }
+  // Prevent default to avoid issues on mobile
+  return false;
+}
+
+function touchEnded() {
+  if (typeof handleMobileTouchEnd === 'function') {
+    handleMobileTouchEnd(touches);
+  }
+  // Prevent default to avoid issues on mobile
+  return false;
 }
 
