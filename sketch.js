@@ -235,13 +235,14 @@ const SONAR_ENV_ADSR = { aT: 0.01, dT: 0.1, sR: 0, rT: 0.1 };
 const SONAR_ENV_LEVELS = { aL: 0.3, rL: 0 };
 const SONAR_FREQ = 800;
 
-const EXPLOSION_NOISE_ENV_ADSR = { aT: 0.001, dT: 1.2, sR: 0, rT: 0.8 };
+// Shorter, snappier explosion (reduced decay times)
+const EXPLOSION_NOISE_ENV_ADSR = { aT: 0.001, dT: 0.6, sR: 0, rT: 0.4 };
 const EXPLOSION_NOISE_ENV_LEVELS = { aL: 0.9, rL: 0 };
-const EXPLOSION_BOOM_ENV_ADSR = { aT: 0.001, dT: 1.5, sR: 0, rT: 1.0 };
+const EXPLOSION_BOOM_ENV_ADSR = { aT: 0.001, dT: 1.5, sR: 0, rT: 0.5 };
 const EXPLOSION_BOOM_ENV_LEVELS = { aL: 0.8, rL: 0 };
 const EXPLOSION_BOOM_MIN_FREQ = 40;
 const EXPLOSION_BOOM_MAX_FREQ = 80;
-const EXPLOSION_BASS_ENV_ADSR = { aT: 0.002, dT: 2.0, sR: 0, rT: 1.5 };
+const EXPLOSION_BASS_ENV_ADSR = { aT: 0.002, dT: 1.0, sR: 0, rT: 0.8 };
 const EXPLOSION_BASS_ENV_LEVELS = { aL: 1.0, rL: 0 };
 const EXPLOSION_BASS_MIN_FREQ = 15;
 const EXPLOSION_BASS_MAX_FREQ = 30;
@@ -364,8 +365,11 @@ const KEY_CODE_D = 68;
 // Note: ENTER key is already a p5.js constant, no need to redefine.
 
 // Sound objects
+let audioInitialized = false;
+let lastLowAirBeepTime = 0;
 var sonarOsc, sonarEnv;
-var explosionNoise, explosionEnv, explosionBoomOsc, explosionBoomEnv, explosionBassOsc, explosionBassEnv; // Enemy Explosion
+var explosionNoise, explosionEnv, explosionBoomOsc, explosionBoomEnv, explosionBassOsc, explosionBassEnv; // Wall Explosion
+var creatureExplosionNoise, creatureExplosionEnv, creatureExplosionBoomOsc, creatureExplosionBoomEnv, creatureExplosionBassOsc, creatureExplosionBassEnv; // Creature Explosion
 var bumpOsc, bumpEnv;
 var torpedoNoise, torpedoEnv; // Changed from Osc to Noise for woosh
 var lowAirOsc, lowAirEnv;
@@ -381,8 +385,17 @@ let reactorHumAmplitude = 0;
 // Creature Growl Audio
 let creatureGrowlOsc, creatureGrowlEnv;
 
-let audioInitialized = false;
-let lastLowAirBeepTime = 0;
+// --- Creature Explosion Sound Constants (less boomy than wall explosions) ---
+const CREATURE_EXPLOSION_NOISE_ENV_ADSR = { aT: 0.001, dT: 0.3, sR: 0, rT: 0.2 };
+const CREATURE_EXPLOSION_NOISE_ENV_LEVELS = { aL: 0.6, rL: 0 };
+const CREATURE_EXPLOSION_BOOM_ENV_ADSR = { aT: 0.001, dT: 0.8, sR: 0, rT: 0.3 };
+const CREATURE_EXPLOSION_BOOM_ENV_LEVELS = { aL: 0.5, rL: 0 };
+const CREATURE_EXPLOSION_BOOM_MIN_FREQ = 60;
+const CREATURE_EXPLOSION_BOOM_MAX_FREQ = 120;
+const CREATURE_EXPLOSION_BASS_ENV_ADSR = { aT: 0.002, dT: 0.6, sR: 0, rT: 0.4 };
+const CREATURE_EXPLOSION_BASS_ENV_LEVELS = { aL: 0.7, rL: 0 };
+const CREATURE_EXPLOSION_BASS_MIN_FREQ = 25;
+const CREATURE_EXPLOSION_BASS_MAX_FREQ = 45;
 
 // Game Variables
 let player;
@@ -1786,6 +1799,14 @@ function initializeSounds() {
   let explosionBassSound = setupSound('osc', 'sine', EXPLOSION_BASS_ENV_ADSR, EXPLOSION_BASS_ENV_LEVELS);
   explosionBassOsc = explosionBassSound.sound; explosionBassEnv = explosionBassSound.envelope;
 
+  // Initialize creature explosion sounds (less boomy)
+  let creatureExplosionNoiseSound = setupSound('noise', 'brown', CREATURE_EXPLOSION_NOISE_ENV_ADSR, CREATURE_EXPLOSION_NOISE_ENV_LEVELS);
+  creatureExplosionNoise = creatureExplosionNoiseSound.sound; creatureExplosionEnv = creatureExplosionNoiseSound.envelope;
+  let creatureExplosionBoomSound = setupSound('osc', 'sine', CREATURE_EXPLOSION_BOOM_ENV_ADSR, CREATURE_EXPLOSION_BOOM_ENV_LEVELS);
+  creatureExplosionBoomOsc = creatureExplosionBoomSound.sound; creatureExplosionBoomEnv = creatureExplosionBoomSound.envelope;
+  let creatureExplosionBassSound = setupSound('osc', 'sine', CREATURE_EXPLOSION_BASS_ENV_ADSR, CREATURE_EXPLOSION_BASS_ENV_LEVELS);
+  creatureExplosionBassOsc = creatureExplosionBassSound.sound; creatureExplosionBassEnv = creatureExplosionBassSound.envelope;
+
   let bumpSound = setupSound('osc', 'triangle', BUMP_ENV_ADSR, BUMP_ENV_LEVELS);
   bumpOsc = bumpSound.sound; bumpEnv = bumpSound.envelope;
 
@@ -1838,6 +1859,10 @@ function playSound(soundName) {
       ensureStarted(explosionNoise); explosionEnv.play(explosionNoise);
       ensureStarted(explosionBoomOsc); explosionBoomOsc.freq(random(EXPLOSION_BOOM_MIN_FREQ, EXPLOSION_BOOM_MAX_FREQ)); explosionBoomEnv.play(explosionBoomOsc);
       ensureStarted(explosionBassOsc); explosionBassOsc.freq(random(EXPLOSION_BASS_MIN_FREQ, EXPLOSION_BASS_MAX_FREQ)); explosionBassEnv.play(explosionBassOsc);
+    } else if (soundName === 'creatureExplosion') {
+      ensureStarted(creatureExplosionNoise); creatureExplosionEnv.play(creatureExplosionNoise);
+      ensureStarted(creatureExplosionBoomOsc); creatureExplosionBoomOsc.freq(random(CREATURE_EXPLOSION_BOOM_MIN_FREQ, CREATURE_EXPLOSION_BOOM_MAX_FREQ)); creatureExplosionBoomEnv.play(creatureExplosionBoomOsc);
+      ensureStarted(creatureExplosionBassOsc); creatureExplosionBassOsc.freq(random(CREATURE_EXPLOSION_BASS_MIN_FREQ, CREATURE_EXPLOSION_BASS_MAX_FREQ)); creatureExplosionBassEnv.play(creatureExplosionBassOsc);
     } else if (soundName === 'bump') {
       ensureStarted(bumpOsc); bumpOsc.freq(BUMP_FREQ); bumpEnv.play(bumpOsc);
     } else if (soundName === 'torpedo') {
@@ -2069,6 +2094,12 @@ function createExplosion(x, y, type) {
     colorH = EXPLOSION_PARTICLE_COLOR_H_ENEMY;
     colorS = EXPLOSION_PARTICLE_COLOR_S_ENEMY;
     colorB = EXPLOSION_PARTICLE_COLOR_B_ENEMY;
+  } else if (type === 'creature') {
+    // Creature explosion uses a different set of particles and colors
+    particleCount = EXPLOSION_PARTICLE_COUNT_TORPEDO_ENEMY; // Same count as enemy for now
+    colorH = 300; // Purple hue for creature explosion
+    colorS = 80;
+    colorB = 70;
   }
 
   for (let i = 0; i < particleCount; i++) {
@@ -2110,7 +2141,9 @@ function prepareNextLevel() {
 function startAudioRoutine() {
     function startAllSoundObjects() {
         const soundObjects = [
-            sonarOsc, explosionNoise, explosionBoomOsc, explosionBassOsc, bumpOsc, torpedoNoise, 
+            sonarOsc, explosionNoise, explosionBoomOsc, explosionBassOsc, 
+            creatureExplosionNoise, creatureExplosionBoomOsc, creatureExplosionBassOsc,
+            bumpOsc, torpedoNoise, 
             currentFlowNoise, currentFlowBassOsc,
             lowAirOsc, reactorHumOsc, creatureGrowlOsc, gameOverImpactNoise, gameOverGroanOsc, gameOverFinalBoomNoise
         ];
@@ -2311,7 +2344,7 @@ function drawStartScreen() {
   
   let apparentHeight = subRadius * PLAYER_PROPELLER_MAX_SIDE_HEIGHT_FACTOR * abs(sin(startScreenPropellerAngle));
   let thickness = subRadius * PLAYER_PROPELLER_THICKNESS_FACTOR;
-  
+
   rectMode(CENTER);
   rect(0, 0, thickness, apparentHeight);
   rectMode(CORNER); // Reset rectMode
@@ -2444,7 +2477,7 @@ function drawPlayingState() {
           enemies.splice(j, 1); 
           projectiles.splice(i, 1); 
           enemiesKilledThisLevel++;
-          playSound('explosion'); 
+          playSound('creatureExplosion'); // Use creature explosion sound
           break; 
         }
       }
@@ -2465,7 +2498,7 @@ function drawPlayingState() {
           if (destroyed) {
             jellyfish.splice(j, 1);
             enemiesKilledThisLevel++;
-            playSound('explosion');
+            playSound('creatureExplosion'); // Use creature explosion sound when destroyed
           } else {
             playSound('bump'); // Different sound for non-fatal hit
           }
