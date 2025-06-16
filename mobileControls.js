@@ -44,6 +44,16 @@ const MOBILE_CONTROLS_CONFIG = {
     fireButtonColor: { h: 0, s: 80, b: 85 },
     sonarButtonColor: { h: 120, s: 70, b: 80 },
     pressedColor: { h: 60, s: 90, b: 95 },
+  },
+
+  // Smooth rotation settings
+  // Eliminates jittery submarine movement when changing joystick direction
+  smoothRotation: {
+    enabled: true,              // Enable/disable smooth rotation
+    lerpSpeed: 0.15,           // How fast to rotate toward target (0.1 = slow, 0.3 = fast)
+    movementThreshold: 0.4,    // Minimum movement magnitude to trigger rotation (higher = less sensitive)
+    stabilityFrames: 8,        // Frames required for stable movement before changing target (higher = less jittery)
+    angleTolerance: 0.3,       // Radians tolerance for movement stability (≈17 degrees, higher = more forgiving)
   }
 };
 
@@ -60,6 +70,15 @@ class MobileControls {
     
     // Movement state
     this.movementVector = { x: 0, y: 0 };
+    
+    // Smooth rotation properties
+    this.targetAngle = 0;
+    this.lastMovementAngle = 0;
+    this.angleLerpSpeed = MOBILE_CONTROLS_CONFIG.smoothRotation.lerpSpeed;
+    this.movementThreshold = MOBILE_CONTROLS_CONFIG.smoothRotation.movementThreshold;
+    this.angleStabilityFrames = 0;
+    this.requiredStabilityFrames = MOBILE_CONTROLS_CONFIG.smoothRotation.stabilityFrames;
+    this.angleTolerance = MOBILE_CONTROLS_CONFIG.smoothRotation.angleTolerance;
     
     if (this.enabled) {
       this.initializeControls();
@@ -267,6 +286,14 @@ class MobileControls {
       // Check joystick
       if (this.isPointInJoystick(touchX, touchY)) {
         console.log('Joystick touch detected! Touch at:', touchX, touchY, 'Joystick at:', MOBILE_CONTROLS_CONFIG.joystick.x, MOBILE_CONTROLS_CONFIG.joystick.y);
+        
+        // Initialize smooth rotation when joystick becomes active
+        if (!this.joystickActive && typeof player !== 'undefined' && player) {
+          this.targetAngle = player.angle; // Start with current submarine angle
+          this.lastMovementAngle = player.angle;
+          this.angleStabilityFrames = 0;
+        }
+        
         this.joystickActive = true;
         const touchId = touch.identifier !== undefined ? touch.identifier : i;
         this.touches.set(touchId, { type: 'joystick', x: touchX, y: touchY });
@@ -341,6 +368,8 @@ class MobileControls {
           this.joystickActive = false;
           this.joystickOffset = { x: 0, y: 0 };
           this.movementVector = { x: 0, y: 0 };
+          // Reset rotation state when joystick is released
+          this.angleStabilityFrames = 0;
         } else if (storedTouch.type === 'fire') {
           this.fireButtonPressed = false;
         } else if (storedTouch.type === 'sonar') {
@@ -441,17 +470,62 @@ class MobileControls {
     }
     
     // Update submarine facing direction based on joystick input
-    // Only change direction if there's significant joystick movement
-    const movementMagnitude = Math.sqrt(moveX * moveX + moveY * moveY);
-    if (movementMagnitude > 0.2) {
-      // Calculate angle from movement vector
-      // atan2(y, x) gives angle from positive x-axis
-      const targetAngle = Math.atan2(moveY, moveX);
-      player.angle = targetAngle;
+    if (MOBILE_CONTROLS_CONFIG.smoothRotation.enabled) {
+      // Use smooth rotation with stability checking to reduce jitter
+      const movementMagnitude = Math.sqrt(moveX * moveX + moveY * moveY);
       
-      // Debug output for movement direction
-      console.log(`Submarine facing updated: angle=${(targetAngle * 180 / Math.PI).toFixed(1)}°, moveX=${moveX.toFixed(2)}, moveY=${moveY.toFixed(2)}`);
+      if (movementMagnitude > this.movementThreshold) {
+        const currentMovementAngle = Math.atan2(moveY, moveX);
+        
+        // Check if the movement direction is stable (not changing rapidly)
+        const angleDifference = this.getAngleDifference(currentMovementAngle, this.lastMovementAngle);
+        
+        if (Math.abs(angleDifference) < this.angleTolerance) {
+          this.angleStabilityFrames++;
+        } else {
+          this.angleStabilityFrames = 0; // Reset if direction changed significantly
+        }
+        
+        // Only update target angle if movement has been stable for enough frames
+        if (this.angleStabilityFrames >= this.requiredStabilityFrames) {
+          this.targetAngle = currentMovementAngle;
+        }
+        
+        this.lastMovementAngle = currentMovementAngle;
+        
+        // Smoothly interpolate toward target angle
+        if (typeof player !== 'undefined' && player) {
+          player.angle = this.lerpAngle(player.angle, this.targetAngle, this.angleLerpSpeed);
+        }
+      } else {
+        // Reset stability when not moving
+        this.angleStabilityFrames = 0;
+      }
+    } else {
+      // Original immediate rotation (for comparison/fallback)
+      const movementMagnitude = Math.sqrt(moveX * moveX + moveY * moveY);
+      if (movementMagnitude > 0.2) {
+        const targetAngle = Math.atan2(moveY, moveX);
+        if (typeof player !== 'undefined' && player) {
+          player.angle = targetAngle;
+        }
+      }
     }
+  }
+  
+  // Helper function to calculate the shortest angular difference between two angles
+  getAngleDifference(angle1, angle2) {
+    let diff = angle1 - angle2;
+    // Normalize to [-PI, PI] range
+    while (diff > Math.PI) diff -= 2 * Math.PI;
+    while (diff < -Math.PI) diff += 2 * Math.PI;
+    return diff;
+  }
+  
+  // Smooth angle interpolation that handles wrapping around PI/-PI
+  lerpAngle(currentAngle, targetAngle, lerpFactor) {
+    const angleDiff = this.getAngleDifference(targetAngle, currentAngle);
+    return currentAngle + angleDiff * lerpFactor;
   }
   
   // Render the mobile controls
@@ -485,10 +559,14 @@ class MobileControls {
       
       const angleInfo = (typeof player !== 'undefined' && player) ? 
         ` | Angle: ${(player.angle * 180 / Math.PI).toFixed(0)}°` : '';
+      const targetInfo = this.joystickActive ? 
+        ` | Target: ${(this.targetAngle * 180 / Math.PI).toFixed(0)}°` : '';
+      const stabilityInfo = this.joystickActive ? 
+        ` | Stability: ${this.angleStabilityFrames}/${this.requiredStabilityFrames}` : '';
       const moveInfo = this.joystickActive ? 
         ` | Move: ${this.movementVector.x.toFixed(2)},${this.movementVector.y.toFixed(2)}` : '';
       
-      text(`Mobile: ${this.enabled ? 'ON' : 'OFF'} | Touch: ${this.joystickActive ? 'JOY' : ''}${this.fireButtonPressed ? 'FIRE' : ''}${angleInfo}${moveInfo}`, 10, 10);
+      text(`Mobile: ${this.enabled ? 'ON' : 'OFF'} | Touch: ${this.joystickActive ? 'JOY' : ''}${this.fireButtonPressed ? 'FIRE' : ''}${angleInfo}${targetInfo}${stabilityInfo}${moveInfo}`, 10, 10);
     }
   }
   
