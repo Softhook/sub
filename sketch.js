@@ -386,11 +386,11 @@ let reactorHumAmplitude = 0;
 let creatureGrowlOsc, creatureGrowlEnv;
 
 // --- Creature Explosion Sound Constants (less boomy than wall explosions) ---
-const CREATURE_EXPLOSION_NOISE_ENV_ADSR = { aT: 0.001, dT: 0.3, sR: 0, rT: 0.2 };
+const CREATURE_EXPLOSION_NOISE_ENV_ADSR = { aT: 0.001, dT: 0.3, sR: 0, rT: 0.1 };
 const CREATURE_EXPLOSION_NOISE_ENV_LEVELS = { aL: 0.6, rL: 0 };
-const CREATURE_EXPLOSION_BOOM_ENV_ADSR = { aT: 0.001, dT: 0.8, sR: 0, rT: 0.3 };
+const CREATURE_EXPLOSION_BOOM_ENV_ADSR = { aT: 0.001, dT: 0.8, sR: 0, rT: 0.1 };
 const CREATURE_EXPLOSION_BOOM_ENV_LEVELS = { aL: 0.5, rL: 0 };
-const CREATURE_EXPLOSION_BOOM_MIN_FREQ = 60;
+const CREATURE_EXPLOSION_BOOM_MIN_FREQ = 100;
 const CREATURE_EXPLOSION_BOOM_MAX_FREQ = 120;
 const CREATURE_EXPLOSION_BASS_ENV_ADSR = { aT: 0.002, dT: 0.6, sR: 0, rT: 0.4 };
 const CREATURE_EXPLOSION_BASS_ENV_LEVELS = { aL: 0.7, rL: 0 };
