@@ -78,8 +78,21 @@ class MobileControls {
     this.fireButtonPressed = false;
     this.sonarButtonPressed = false;
 
+    // Button press timestamps for timeout safety
+    this.buttonPressTimestamps = {
+      thrust: 0,
+      reverse: 0,
+      turnLeft: 0,
+      turnRight: 0,
+      fire: 0,
+      sonar: 0
+    };
+
     this.lastFireTime = 0;
     this.lastSonarTime = 0;
+
+    // Safety timeout to prevent stuck buttons (in milliseconds)
+    this.BUTTON_TIMEOUT = 5000; // 5 seconds max button press
 
     if (this.enabled) {
       this.initializeControls();
@@ -268,27 +281,33 @@ class MobileControls {
 
       if (this.isPointInThrustButton(touchX, touchY)) {
         this.thrustButtonPressed = true;
+        this.buttonPressTimestamps.thrust = millis();
         this.touches.set(touchId, { type: 'thrust', x: touchX, y: touchY });
         console.log('Thrust button pressed');
       } else if (this.isPointInReverseButton(touchX, touchY)) {
         this.reverseButtonPressed = true;
+        this.buttonPressTimestamps.reverse = millis();
         this.touches.set(touchId, { type: 'reverse', x: touchX, y: touchY });
         console.log('Reverse button pressed');
       } else if (this.isPointInTurnLeftButton(touchX, touchY)) {
         this.turnLeftButtonPressed = true;
+        this.buttonPressTimestamps.turnLeft = millis();
         this.touches.set(touchId, { type: 'turnLeft', x: touchX, y: touchY });
         console.log('Turn Left button pressed');
       } else if (this.isPointInTurnRightButton(touchX, touchY)) {
         this.turnRightButtonPressed = true;
+        this.buttonPressTimestamps.turnRight = millis();
         this.touches.set(touchId, { type: 'turnRight', x: touchX, y: touchY });
         console.log('Turn Right button pressed');
       } else if (this.isPointInFireButton(touchX, touchY)) {
         this.fireButtonPressed = true;
+        this.buttonPressTimestamps.fire = millis();
         this.touches.set(touchId, { type: 'fire', x: touchX, y: touchY });
         this.handleFire();
         console.log('Fire button pressed');
       } else if (MOBILE_CONTROLS_CONFIG.sonarButton.enabled && this.isPointInSonarButton(touchX, touchY)) {
         this.sonarButtonPressed = true;
+        this.buttonPressTimestamps.sonar = millis();
         this.touches.set(touchId, { type: 'sonar', x: touchX, y: touchY });
         this.handleSonar();
         console.log('Sonar button pressed');
@@ -299,23 +318,72 @@ class MobileControls {
   handleTouchMove(touches) {
     if (!this.enabled) return;
 
-    // For simple buttons, touch move doesn't change their state unless the touch moves
-    // out of the button. We'll handle this in touchEnd.
-    // If a touch moves from one button to another, touchEnd for the first and touchStart for the second
-    // should ideally be triggered. For now, we keep it simple: a button is active if a touch started on it
-    // and hasn't ended for that specific touch.
-  }
+    // Check each tracked touch to see if it's still within its button
+    for (let [touchId, storedTouch] of this.touches.entries()) {
+      let touchFound = false;
+      
+      // Find the current position of this touch
+      for (let i = 0; i < touches.length; i++) {
+        const touch = touches[i];
+        const currentTouchId = touch.identifier !== undefined ? touch.identifier : i;
+        
+        if (currentTouchId === touchId) {
+          touchFound = true;
+          let touchX, touchY;
 
-  handleTouchEnd(touches) {
-    if (!this.enabled) return;
+          if (touch.x !== undefined && touch.y !== undefined) {
+            touchX = touch.x;
+            touchY = touch.y;
+          } else if (touch.clientX !== undefined && touch.clientY !== undefined) {
+            touchX = touch.clientX;
+            touchY = touch.clientY;
+          } else {
+            continue;
+          }
 
-    for (let i = 0; i < touches.length; i++) {
-      const touch = touches[i];
-      const touchId = touch.identifier !== undefined ? touch.identifier : i;
-      const storedTouch = this.touches.get(touchId);
+          // Check if the touch is still within the original button
+          let stillInButton = false;
+          switch (storedTouch.type) {
+            case 'thrust':
+              stillInButton = this.isPointInThrustButton(touchX, touchY);
+              break;
+            case 'reverse':
+              stillInButton = this.isPointInReverseButton(touchX, touchY);
+              break;
+            case 'turnLeft':
+              stillInButton = this.isPointInTurnLeftButton(touchX, touchY);
+              break;
+            case 'turnRight':
+              stillInButton = this.isPointInTurnRightButton(touchX, touchY);
+              break;
+            case 'fire':
+              stillInButton = this.isPointInFireButton(touchX, touchY);
+              break;
+            case 'sonar':
+              stillInButton = this.isPointInSonarButton(touchX, touchY);
+              break;
+          }
 
-      if (storedTouch) {
-        console.log('Touch end for type:', storedTouch.type, 'ID:', touchId);
+          // If touch moved outside the button, release it
+          if (!stillInButton) {
+            console.log('Touch moved outside button, releasing:', storedTouch.type);
+            switch (storedTouch.type) {
+              case 'thrust': this.thrustButtonPressed = false; break;
+              case 'reverse': this.reverseButtonPressed = false; break;
+              case 'turnLeft': this.turnLeftButtonPressed = false; break;
+              case 'turnRight': this.turnRightButtonPressed = false; break;
+              case 'fire': this.fireButtonPressed = false; break;
+              case 'sonar': this.sonarButtonPressed = false; break;
+            }
+            this.touches.delete(touchId);
+          }
+          break;
+        }
+      }
+
+      // If we couldn't find this touch in the current touches array, it probably ended
+      if (!touchFound) {
+        console.log('Touch not found in current touches, releasing:', storedTouch.type);
         switch (storedTouch.type) {
           case 'thrust': this.thrustButtonPressed = false; break;
           case 'reverse': this.reverseButtonPressed = false; break;
@@ -327,17 +395,74 @@ class MobileControls {
         this.touches.delete(touchId);
       }
     }
-    // If all touches are released, ensure all directional buttons are reset
-    // This handles cases where a touch might slide off a button without a specific "end" event on it.
-    if (this.touches.size === 0) {
-        this.thrustButtonPressed = false;
-        this.reverseButtonPressed = false;
-        this.turnLeftButtonPressed = false;
-        this.turnRightButtonPressed = false;
-        // Fire and Sonar are generally single-press, but good to reset too.
-        this.fireButtonPressed = false;
-        this.sonarButtonPressed = false;
+  }
+
+  handleTouchEnd(touches) {
+    if (!this.enabled) return;
+
+    console.log('Touch end event, touches provided:', touches.length);
+
+    // In p5.js touchEnded, the touches array contains the touches that just ended
+    for (let i = 0; i < touches.length; i++) {
+      const touch = touches[i];
+      const touchId = touch.identifier !== undefined ? touch.identifier : i;
+      const storedTouch = this.touches.get(touchId);
+
+      console.log('Processing touch end for ID:', touchId, 'stored touch:', storedTouch);
+
+      if (storedTouch) {
+        console.log('Touch end for type:', storedTouch.type, 'ID:', touchId);
+        switch (storedTouch.type) {
+          case 'thrust': 
+            this.thrustButtonPressed = false; 
+            console.log('Thrust button released');
+            break;
+          case 'reverse': 
+            this.reverseButtonPressed = false; 
+            console.log('Reverse button released');
+            break;
+          case 'turnLeft': 
+            this.turnLeftButtonPressed = false; 
+            console.log('Turn left button released');
+            break;
+          case 'turnRight': 
+            this.turnRightButtonPressed = false; 
+            console.log('Turn right button released');
+            break;
+          case 'fire': 
+            this.fireButtonPressed = false; 
+            console.log('Fire button released');
+            break;
+          case 'sonar': 
+            this.sonarButtonPressed = false; 
+            console.log('Sonar button released');
+            break;
+        }
+        this.touches.delete(touchId);
+      } else {
+        // If we don't have a stored touch, this might be a touch that ended
+        // without being tracked properly. Reset all buttons as a safety measure.
+        console.log('Unknown touch ended, resetting all buttons as safety measure');
+        this.resetAllButtons();
+      }
     }
+
+    // Also check if all touches have ended by checking remaining active touches
+    console.log('Remaining tracked touches:', this.touches.size);
+    if (this.touches.size === 0) {
+      console.log('No more tracked touches, ensuring all buttons are released');
+      this.resetAllButtons();
+    }
+  }
+
+  resetAllButtons() {
+    this.thrustButtonPressed = false;
+    this.reverseButtonPressed = false;
+    this.turnLeftButtonPressed = false;
+    this.turnRightButtonPressed = false;
+    this.fireButtonPressed = false;
+    this.sonarButtonPressed = false;
+    console.log('All buttons reset');
   }
 
   handleFire() {
@@ -419,6 +544,9 @@ class MobileControls {
       return;
     }
     this.updatePositions(); // Ensure positions are current
+    
+    // Safety check: release buttons that have been pressed too long
+    this.checkButtonTimeouts();
 
     // Draw D-pad buttons
     this.renderDirectionalButton(MOBILE_CONTROLS_CONFIG.thrustButton, this.thrustButtonPressed);
@@ -437,6 +565,35 @@ class MobileControls {
       textSize(12);
       let touchDebug = `T:${this.thrustButtonPressed ? 'U' : ''}${this.reverseButtonPressed ? 'D' : ''}${this.turnLeftButtonPressed ? 'L' : ''}${this.turnRightButtonPressed ? 'R' : ''}`;
       text(`Mobile: ${this.enabled ? 'ON' : 'OFF'} | ${touchDebug} ${this.fireButtonPressed ? 'FIRE' : ''}`, 10, 10);
+    }
+  }
+
+  checkButtonTimeouts() {
+    const currentTime = millis();
+    
+    if (this.thrustButtonPressed && currentTime - this.buttonPressTimestamps.thrust > this.BUTTON_TIMEOUT) {
+      console.log('Thrust button timeout, releasing');
+      this.thrustButtonPressed = false;
+    }
+    if (this.reverseButtonPressed && currentTime - this.buttonPressTimestamps.reverse > this.BUTTON_TIMEOUT) {
+      console.log('Reverse button timeout, releasing');
+      this.reverseButtonPressed = false;
+    }
+    if (this.turnLeftButtonPressed && currentTime - this.buttonPressTimestamps.turnLeft > this.BUTTON_TIMEOUT) {
+      console.log('Turn left button timeout, releasing');
+      this.turnLeftButtonPressed = false;
+    }
+    if (this.turnRightButtonPressed && currentTime - this.buttonPressTimestamps.turnRight > this.BUTTON_TIMEOUT) {
+      console.log('Turn right button timeout, releasing');
+      this.turnRightButtonPressed = false;
+    }
+    if (this.fireButtonPressed && currentTime - this.buttonPressTimestamps.fire > this.BUTTON_TIMEOUT) {
+      console.log('Fire button timeout, releasing');
+      this.fireButtonPressed = false;
+    }
+    if (this.sonarButtonPressed && currentTime - this.buttonPressTimestamps.sonar > this.BUTTON_TIMEOUT) {
+      console.log('Sonar button timeout, releasing');
+      this.sonarButtonPressed = false;
     }
   }
 
