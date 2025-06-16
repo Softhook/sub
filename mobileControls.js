@@ -41,14 +41,6 @@ const MOBILE_CONTROLS_CONFIG = {
     cooldownDisplay: true, // Show cooldown indicator
   },
 
-  // Sonar button (optional - sonar is automatic but manual trigger can be useful)
-  sonarButton: {
-    x: null,          // Will be set to screen width - 100
-    y: null,          // Will be set to screen height - 220
-    radius: 45,       // Smaller than fire button
-    enabled: false,   // Disabled by default since sonar is automatic
-  },
-
   // Visual styling
   style: {
     strokeWeight: 3,
@@ -58,10 +50,9 @@ const MOBILE_CONTROLS_CONFIG = {
     textSize: 24, // Increased for button labels
     buttonCornerRadius: 10,
 
-    // Colors (HSB values to match game\'s color scheme)
+    // Colors (HSB values to match game's color scheme)
     controlButtonColor: { h: 180, s: 50, b: 70 }, // For directional buttons
     fireButtonColor: { h: 0, s: 80, b: 85 },
-    sonarButtonColor: { h: 120, s: 70, b: 80 },
     pressedColor: { h: 60, s: 90, b: 95 },
   }
 };
@@ -76,7 +67,6 @@ class MobileControls {
     this.turnLeftButtonPressed = false;
     this.turnRightButtonPressed = false;
     this.fireButtonPressed = false;
-    this.sonarButtonPressed = false;
 
     // Button press timestamps for timeout safety
     this.buttonPressTimestamps = {
@@ -84,12 +74,10 @@ class MobileControls {
       reverse: 0,
       turnLeft: 0,
       turnRight: 0,
-      fire: 0,
-      sonar: 0
+      fire: 0
     };
 
     this.lastFireTime = 0;
-    this.lastSonarTime = 0;
 
     // Safety timeout to prevent stuck buttons (in milliseconds)
     this.BUTTON_TIMEOUT = 5000; // 5 seconds max button press
@@ -183,14 +171,9 @@ class MobileControls {
     MOBILE_CONTROLS_CONFIG.turnLeftButton.x = 50;
     MOBILE_CONTROLS_CONFIG.turnRightButton.x = 190;
 
-
     // Update fire button position (bottom right)
     MOBILE_CONTROLS_CONFIG.fireButton.x = canvasWidth - 100;
     MOBILE_CONTROLS_CONFIG.fireButton.y = canvasHeight - 120;
-
-    // Update sonar button position (above fire button)
-    MOBILE_CONTROLS_CONFIG.sonarButton.x = canvasWidth - 100;
-    MOBILE_CONTROLS_CONFIG.sonarButton.y = canvasHeight - 220;
 
     console.log('Control positions updated:', {
       thrustButton: { x: MOBILE_CONTROLS_CONFIG.thrustButton.x, y: MOBILE_CONTROLS_CONFIG.thrustButton.y },
@@ -207,7 +190,7 @@ class MobileControls {
     console.log('Setting up touch events for mobile controls');
 
     document.addEventListener('touchmove', (e) => {
-      if (this.thrustButtonPressed || this.reverseButtonPressed || this.turnLeftButtonPressed || this.turnRightButtonPressed || this.fireButtonPressed || this.sonarButtonPressed) {
+      if (this.thrustButtonPressed || this.reverseButtonPressed || this.turnLeftButtonPressed || this.turnRightButtonPressed || this.fireButtonPressed) {
         e.preventDefault();
       }
     }, { passive: false });
@@ -235,8 +218,7 @@ class MobileControls {
            this.isPointInReverseButton(touchX, touchY) ||
            this.isPointInTurnLeftButton(touchX, touchY) ||
            this.isPointInTurnRightButton(touchX, touchY) ||
-           this.isPointInFireButton(touchX, touchY) ||
-           (MOBILE_CONTROLS_CONFIG.sonarButton.enabled && this.isPointInSonarButton(touchX, touchY));
+           this.isPointInFireButton(touchX, touchY);
   }
 
   handleTouchStart(touches) {
@@ -305,12 +287,6 @@ class MobileControls {
         this.touches.set(touchId, { type: 'fire', x: touchX, y: touchY });
         this.handleFire();
         console.log('Fire button pressed');
-      } else if (MOBILE_CONTROLS_CONFIG.sonarButton.enabled && this.isPointInSonarButton(touchX, touchY)) {
-        this.sonarButtonPressed = true;
-        this.buttonPressTimestamps.sonar = millis();
-        this.touches.set(touchId, { type: 'sonar', x: touchX, y: touchY });
-        this.handleSonar();
-        console.log('Sonar button pressed');
       }
     }
   }
@@ -359,9 +335,6 @@ class MobileControls {
             case 'fire':
               stillInButton = this.isPointInFireButton(touchX, touchY);
               break;
-            case 'sonar':
-              stillInButton = this.isPointInSonarButton(touchX, touchY);
-              break;
           }
 
           // If touch moved outside the button, release it
@@ -373,7 +346,6 @@ class MobileControls {
               case 'turnLeft': this.turnLeftButtonPressed = false; break;
               case 'turnRight': this.turnRightButtonPressed = false; break;
               case 'fire': this.fireButtonPressed = false; break;
-              case 'sonar': this.sonarButtonPressed = false; break;
             }
             this.touches.delete(touchId);
           }
@@ -390,7 +362,6 @@ class MobileControls {
           case 'turnLeft': this.turnLeftButtonPressed = false; break;
           case 'turnRight': this.turnRightButtonPressed = false; break;
           case 'fire': this.fireButtonPressed = false; break;
-          case 'sonar': this.sonarButtonPressed = false; break;
         }
         this.touches.delete(touchId);
       }
@@ -433,10 +404,6 @@ class MobileControls {
             this.fireButtonPressed = false; 
             console.log('Fire button released');
             break;
-          case 'sonar': 
-            this.sonarButtonPressed = false; 
-            console.log('Sonar button released');
-            break;
         }
         this.touches.delete(touchId);
       } else {
@@ -461,7 +428,6 @@ class MobileControls {
     this.turnLeftButtonPressed = false;
     this.turnRightButtonPressed = false;
     this.fireButtonPressed = false;
-    this.sonarButtonPressed = false;
     console.log('All buttons reset');
   }
 
@@ -473,18 +439,6 @@ class MobileControls {
       // Trigger player shoot if player exists and game is playing
       if (typeof player !== 'undefined' && player && gameState === 'playing') {
         player.shoot();
-      }
-    }
-  }
-
-  handleSonar() {
-    const currentTime = millis();
-    if (currentTime - this.lastSonarTime > 500) { // Minimum 500ms between sonar pulses
-      this.lastSonarTime = currentTime;
-      
-      // Trigger manual sonar if player exists and game is playing
-      if (typeof player !== 'undefined' && player && gameState === 'playing') {
-        player.fireSonar(cave, enemies, jellyfish);
       }
     }
   }
@@ -512,12 +466,6 @@ class MobileControls {
 
   isPointInFireButton(x, y) {
     const button = MOBILE_CONTROLS_CONFIG.fireButton;
-    const distance = Math.sqrt(Math.pow(x - button.x, 2) + Math.pow(y - button.y, 2));
-    return distance <= button.radius;
-  }
-
-  isPointInSonarButton(x, y) {
-    const button = MOBILE_CONTROLS_CONFIG.sonarButton;
     const distance = Math.sqrt(Math.pow(x - button.x, 2) + Math.pow(y - button.y, 2));
     return distance <= button.radius;
   }
@@ -555,9 +503,6 @@ class MobileControls {
     this.renderDirectionalButton(MOBILE_CONTROLS_CONFIG.turnRightButton, this.turnRightButtonPressed);
 
     this.renderFireButton();
-    if (MOBILE_CONTROLS_CONFIG.sonarButton.enabled) {
-      this.renderSonarButton();
-    }
 
     if (typeof fill === 'function' && typeof text === 'function') {
       fill(255, 255, 255, 150);
@@ -590,10 +535,6 @@ class MobileControls {
     if (this.fireButtonPressed && currentTime - this.buttonPressTimestamps.fire > this.BUTTON_TIMEOUT) {
       console.log('Fire button timeout, releasing');
       this.fireButtonPressed = false;
-    }
-    if (this.sonarButtonPressed && currentTime - this.buttonPressTimestamps.sonar > this.BUTTON_TIMEOUT) {
-      console.log('Sonar button timeout, releasing');
-      this.sonarButtonPressed = false;
     }
   }
 
@@ -660,41 +601,6 @@ class MobileControls {
     textAlign(CENTER, CENTER);
     textSize(style.textSize * 0.9);
     text("FIRE", button.x, button.y + button.radius + 25);
-    
-    pop();
-  }
-  
-  renderSonarButton() {
-    const button = MOBILE_CONTROLS_CONFIG.sonarButton;
-    const style = MOBILE_CONTROLS_CONFIG.style;
-    
-    push();
-    
-    // Main button
-    const buttonAlpha = this.sonarButtonPressed ? style.pressedAlpha : style.innerAlpha;
-    const buttonColor = this.sonarButtonPressed ? style.pressedColor : style.sonarButtonColor;
-    
-    strokeWeight(style.strokeWeight);
-    stroke(buttonColor.h, buttonColor.s, buttonColor.b + 20, buttonAlpha);
-    fill(buttonColor.h, buttonColor.s, buttonColor.b, buttonAlpha * 0.7);
-    ellipse(button.x, button.y, button.radius * 2);
-    
-    // Sonar icon (concentric arcs)
-    stroke(buttonColor.h, buttonColor.s, buttonColor.b + 30, buttonAlpha);
-    strokeWeight(2);
-    noFill();
-    const iconSize = button.radius * 0.5;
-    for (let i = 1; i <= 3; i++) {
-      arc(button.x, button.y, iconSize * i * 0.6, iconSize * i * 0.6, 
-          -PI/3, PI/3);
-    }
-    
-    // Label
-    fill(buttonColor.h, buttonColor.s, buttonColor.b + 40, buttonAlpha);
-    noStroke();
-    textAlign(CENTER, CENTER);
-    textSize(style.textSize * 0.7);
-    text("SONAR", button.x, button.y + button.radius + 15);
     
     pop();
   }
