@@ -1,4 +1,5 @@
 // Mobile and iPad Touch Controls for Submarine Game
+// Direct movement controls: Up moves up, Right moves right, etc.
 // Refactored for better organization and maintainability
 
 // Mobile Controls Configuration
@@ -71,6 +72,9 @@ class MobileControls {
     const userAgent = navigator.userAgent.toLowerCase();
     const patterns = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i;
     const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    
+    // Check for specific mobile/tablet patterns
+    const isMobile = patterns.test(userAgent);
     
     // Enhanced iPad detection for modern iPadOS
     const isIPad = /ipad/i.test(userAgent) || 
@@ -364,7 +368,8 @@ class MobileControls {
   
   handleFire() {
     const currentTime = millis();
-    if (currentTime - this.lastFireTime > MOBILE_CONFIG.TIMING.FIRE_COOLDOWN) {
+    const fireCooldown = 300; // 300ms cooldown between shots
+    if (currentTime - this.lastFireTime > fireCooldown) {
       this.lastFireTime = currentTime;
       
       if (typeof player !== 'undefined' && player && gameState === 'playing') {
@@ -413,18 +418,15 @@ class MobileControls {
     const moveX = this.movementVector.x * sensitivity;
     const moveY = this.movementVector.y * sensitivity;
     
-    // Apply movement as velocity adjustments
+    // Apply direct movement (joystick-style)
+    // Horizontal movement: left/right moves the submarine left/right
     if (Math.abs(moveX) > 0.1) {
-      // Horizontal movement affects turning
-      player.angle += moveX * PLAYER_TURN_SPEED * 1.5; // Slightly faster turning for touch
+      player.vel.x += moveX * PLAYER_THRUST_POWER;
     }
     
-    if (moveY < -0.1) {
-      // Forward movement (touch up)
-      player.vel.add(p5.Vector.fromAngle(player.angle).mult(PLAYER_THRUST_POWER * Math.abs(moveY)));
-    } else if (moveY > 0.1) {
-      // Backward movement (touch down)
-      player.vel.add(p5.Vector.fromAngle(player.angle).mult(-PLAYER_THRUST_POWER * PLAYER_REVERSE_THRUST_FACTOR * moveY));
+    // Vertical movement: up/down moves the submarine up/down
+    if (Math.abs(moveY) > 0.1) {
+      player.vel.y += moveY * PLAYER_THRUST_POWER;
     }
   }
   
@@ -496,13 +498,14 @@ class MobileControls {
   renderFireButton() {
     const button = MOBILE_CONTROLS_CONFIG.fireButton;
     const style = MOBILE_CONTROLS_CONFIG.style;
+    const isPressed = this.fireButtonPressed;
     
     push();
     
-    const alpha = isPressed ? STYLE.ALPHA.PRESSED + 50 : STYLE.ALPHA.NORMAL + 30;
-    const color = isPressed ? STYLE.COLORS.PRESSED : STYLE.COLORS.FIRE;
+    const alpha = isPressed ? style.pressedAlpha + 50 : style.innerAlpha + 30;
+    const color = isPressed ? style.pressedColor : style.fireButtonColor;
     
-    strokeWeight(STYLE.STROKE_WEIGHT + 1);
+    strokeWeight(style.strokeWeight + 1);
     stroke(color.h, color.s, color.b + 20, alpha);
     fill(color.h, color.s, color.b, alpha * 0.8);
     ellipse(button.x, button.y, button.radius * 2);
@@ -518,46 +521,63 @@ class MobileControls {
     );
     
     // Cooldown indicator
-    this._renderFireCooldown(button, alpha);
+    this.renderFireCooldown(button, alpha);
     
     // Label
     fill(color.h, color.s, color.b + 40, alpha + 30);
     noStroke();
     textAlign(CENTER, CENTER);
-    textSize(STYLE.TEXT_SIZE * 0.9);
+    textSize(style.textSize * 0.9);
     text("FIRE", button.x, button.y + button.radius + 25);
     
     pop();
   }
-  
-  _renderFireCooldown(button, alpha) {
+
+  renderSonarButton() {
+    if (!MOBILE_CONTROLS_CONFIG.sonarButton.enabled) return;
+    
+    const button = MOBILE_CONTROLS_CONFIG.sonarButton;
+    const style = MOBILE_CONTROLS_CONFIG.style;
+    const isPressed = this.sonarButtonPressed;
+    
+    push();
+    
+    const alpha = isPressed ? style.pressedAlpha : style.innerAlpha;
+    const color = isPressed ? style.pressedColor : style.sonarButtonColor;
+    
+    strokeWeight(style.strokeWeight);
+    stroke(color.h, color.s, color.b, alpha);
+    fill(color.h, color.s, color.b, alpha * 0.7);
+    ellipse(button.x, button.y, button.radius * 2);
+    
+    // Sonar icon (concentric circles)
+    noFill();
+    stroke(color.h, color.s, color.b + 20, alpha);
+    strokeWeight(style.strokeWeight - 1);
+    ellipse(button.x, button.y, button.radius * 0.6);
+    ellipse(button.x, button.y, button.radius * 0.9);
+    
+    // Label
+    fill(color.h, color.s, color.b + 30, alpha + 20);
+    noStroke();
+    textAlign(CENTER, CENTER);
+    textSize(style.textSize * 0.8);
+    text("SONAR", button.x, button.y + button.radius + 20);
+    
+    pop();
+  }
+
+  renderFireCooldown(button, alpha) {
     if (typeof player !== 'undefined' && player) {
-      const cooldownProgress = Math.max(0, (millis() - this.lastFireTime) / MOBILE_CONFIG.TIMING.FIRE_COOLDOWN);
+      const fireCooldown = 300; // Same as in handleFire
+      const cooldownProgress = Math.max(0, (millis() - this.lastFireTime) / fireCooldown);
       if (cooldownProgress < 1) {
         stroke(60, 100, 100, 200);
-        strokeWeight(MOBILE_CONFIG.STYLE.STROKE_WEIGHT + 2);
+        strokeWeight(MOBILE_CONTROLS_CONFIG.style.strokeWeight + 2);
         noFill();
         arc(button.x, button.y, button.radius * 2.2, button.radius * 2.2, 
             -PI/2, -PI/2 + TWO_PI * cooldownProgress);
       }
-    }
-  }
-
-  _renderDebugInfo() {
-    if (typeof fill === 'function' && typeof text === 'function') {
-      fill(255, 255, 255, 150);
-      textAlign(LEFT, TOP);
-      textSize(12);
-      
-      const activeButtons = [];
-      if (this.buttonState.thrust) activeButtons.push('↑');
-      if (this.buttonState.reverse) activeButtons.push('↓');
-      if (this.buttonState.turnLeft) activeButtons.push('←');
-      if (this.buttonState.turnRight) activeButtons.push('→');
-      if (this.buttonState.fire) activeButtons.push('FIRE');
-      
-      const debugText = `Mobile: ${this.enabled ? 'ON' : 'OFF'} | Touches: ${this.touchTracker.size} | Active: ${activeButtons.join(' ')}`;
-      text(debugText, 10, 10);
     }
   }
 }
