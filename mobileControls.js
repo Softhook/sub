@@ -233,12 +233,23 @@ class MobileControls {
         // Simulate ENTER key press for non-gameplay screens
         if (typeof keyPressed === 'function') {
           // Set the global keyCode variable that p5.js uses
-          window.keyCode = 13; // ENTER key code
+          // Try both window.keyCode and global keyCode for compatibility
+          const originalKeyCode = typeof keyCode !== 'undefined' ? keyCode : null;
+          const originalWindowKeyCode = window.keyCode;
+          
+          keyCode = 13; // ENTER key code
+          window.keyCode = 13;
+          
           try {
             keyPressed(); // Call the keyPressed function
+            console.log('Successfully triggered keyPressed for mobile tap-to-restart');
           } catch (e) {
             console.log('Error calling keyPressed:', e);
           }
+          
+          // Restore original values
+          if (originalKeyCode !== null) keyCode = originalKeyCode;
+          if (originalWindowKeyCode !== undefined) window.keyCode = originalWindowKeyCode;
         }
         return;
       }
@@ -428,6 +439,19 @@ class MobileControls {
     if (Math.abs(moveY) > 0.1) {
       player.vel.y += moveY * PLAYER_THRUST_POWER;
     }
+    
+    // Update submarine facing direction based on joystick input
+    // Only change direction if there's significant joystick movement
+    const movementMagnitude = Math.sqrt(moveX * moveX + moveY * moveY);
+    if (movementMagnitude > 0.2) {
+      // Calculate angle from movement vector
+      // atan2(y, x) gives angle from positive x-axis
+      const targetAngle = Math.atan2(moveY, moveX);
+      player.angle = targetAngle;
+      
+      // Debug output for movement direction
+      console.log(`Submarine facing updated: angle=${(targetAngle * 180 / Math.PI).toFixed(1)}°, moveX=${moveX.toFixed(2)}, moveY=${moveY.toFixed(2)}`);
+    }
   }
   
   // Render the mobile controls
@@ -458,7 +482,13 @@ class MobileControls {
       fill(255, 255, 255, 150);
       textAlign(LEFT, TOP);
       textSize(12);
-      text(`Mobile: ${this.enabled ? 'ON' : 'OFF'} | Touch: ${this.joystickActive ? 'JOY' : ''}${this.fireButtonPressed ? 'FIRE' : ''}`, 10, 10);
+      
+      const angleInfo = (typeof player !== 'undefined' && player) ? 
+        ` | Angle: ${(player.angle * 180 / Math.PI).toFixed(0)}°` : '';
+      const moveInfo = this.joystickActive ? 
+        ` | Move: ${this.movementVector.x.toFixed(2)},${this.movementVector.y.toFixed(2)}` : '';
+      
+      text(`Mobile: ${this.enabled ? 'ON' : 'OFF'} | Touch: ${this.joystickActive ? 'JOY' : ''}${this.fireButtonPressed ? 'FIRE' : ''}${angleInfo}${moveInfo}`, 10, 10);
     }
   }
   
