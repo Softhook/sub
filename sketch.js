@@ -13,6 +13,9 @@ const BASE_AIR_DEPLETION_RATE = 1; // Base air depletion per frame
 const AIR_DEPLETION_LEVEL_INCREASE = 0.1; // Additional depletion per level
 const LEVEL_EXIT_MAX_ENEMIES_THRESHOLD = 0; // Max enemies to exit level
 
+// Fullscreen on initial interaction
+let initialInteractionDone = false;
+
 // Player Constants
 const PLAYER_RADIUS = 14;
 const PLAYER_INITIAL_HEALTH = 100;
@@ -1930,6 +1933,27 @@ function setup() {
   
   // Initialize mobile controls
   initMobileControls();
+
+  // Attempt fullscreen and audio initialization on first user interaction
+  function handleInitialInteraction() {
+    if (initialInteractionDone) return;
+    initialInteractionDone = true;
+    // Start audio if not already initialized
+    if (typeof startAudioRoutine === 'function' && !audioInitialized) {
+      startAudioRoutine();
+    }
+    // Attempt to go fullscreen
+    if (!fullscreen()) {
+      fullscreen(true);
+    }
+    console.log('Initial interaction: Audio started and fullscreen requested');
+  }
+  // Add one-time event listeners to canvas
+  const canvasElt = document.querySelector('canvas');
+  if (canvasElt) {
+    canvasElt.addEventListener('click', handleInitialInteraction, { once: true });
+    canvasElt.addEventListener('touchstart', handleInitialInteraction, { once: true });
+  }
   
   if (customFont) {
     textFont(customFont);
