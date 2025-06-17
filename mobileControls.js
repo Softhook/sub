@@ -566,7 +566,13 @@ class MobileControls {
       const moveInfo = this.joystickActive ? 
         ` | Move: ${this.movementVector.x.toFixed(2)},${this.movementVector.y.toFixed(2)}` : '';
       
-      text(`Mobile: ${this.enabled ? 'ON' : 'OFF'} | Touch: ${this.joystickActive ? 'JOY' : ''}${this.fireButtonPressed ? 'FIRE' : ''}${angleInfo}${targetInfo}${stabilityInfo}${moveInfo}`, 10, 10);
+      // Add fire cooldown info
+      const fireCooldown = 300;
+      const timeSinceLastFire = millis() - this.lastFireTime;
+      const timeRemaining = Math.max(0, fireCooldown - timeSinceLastFire);
+      const cooldownInfo = timeRemaining > 0 ? ` | Cooldown: ${Math.ceil(timeRemaining)}ms` : ' | Ready';
+      
+      text(`Mobile: ${this.enabled ? 'ON' : 'OFF'} | Touch: ${this.joystickActive ? 'JOY' : ''}${this.fireButtonPressed ? 'FIRE' : ''}${angleInfo}${targetInfo}${stabilityInfo}${moveInfo}${cooldownInfo}`, 10, 10);
     }
   }
   
@@ -678,13 +684,22 @@ class MobileControls {
   renderFireCooldown(button, alpha) {
     if (typeof player !== 'undefined' && player) {
       const fireCooldown = 300; // Same as in handleFire
-      const cooldownProgress = Math.max(0, (millis() - this.lastFireTime) / fireCooldown);
-      if (cooldownProgress < 1) {
-        stroke(60, 100, 100, 200);
+      const timeSinceLastFire = millis() - this.lastFireTime;
+      const timeRemaining = Math.max(0, fireCooldown - timeSinceLastFire);
+      
+      // Only show cooldown indicator if we're still in cooldown
+      if (timeRemaining > 0) {
+        // Calculate how much of the circle should be filled (1.0 = full circle, 0.0 = no circle)
+        const cooldownRatio = timeRemaining / fireCooldown;
+        
+        // Draw the cooldown arc - it should shrink as time remaining decreases
+        stroke(0, 80, 90, 220); // Red-orange color for "can't fire yet"
         strokeWeight(MOBILE_CONTROLS_CONFIG.style.strokeWeight + 2);
         noFill();
+        
+        // Draw arc from top, going clockwise, showing remaining cooldown time
         arc(button.x, button.y, button.radius * 2.2, button.radius * 2.2, 
-            -PI/2, -PI/2 + TWO_PI * cooldownProgress);
+            -PI/2, -PI/2 + TWO_PI * cooldownRatio);
       }
     }
   }
