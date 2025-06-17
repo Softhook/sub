@@ -408,12 +408,14 @@ class MobileControls {
   
   handleFire() {
     const currentTime = millis();
-    const fireCooldown = 300; // 300ms cooldown between shots
-    if (currentTime - this.lastFireTime > fireCooldown) {
-      this.lastFireTime = currentTime;
-      
-      if (typeof player !== 'undefined' && player && gameState === 'playing') {
+    
+    // Only attempt to shoot if player exists
+    if (typeof player !== 'undefined' && player && gameState === 'playing') {
+      // Use the actual player shot cooldown frames for consistency
+      // At 60fps, this is approximately 1167ms but works regardless of framerate
+      if (frameCount - player.lastShotTime >= player.shotCooldown) {
         player.shoot();
+        this.lastFireTime = currentTime; // Store when we last successfully fired
       }
     }
   }
@@ -566,11 +568,14 @@ class MobileControls {
       const moveInfo = this.joystickActive ? 
         ` | Move: ${this.movementVector.x.toFixed(2)},${this.movementVector.y.toFixed(2)}` : '';
       
-      // Add fire cooldown info
-      const fireCooldown = 300;
-      const timeSinceLastFire = millis() - this.lastFireTime;
-      const timeRemaining = Math.max(0, fireCooldown - timeSinceLastFire);
-      const cooldownInfo = timeRemaining > 0 ? ` | Cooldown: ${Math.ceil(timeRemaining)}ms` : ' | Ready';
+      // Add fire cooldown info using actual player shot timing
+      const canFire = typeof player !== 'undefined' && player && 
+                     frameCount - player.lastShotTime >= player.shotCooldown;
+      const frameRemaining = typeof player !== 'undefined' && player ? 
+                           Math.max(0, player.shotCooldown - (frameCount - player.lastShotTime)) : 0;
+      const cooldownInfo = !canFire ? 
+                         ` | Cooldown: ${frameRemaining} frames` : 
+                         ' | Ready to Fire!';
       
       text(`Mobile: ${this.enabled ? 'ON' : 'OFF'} | Touch: ${this.joystickActive ? 'JOY' : ''}${this.fireButtonPressed ? 'FIRE' : ''}${angleInfo}${targetInfo}${stabilityInfo}${moveInfo}${cooldownInfo}`, 10, 10);
     }
@@ -616,8 +621,18 @@ class MobileControls {
     
     push();
     
+    // Determine if player can fire based on cooldown
+    const canFire = typeof player !== 'undefined' && 
+                    player && 
+                    frameCount - player.lastShotTime >= player.shotCooldown;
+    
+    // Use red when ready to fire, orange/yellow when in cooldown
+    const baseColor = canFire ? 
+      { h: 0, s: 90, b: 85 } :           // Red when ready to fire
+      { h: 30, s: 70, b: 80 };           // Orange when in cooldown
+    
+    const color = isPressed ? style.pressedColor : baseColor;
     const alpha = isPressed ? style.pressedAlpha + 50 : style.innerAlpha + 30;
-    const color = isPressed ? style.pressedColor : style.fireButtonColor;
     
     strokeWeight(style.strokeWeight + 1);
     stroke(color.h, color.s, color.b + 20, alpha);
@@ -683,17 +698,21 @@ class MobileControls {
 
   renderFireCooldown(button, alpha) {
     if (typeof player !== 'undefined' && player) {
-      const fireCooldown = 300; // Same as in handleFire
-      const timeSinceLastFire = millis() - this.lastFireTime;
-      const timeRemaining = Math.max(0, fireCooldown - timeSinceLastFire);
+      // Use the actual player shot cooldown for timing consistency
+      const shotCooldownFrames = player.shotCooldown;
+      const framesSinceLastShot = frameCount - player.lastShotTime;
+      const cooldownRatio = 1 - Math.min(1, framesSinceLastShot / shotCooldownFrames);
       
-      // Only show cooldown indicator if we're still in cooldown
-      if (timeRemaining > 0) {
-        // Calculate how much of the circle should be filled (1.0 = full circle, 0.0 = no circle)
-        const cooldownRatio = timeRemaining / fireCooldown;
-        
-        // Draw the cooldown arc - it should shrink as time remaining decreases
-        stroke(0, 80, 90, 220); // Red-orange color for "can't fire yet"
+      // Change button color based on whether we can fire
+      if (framesSinceLastShot >= shotCooldownFrames) {
+        // Ready to fire - Red button (more saturated)
+        stroke(0, 100, 90, 220); // Bright red outline to indicate ready
+        strokeWeight(MOBILE_CONTROLS_CONFIG.style.strokeWeight + 1);
+        noFill();
+        ellipse(button.x, button.y, button.radius * 2.1, button.radius * 2.1); 
+      } else {
+        // Still in cooldown - show yellow/orange cooldown arc
+        stroke(40, 100, 90, 220); // Yellow/orange color to show "not ready"
         strokeWeight(MOBILE_CONTROLS_CONFIG.style.strokeWeight + 2);
         noFill();
         
