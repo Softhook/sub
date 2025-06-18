@@ -34,16 +34,38 @@
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          // Check if we're on GitHub Pages (softhook.github.io)
-          const isGitHubPages = location.hostname === 'softhook.github.io';
-          const swPath = 'sw.js';
-          const swOptions = isGitHubPages ? { scope: '/sub/' } : { scope: './' };
+          // Determine scope based on the current URL path
+          const pathname = window.location.pathname;
+          const scope = pathname.substring(0, pathname.lastIndexOf('/') + 1) || './';
           
-          navigator.serviceWorker.register(swPath, swOptions).then(registration => {
-            console.log('ServiceWorker registration successful with scope: ', registration.scope);
-          }, err => {
-            console.log('ServiceWorker registration failed: ', err);
-          });
+          console.log('Registering service worker with scope:', scope);
+          
+          // Try to register with the determined scope
+          navigator.serviceWorker.register('sw.js', { scope: scope })
+            .then(registration => {
+              console.log('ServiceWorker registration successful with scope: ', registration.scope);
+            })
+            .catch(err => {
+              console.error('Initial ServiceWorker registration failed: ', err);
+              
+              // Fallback: try with different scope options
+              const fallbackScopes = ['./', '/', '/sub/'];
+              console.log('Trying fallback scopes:', fallbackScopes);
+              
+              // Try each scope until one works
+              fallbackScopes.reduce((promise, fallbackScope) => {
+                return promise.catch(() => {
+                  console.log('Trying scope:', fallbackScope);
+                  return navigator.serviceWorker.register('sw.js', { scope: fallbackScope });
+                });
+              }, Promise.reject())
+                .then(registration => {
+                  console.log('ServiceWorker registration successful with fallback scope: ', registration.scope);
+                })
+                .catch(err => {
+                  console.error('All ServiceWorker registration attempts failed: ', err);
+                });
+            });
         });
       }
     </script>
