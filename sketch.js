@@ -959,845 +959,166 @@ class Cave {
     }
     this.goalPos.y = this.exitPathY * this.cellSize;
   }
-}
-
-// --- Chunked Cave Generation for Visual Progress ---
-function startChunkedCaveGeneration() {
-  // Initialize game objects but don't generate cave yet
-  currentCellSize = BASE_CELL_SIZE + (currentLevel - 1); // Increase cell size per level
   
-  let baseAir = INITIAL_AIR_SUPPLY_BASE;
-  let airForLevel = baseAir;
-  airForLevel = max(airForLevel, MIN_AIR_SUPPLY_PER_LEVEL);
-  let airDepletion = BASE_AIR_DEPLETION_RATE + (currentLevel - 1) * AIR_DEPLETION_LEVEL_INCREASE;
-  
-  // Create cave object but don't generate yet
-  cave = new Cave(WORLD_WIDTH, WORLD_HEIGHT, currentCellSize); // false = don't auto-generate
-  
-  // Reset progress and start chunked generation
-  caveGenerationProgress = 0;
-  
-  // Phase 1: Generate main path (30%)
-  setTimeout(() => {
-    cave.generateMainPath();
-    caveGenerationProgress = 0.3;
-    
-    // Phase 2: Add obstacles (40% more = 70% total)
-    setTimeout(() => {
-      cave.generateObstacles();
-      caveGenerationProgress = 0.7;
-      
-      // Phase 3: Ensure path clearance (10% more = 80% total)
-      setTimeout(() => {
-        cave.ensureMainPathClearance(cave.mainPath);
-        caveGenerationProgress = 0.8;
-        
-        // Phase 4: Connect spaces (10% more = 90% total)
-        setTimeout(() => {
-          cave.connectAllSignificantSpaces();
-          caveGenerationProgress = 0.9;
-          
-          // Phase 5: Final setup (10% more = 100% total)
-          setTimeout(() => {
-            cave.finalizeCave();
-            caveGenerationProgress = 1.0;
-            
-            // Complete game initialization
-            completeGameInitialization(airForLevel, airDepletion);
-          }, 50);
-        }, 50);
-      }, 50);
-    }, 50);
-  }, 50);
-}
-
-function completeGameInitialization(airForLevel, airDepletion) {
-  // Find safe player starting position
-  let playerStartX, playerStartY;
-  let attempts = 0;
-  let playerSpawnRadiusBuffer = currentCellSize * PLAYER_SPAWN_RADIUS_BUFFER_CELL_FACTOR;
-
-  do {
-    playerStartX = currentCellSize * (PLAYER_START_X_BASE_CELLS + attempts * PLAYER_START_X_ATTEMPT_INCREMENT_CELLS);
-    playerStartY = WORLD_HEIGHT / 2 + random(-currentCellSize * PLAYER_START_Y_RANDOM_RANGE_CELLS, currentCellSize * PLAYER_START_Y_RANDOM_RANGE_CELLS);
-    attempts++;
-    if (playerStartX > WORLD_WIDTH * PLAYER_SPAWN_MAX_X_SEARCH_FACTOR) {
-      playerStartX = currentCellSize * PLAYER_START_X_BASE_CELLS; 
-      playerStartY = WORLD_HEIGHT / 2; 
-      break;
-    }
-  } while (cave.isWall(playerStartX, playerStartY, playerSpawnRadiusBuffer) && attempts < MAX_PLAYER_SPAWN_ATTEMPTS);
-  
-  if (attempts >= MAX_PLAYER_SPAWN_ATTEMPTS) {
-    playerStartX = currentCellSize * PLAYER_START_X_BASE_CELLS; 
-    playerStartY = WORLD_HEIGHT / 2;
-  }
-
-  player = new PlayerSub(playerStartX, playerStartY, airForLevel, airDepletion);
-  
-  // Initialize other game objects
-  enemies = []; projectiles = [];
-  sonarBubbles = []; particles = []; 
-  let enemyCount = BASE_ENEMY_COUNT + (currentLevel - 1) * ENEMY_COUNT_PER_LEVEL_INCREASE;
-  enemyCount = min(enemyCount, MAX_ENEMY_COUNT);
-  enemiesKilledThisLevel = 0;
-  
-  // Spawn enemies
-  for (let i = 0; i < enemyCount; i++) {
-    let spawnAttempts = 0;
-    while (spawnAttempts < MAX_ENEMY_SPAWN_ATTEMPTS) {
-      let x = random(WORLD_WIDTH * ENEMY_SPAWN_MIN_X_WORLD_FACTOR, WORLD_WIDTH * ENEMY_SPAWN_MAX_X_WORLD_FACTOR);
-      let y = random(WORLD_HEIGHT * ENEMY_SPAWN_MIN_Y_WORLD_FACTOR, WORLD_HEIGHT * ENEMY_SPAWN_MAX_Y_WORLD_FACTOR);
-      
-      if (!cave.isWall(x, y, ENEMY_SPAWN_WALL_CHECK_RADIUS)) {
-        let speed = random(ENEMY_MIN_BASE_SPEED, ENEMY_MAX_BASE_SPEED) + (currentLevel - 1) * ENEMY_SPEED_LEVEL_MULTIPLIER;
-        enemies.push(new Enemy(x, y, speed));
-        break;
-      }
-      spawnAttempts++;
-    }
-  }
-  
-  // Spawn Jellyfish
-  jellyfish = []; // Clear existing jellyfish
-  let jellyfishCount = floor(currentLevel / 3); // e.g., one at level 3, two at level 6
-  for (let i = 0; i < jellyfishCount; i++) {
-    let spawnAttempts = 0;
-    while (spawnAttempts < MAX_ENEMY_SPAWN_ATTEMPTS) {
-      let x = random(WORLD_WIDTH * ENEMY_SPAWN_MIN_X_WORLD_FACTOR, WORLD_WIDTH * ENEMY_SPAWN_MAX_X_WORLD_FACTOR);
-      let y = random(WORLD_HEIGHT * ENEMY_SPAWN_MIN_Y_WORLD_FACTOR, WORLD_HEIGHT * ENEMY_SPAWN_MAX_Y_WORLD_FACTOR);
-      
-      if (!cave.isWall(x, y, JELLYFISH_RADIUS * 1.5)) { // Larger check radius for jellyfish
-        jellyfish.push(new Jellyfish(x, y));
-        break;
-      }
-      spawnAttempts++;
-    }
-  }
-  
-  // Create current areas
-  currentAreas = [];
-  let numCurrentAreas = CURRENT_AREAS_PER_LEVEL;
-  for (let i = 0; i < numCurrentAreas; i++) {
-    let areaW = random(CURRENT_AREA_MIN_WIDTH, CURRENT_AREA_MAX_WIDTH);
-    let areaH = random(CURRENT_AREA_MIN_HEIGHT, CURRENT_AREA_MAX_HEIGHT);
-    let areaX = random(player.pos.x + CURRENT_AREA_PADDING_FROM_PLAYER_START, cave.exitX - areaW - CURRENT_AREA_PADDING_FROM_GOAL);
-    let areaY = random(0, WORLD_HEIGHT - areaH);
-    let forceDir = p5.Vector.random2D();
-    let forceMag = random(CURRENT_FORCE_MAGNITUDE_MIN, CURRENT_FORCE_MAGNITUDE_MAX);
-    
-    currentAreas.push(new CurrentArea(areaX, areaY, areaW, areaH, forceDir, forceMag));
-  }
-  
-  // Reset score for the new level
-  levelScore = 0;
-  
-  // Transition to playing state
-  gameState = 'playing';
-}
-
-// --- PlayerSub Class ---
-class PlayerSub {
-  constructor(x, y, airSupply, airDepletionRate) {
-    this.pos = createVector(x, y);
-    this.vel = createVector(0, 0);
-    this.radius = PLAYER_RADIUS;
-    this.health = PLAYER_INITIAL_HEALTH;
-    this.airSupply = airSupply;
-    this.initialAirSupply = airSupply;
-    this.airDepletionRate = airDepletionRate;
-    this.lastSonarTime = 0;
-    this.lastShotTime = 0;
-    this.sonarCooldown = PLAYER_SONAR_COOLDOWN_FRAMES;
-    this.shotCooldown = PLAYER_SHOT_COOLDOWN_FRAMES;
-  }
-
-  update(cave, enemies) {
-    this.handleInput();
-    this.applyPhysics();
-    this.checkBounds();
-    this.updateAirSupply();
-    this.updateSonar();
-    this.updateShots();
-    this.checkCollisions(cave, enemies);
-  }
-
-  handleInput() {
-    let thrust = this.vel.copy().mult(-PLAYER_REVERSE_THRUST_FACTOR);
-    if (keyIsDown(KEY_CODE_W)) this.vel.add(thrust);
-    if (keyIsDown(KEY_CODE_S)) this.vel.add(thrust.mult(PLAYER_THRUST_POWER));
-    if (keyIsDown(KEY_CODE_A)) this.vel.rotate(-PLAYER_TURN_SPEED);
-    if (keyIsDown(KEY_CODE_D)) this.vel.rotate(PLAYER_TURN_SPEED);
-    
-    // Debug: Reset position with R key
-    if (keyIsDown(82)) { // R key
-      this.pos.set(WORLD_WIDTH / 2, WORLD_HEIGHT / 2);
-      this.vel.set(0, 0);
-    }
-  }
-
-  applyPhysics() {
-    this.vel.limit(PLAYER_MAX_SPEED);
-    this.pos.add(this.vel);
-    this.vel.mult(PLAYER_DAMPING);
-  }
-
-  checkBounds() {
-    // Wrap around edges
-    if (this.pos.x < 0) this.pos.x = WORLD_WIDTH;
-    else if (this.pos.x > WORLD_WIDTH) this.pos.x = 0;
-    if (this.pos.y < 0) this.pos.y = WORLD_HEIGHT;
-    else if (this.pos.y > WORLD_HEIGHT) this.pos.y = 0;
-  }
-
-  updateAirSupply() {
-    if (this.airSupply > 0) {
-      this.airSupply -= this.airDepletionRate;
-    }
-  }
-
-  updateSonar() {
-    if (frameCount - this.lastSonarTime >= this.sonarCooldown) {
-      this.lastSonarTime = frameCount;
-      // Emit sonar pulse
-      let pulse = new SonarPulse(this.pos.x, this.pos.y, PLAYER_SONAR_RANGE, PLAYER_SONAR_PULSES);
-      sonarBubbles.push(pulse);
-    }
-  }
-
-  updateShots() {
-    if (frameCount - this.lastShotTime >= this.shotCooldown) {
-      this.lastShotTime = frameCount;
-      // Fire a projectile
-      let proj = new Projectile(this.pos.x, this.pos.y, this.vel.heading());
-      projectiles.push(proj);
-    }
-  }
-
-  checkCollisions(cave, enemies) {
-    // Cave collisions
-    if (cave.isWall(this.pos.x, this.pos.y, this.radius)) {
-      this.health -= PLAYER_BUMP_DAMAGE;
-      this.vel.mult(-PLAYER_BUMP_RECOIL_FACTOR);
-      playSound('bump');
-    }
-    
-    // Enemy collisions
-    for (let enemy of enemies) {
-      let d = dist(this.pos.x, this.pos.y, enemy.pos.x, enemy.pos.y);
-      if (d < this.radius + enemy.radius) {
-        this.health -= PLAYER_ENEMY_COLLISION_DAMAGE;
-        enemy.vel.add(p5.Vector.sub(this.pos, enemy.pos).normalize().mult(PLAYER_ENEMY_COLLISION_KNOCKBACK));
-        playSound('bump');
-      }
-    }
-  }
-
-  render(offsetX, offsetY) {
-    push();
-    translate(this.pos.x - offsetX, this.pos.y - offsetY);
-
-    // Body
-    fill(PLAYER_COLOR_BODY_H, PLAYER_COLOR_BODY_S, PLAYER_COLOR_BODY_B);
-    noStroke();
-    ellipse(0, 0, this.radius * PLAYER_BODY_WIDTH_FACTOR, this.radius * PLAYER_BODY_HEIGHT_FACTOR);
-    
-    // Sail
-    fill(PLAYER_COLOR_SAIL_H, PLAYER_COLOR_SAIL_S, PLAYER_COLOR_SAIL_B);
-    rectMode(CENTER);
-    rect(this.radius * PLAYER_SAIL_OFFSET_X_FACTOR, 0, this.radius * PLAYER_SAIL_WIDTH_FACTOR, this.radius * PLAYER_SAIL_HEIGHT_FACTOR, this.radius * PLAYER_SAIL_CORNER_RADIUS_FACTOR);
-    rectMode(CORNER); // Reset rectMode
-    
-    // Fin
-    fill(PLAYER_COLOR_FIN_H, PLAYER_COLOR_FIN_S, PLAYER_COLOR_FIN_B);
-    beginShape();
-    vertex(-this.radius * PLAYER_FIN_X1_FACTOR, -this.radius * PLAYER_FIN_Y1_FACTOR);
-    vertex(-this.radius * PLAYER_FIN_X2_FACTOR, this.radius * PLAYER_FIN_Y2_FACTOR);
-    vertex(-this.radius * PLAYER_FIN_X3_FACTOR, this.radius * PLAYER_FIN_Y3_FACTOR);
-    vertex(-this.radius * PLAYER_FIN_X4_FACTOR, -this.radius * PLAYER_FIN_Y4_FACTOR);
-    endShape(CLOSE);
-    
-    // Propeller
-    push();
-    translate(this.radius * PLAYER_PROPELLER_X_OFFSET_FACTOR, 0); // Position propeller at the back
-    
-    fill(PLAYER_COLOR_PROPELLER_H, PLAYER_COLOR_PROPELLER_S, PLAYER_COLOR_PROPELLER_B);
-    noStroke();
-    
-    let apparentHeight = this.radius * PLAYER_PROPELLER_MAX_SIDE_HEIGHT_FACTOR * abs(sin(startScreenPropellerAngle));
-    let thickness = this.radius * PLAYER_PROPELLER_THICKNESS_FACTOR;
-
-    rectMode(CENTER);
-    rect(0, 0, thickness, apparentHeight);
-    rectMode(CORNER); // Reset rectMode
-    pop();
-    
-    pop();
-  }
-}
-
-// --- Setup and Initialization ---
-function setup() {
-  createCanvas(windowWidth, windowHeight);
-  colorMode(HSB, 360, 100, 100, 100);
-  noStroke();
-  
-  // Start audio context on first interaction
-  let startAudio = () => {
-    if (typeof userStartAudio === 'function') {
-      userStartAudio().then(() => { audioInitialized = true; })
-                      .catch(e => { /* console.error("userStartAudio error", e); */ });
-    } else {
-      let ctx = getAudioContext();
-      if (ctx && ctx.state !== 'running') {
-        ctx.resume().then(() => { audioInitialized = true; })
-                    .catch(e => { /* console.error("AudioContext.resume error", e); */ });
-      } else if (ctx && ctx.state === 'running') { audioInitialized = true; }
-    }
-  }
-  
-  // Initial audio setup
-  startAudio();
-  
-  // Custom font loading
-  customFont = loadFont('Berpatroli.otf');
-}
-
-// --- Creature Explosion Sound Constants (less boomy than wall explosions) ---
-const CREATURE_EXPLOSION_NOISE_ENV_ADSR = { aT: 0.001, dT: 0.3, sR: 0, rT: 0.1 };
-const CREATURE_EXPLOSION_NOISE_ENV_LEVELS = { aL: 0.6, rL: 0 };
-const CREATURE_EXPLOSION_BOOM_ENV_ADSR = { aT: 0.001, dT: 0.8, sR: 0, rT: 0.1 };
-const CREATURE_EXPLOSION_BOOM_ENV_LEVELS = { aL: 0.5, rL: 0 };
-const CREATURE_EXPLOSION_BOOM_MIN_FREQ = 100;
-const CREATURE_EXPLOSION_BOOM_MAX_FREQ = 120;
-const CREATURE_EXPLOSION_BASS_ENV_ADSR = { aT: 0.002, dT: 0.6, sR: 0, rT: 0.4 };
-const CREATURE_EXPLOSION_BASS_ENV_LEVELS = { aL: 0.7, rL: 0 };
-const CREATURE_EXPLOSION_BASS_MIN_FREQ = 25;
-const CREATURE_EXPLOSION_BASS_MAX_FREQ = 45;
-
-// --- Touch Event Forwarding for Mobile Controls ---
-function touchStarted() {
-  if (typeof handleMobileTouchStart === 'function') {
-    handleMobileTouchStart(touches);
-  }
-  // Prevent default to avoid issues on mobile
-  return false;
-}
-
-function touchMoved() {
-  if (typeof handleMobileTouchMove === 'function') {
-    handleMobileTouchMove(touches);
-  }
-  // Prevent default to avoid issues on mobile
-  return false;
-}
-
-function touchEnded() {
-  if (typeof handleMobileTouchEnd === 'function') {
-    handleMobileTouchEnd(touches);
-  }
-  // Prevent default to avoid issues on mobile
-  return false;
-}
-
-// --- Dynamic Kills Requirement Constants ---
-const BASE_KILLS_REQUIRED = 3; // Kills required for the first level
-const KILLS_INCREASE_PER_LEVEL = 3; // How many more kills needed each subsequent level
-function getKillsRequiredForLevel(level) {
-  if (level <= 0) return 0;
-  return BASE_KILLS_REQUIRED + (level - 1) * KILLS_INCREASE_PER_LEVEL;
-}
-
-function mousePressed() {
-    if (!audioInitialized) { // If audio not started, mouse click can also start it
-        startAudioRoutine();
-    }
-    let fs = fullscreen();
-    fullscreen(!fs);
-}
-
-function keyPressed() {
-  // Start audio on Enter press from certain game states if not already started
-  if (!audioInitialized && (keyCode === ENTER && (gameState === 'start' || gameState === 'levelComplete' || gameState === 'gameOver' || gameState === 'gameComplete'))) {
-    startAudioRoutine();
-  }
-
-  if (gameState === 'playing') {
-    if (keyCode === KEY_CODE_SPACE) player.shoot(); // Use constant for space key
-  }
-  
-  // Debug toggle for showing cave walls (works in any state)
-  if (key === ']') {
-    debugShowWalls = !debugShowWalls;
-    console.log("Debug wall view:", debugShowWalls ? "ON" : "OFF");
-  }
-  
-  if (gameState === 'start' && keyCode === ENTER) {
-    // Set loading state and defer heavy initialization
-    gameState = 'loading';
-    loadingStartTime = millis(); // Record when loading started
-    
-    // Use setTimeout to allow loading screen to render
-    setTimeout(() => {
-      // Start chunked cave generation instead of synchronous generation
-      startChunkedCaveGeneration();
-    }, 100); // Small delay to allow loading screen to render
- }  else if ((gameState === 'gameOver' || gameState === 'gameComplete') && keyCode === ENTER) {
-    resetGame();
-  } else if (gameState === 'levelComplete' && keyCode === ENTER) {
-    prepareNextLevel();
-  }
-}
-
-function drawDebugCaveWalls(offsetX, offsetY) {
-  push();
-  
-  // Set up drawing style for walls
-  //stroke(255, 0, 0); // Red outline for walls
-  //strokeWeight(1);
-  noFill();
-  
-  // Calculate which grid cells are visible on screen
-  let startGridX = Math.max(0, Math.floor(offsetX / cave.cellSize));
-  let endGridX = Math.min(cave.gridWidth - 1, Math.floor((offsetX + width) / cave.cellSize) + 1);
-  let startGridY = Math.max(0, Math.floor(offsetY / cave.cellSize));
-  let endGridY = Math.min(cave.gridHeight - 1, Math.floor((offsetY + height) / cave.cellSize) + 1);
-  
-  // Draw wall cells as red rectangles
-  for (let i = startGridX; i <= endGridX; i++) {
-    for (let j = startGridY; j <= endGridY; j++) {
-      if (cave.grid[i] && cave.grid[i][j]) {
-        let worldX = i * cave.cellSize - offsetX;
-        let worldY = j * cave.cellSize - offsetY;
-        rect(worldX, worldY, cave.cellSize, cave.cellSize);
-      }
-    }
-  }
-  
-  // Also draw open spaces as green rectangles with transparency
-  fill(255,100); // Semi-transparent green for open spaces
- // stroke(0, 255, 0); // Green outline
-  
-  for (let i = startGridX; i <= endGridX; i++) {
-    for (let j = startGridY; j <= endGridY; j++) {
-      if (cave.grid[i] && !cave.grid[i][j]) {
-        let worldX = i * cave.cellSize - offsetX;
-        let worldY = j * cave.cellSize - offsetY;
-        rect(worldX, worldY, cave.cellSize, cave.cellSize);
-      }
-    }
-  }
-  
-  // Draw enemies as filled shapes
-  fill(255, 0, 255); // Magenta for enemies
-  noStroke();
-  for (let enemy of enemies) {
-    let enemyX = enemy.pos.x - offsetX;
-    let enemyY = enemy.pos.y - offsetY;
-    // Only draw if enemy is visible on screen
-    if (enemyX >= -enemy.radius && enemyX <= width + enemy.radius &&
-        enemyY >= -enemy.radius && enemyY <= height + enemy.radius) {
-      ellipse(enemyX, enemyY, enemy.radius * 2, enemy.radius * 2);
-      
-      // Add enemy info text
-      fill(255, 255, 255); // White text
-      textAlign(CENTER, CENTER);
-      textSize(10);
-           text("E", enemyX, enemyY);
-      fill(255, 0, 255); // Back to magenta
-    }
-  }
-  
-  // Draw jellyfish as filled shapes
-  fill(0, 255, 255); // Cyan for jellyfish
-  noStroke();
-  for (let jelly of jellyfish) {
-    let jellyX = jelly.pos.x - offsetX;
-    let jellyY = jelly.pos.y - offsetY;
-    // Only draw if jellyfish is visible on screen
-    if (jellyX >= -jelly.radius && jellyX <= width + jelly.radius &&
-        jellyY >= -jelly.radius && jellyY <= height + jelly.radius) {
-      ellipse(jellyX, jellyY, jelly.radius * 2, jelly.radius * 2);
-      
-      // Add jellyfish info text with health
-      fill(255, 255, 255); // White text
-      textAlign(CENTER, CENTER);
-      textSize(10);
-      text(`J${jelly.health}`, jellyX, jellyY);
-      fill(0, 255, 255); // Back to cyan
-    }
-  }
-  
-  // Add debug info text
-  fill(255, 255, 0); // Yellow text
-  noStroke();
-  textAlign(RIGHT, TOP);
-  textSize(16);
-  text("DEBUG: Cave Walls & Enemies (Press ] to toggle)", width - 10, 10);
-  text(`Grid: ${cave.gridWidth}x${cave.gridHeight}, Cell: ${cave.cellSize}px`, width - 10, 30);
-  text(`Enemies: ${enemies.length}, Jellyfish: ${jellyfish.length}`, width - 10, 50);
-
-  pop();
-}
-
-function drawLoadingScreen() {
-  background(BACKGROUND_COLOR_H, BACKGROUND_COLOR_S, BACKGROUND_COLOR_B); // Use same background as game
-  
-  // Center the loading text
-  fill(60, 100, 90); // Yellow color (HSB)
-  noStroke();
-  textAlign(CENTER, CENTER);
-  textSize(48);
-  text("LOADING", width / 2, height / 2);
-  
-  // Add progress-based spinning indicator
-  push();
-  translate(width / 2, height / 2 + 60);
-  
-  // Use the actual cave generation progress, but also add time-based animation for smooth visual feedback
-  let baseProgress = caveGenerationProgress;
-  let timeProgress = min(1.0, (millis() - loadingStartTime) / 1000); // Complete in 1 second max
-  let displayProgress = max(baseProgress, timeProgress * 0.9); // Show at least time-based progress
-  
-  // Calculate spinner angle based on progress (0 to 2*PI for full circle)
-  let progressAngle = displayProgress * TWO_PI;
-  
-  stroke(60, 100, 100); // Yellow color in HSB
-  strokeWeight(4);
-  noFill();
-  
-  // Draw background circle (faint)
-  stroke(60, 30, 50); // Dimmer yellow for background
-  strokeWeight(2);
-  circle(0, 0, 40);
-  
-  // Draw progress arc
-  stroke(60, 100, 100); // Bright yellow for progress
-  strokeWeight(4);
-  if (progressAngle > 0) {
-    arc(0, 0, 40, 40, -PI/2, -PI/2 + progressAngle); // Start from top (-PI/2) and progress clockwise
-  }
-  
-  pop();
-  
-  // Optional: Add level information
-  if (typeof currentLevel !== 'undefined') {
-    fill(0, 0, 80, 180); // Semi-transparent white (HSB)
-    noStroke(); // Ensure no stroke for text
-    textAlign(CENTER, CENTER);
-    textSize(24);
-    text(`Generating Level ${currentLevel}`, width / 2, height / 2 + 120);
-    
-    // Show progress percentage
-    textSize(16);
-    text(`${Math.round(displayProgress * 100)}%`, width / 2, height / 2 + 150);
-  }
-}
-
-function drawStartScreen() {
-
-  // Animate submarine
-  let subX = width / 2;
-  let subY = height / 2 + START_SCREEN_TITLE_Y_OFFSET - 80;
-  
-  push();
-  translate(subX, subY);
-  
-  // Use the same rendering as the gameplay submarine
-  let subRadius = PLAYER_RADIUS; // Use actual player radius
-  
-  // Submarine body (same as _renderBody)
-  fill(PLAYER_COLOR_BODY_H, PLAYER_COLOR_BODY_S, PLAYER_COLOR_BODY_B);
-  noStroke();
-  ellipse(0, 0, subRadius * PLAYER_BODY_WIDTH_FACTOR, subRadius * PLAYER_BODY_HEIGHT_FACTOR);
-  
-  // Sail (same as _renderSail)
-  fill(PLAYER_COLOR_SAIL_H, PLAYER_COLOR_SAIL_S, PLAYER_COLOR_SAIL_B);
-  rectMode(CENTER);
-  rect(subRadius * PLAYER_SAIL_OFFSET_X_FACTOR, 0, subRadius * PLAYER_SAIL_WIDTH_FACTOR, subRadius * PLAYER_SAIL_HEIGHT_FACTOR, subRadius * PLAYER_SAIL_CORNER_RADIUS_FACTOR);
-  rectMode(CORNER); // Reset rectMode
-  
-  // Fin (same as _renderFin)
-  fill(PLAYER_COLOR_FIN_H, PLAYER_COLOR_FIN_S, PLAYER_COLOR_FIN_B);
-  beginShape();
-  vertex(-subRadius * PLAYER_FIN_X1_FACTOR, -subRadius * PLAYER_FIN_Y1_FACTOR);
-  vertex(-subRadius * PLAYER_FIN_X2_FACTOR, subRadius * PLAYER_FIN_Y2_FACTOR);
-  vertex(-subRadius * PLAYER_FIN_X3_FACTOR, subRadius * PLAYER_FIN_Y3_FACTOR);
-  vertex(-subRadius * PLAYER_FIN_X4_FACTOR, -subRadius * PLAYER_FIN_Y4_FACTOR);
-  endShape(CLOSE);
-  
-  // Propeller (same as _renderPropeller)
-  push();
-  translate(subRadius * PLAYER_PROPELLER_X_OFFSET_FACTOR, 0); // Position propeller at the back
-  
-  fill(PLAYER_COLOR_PROPELLER_H, PLAYER_COLOR_PROPELLER_S, PLAYER_COLOR_PROPELLER_B);
-  noStroke();
-  
-  let apparentHeight = subRadius * PLAYER_PROPELLER_MAX_SIDE_HEIGHT_FACTOR * abs(sin(startScreenPropellerAngle));
-  let thickness = subRadius * PLAYER_PROPELLER_THICKNESS_FACTOR;
-
-  rectMode(CENTER);
-  rect(0, 0, thickness, apparentHeight);
-  rectMode(CORNER); // Reset rectMode
-  pop();
-  
-  pop();
-  
-  // Update propeller animation
-  startScreenPropellerAngle += 0.3;
-  
-  // Spawn bubbles from propeller
-  if (frameCount % 10 === 0) {
-    sonarBubbles.push(new SonarBubble(subX - 20 + random(-5, 5), subY + random(-5, 5)));
-  }
-  
-  // Update and render bubbles
-  for (let i = sonarBubbles.length - 1; i >= 0; i--) {
-    sonarBubbles[i].update();
-    sonarBubbles[i].render(0, 0);
-    if (sonarBubbles[i].isOffscreen()) {
-      sonarBubbles.splice(i, 1);
-    }
-  }
-  
-
-
-  textAlign(CENTER, CENTER);
-  fill(START_SCREEN_TITLE_COLOR_H, START_SCREEN_TITLE_COLOR_S, START_SCREEN_TITLE_COLOR_B); textSize(START_SCREEN_TITLE_TEXT_SIZE);
-  text(`Reactor Dive`, width / 2, height / 2 + START_SCREEN_TITLE_Y_OFFSET);
-  
-  textSize(START_SCREEN_INFO_TEXT_SIZE);
-  text("Christian Nold 2025", width / 2, height / 2 + START_SCREEN_INFO_Y_OFFSET_3);
-
-  let killsForLevel1 = getKillsRequiredForLevel(1);
-  text(`Destroy ${killsForLevel1} mutated creatures and reach the flooded reactor`, width / 2, height / 2 + START_SCREEN_INFO_Y_OFFSET_1);
-  
-  // Show different control instructions based on device
-  if (typeof isMobileControlsEnabled === 'function' && isMobileControlsEnabled()) {
-    text("Touch controls: Joystick (left) and Fire button (right)", width / 2, height / 2 + START_SCREEN_INFO_Y_OFFSET_2);
-  } else {
-    text("WASD/Arrows: Move. SPACE: Shoot.", width / 2, height / 2 + START_SCREEN_INFO_Y_OFFSET_2);
-  }
-  
-  textSize(START_SCREEN_PROMPT_TEXT_SIZE); fill(START_SCREEN_PROMPT_COLOR_H, START_SCREEN_PROMPT_COLOR_S, START_SCREEN_PROMPT_COLOR_B);
-  
-  // Show different instructions based on whether mobile controls are active
-  if (typeof isMobileControlsEnabled === 'function' && isMobileControlsEnabled()) {
-    text("Tap anywhere to Dive", width / 2, height / 2 + START_SCREEN_PROMPT_Y_OFFSET);
-  } else {
-    text("Press ENTER to Dive", width / 2, height / 2 + START_SCREEN_PROMPT_Y_OFFSET);
-  }
-  if (!audioInitialized) {
-      textSize(START_SCREEN_AUDIO_NOTE_TEXT_SIZE); fill(START_SCREEN_AUDIO_NOTE_COLOR_H, START_SCREEN_AUDIO_NOTE_COLOR_S, START_SCREEN_AUDIO_NOTE_COLOR_B);
-      //text("(Sound will enable after you press Enter or Click)", width/2, height/2 + START_SCREEN_AUDIO_NOTE_Y_OFFSET);
- }
-}
-
-function drawLevelCompleteScreen() {
-  textAlign(CENTER, CENTER); 
-  fill(LEVEL_COMPLETE_TITLE_COLOR_H, LEVEL_COMPLETE_TITLE_COLOR_S, LEVEL_COMPLETE_TITLE_COLOR_B); textSize(LEVEL_COMPLETE_TITLE_TEXT_SIZE);
-  text(`LEVEL ${currentLevel} CLEARED!`, width / 2, height / 2 + LEVEL_COMPLETE_TITLE_Y_OFFSET); 
-  
-  // Show score information
-  textSize(LEVEL_COMPLETE_INFO_TEXT_SIZE);
-  let timeLeftInSeconds = Math.max(0, Math.floor(player.airSupply / 60));
-  text(`Time bonus: ${timeLeftInSeconds} seconds x 10 = ${levelScore} points`, width / 2, height / 2 + LEVEL_COMPLETE_INFO_Y_OFFSET);
-  let killsForNextLevel = getKillsRequiredForLevel(currentLevel+1);
-  text(`Next Level: Destroy ${killsForNextLevel} enemies and reach the reactor`, width/2, height / 2 + LEVEL_COMPLETE_INFO_Y_OFFSET + 40);
-  
-  // Show appropriate continue instruction
-  if (typeof isMobileControlsEnabled === 'function' && isMobileControlsEnabled()) {
-    text("Tap to Continue", width / 2, height / 2 + LEVEL_COMPLETE_PROMPT_Y_OFFSET);
-  } else {
-    text("ENTER to Continue", width / 2, height / 2 + LEVEL_COMPLETE_PROMPT_Y_OFFSET);
-  }
-}
-
-function drawGameCompleteScreen() {
-  textAlign(CENTER, CENTER);
-  fill(GAME_COMPLETE_TITLE_COLOR_H, GAME_COMPLETE_TITLE_COLOR_S, GAME_COMPLETE_TITLE_COLOR_B); textSize(GAME_COMPLETE_TITLE_TEXT_SIZE);
-  text("MISSION ACCOMPLISHED!", width / 2, height / 2 + GAME_COMPLETE_TITLE_Y_OFFSET);
-  textSize(GAME_COMPLETE_INFO_TEXT_SIZE);
-  text(`You cleared all ${MAX_LEVELS} levels!`, width/2, height/2 + GAME_COMPLETE_INFO_Y_OFFSET);
-  text(`Final Score: ${totalScore}`, width/2, height/2 + GAME_COMPLETE_INFO_Y_OFFSET + 30);
-  
-  // Show appropriate restart instruction
-  if (typeof isMobileControlsEnabled === 'function' && isMobileControlsEnabled()) {
-    text("Tap to Play Again", width / 2, height / 2 + GAME_COMPLETE_PROMPT_Y_OFFSET);
-  } else {
-    text("Press ENTER to Play Again", width / 2, height / 2 + GAME_COMPLETE_PROMPT_Y_OFFSET);
-  }
-}
-
-function drawGameOverScreen() {
-  textAlign(CENTER, CENTER);
-  fill(GAME_OVER_TITLE_COLOR_H, GAME_OVER_TITLE_COLOR_S, GAME_OVER_TITLE_COLOR_B); textSize(GAME_OVER_TITLE_TEXT_SIZE);
-  text("MISSION FAILED", width/2, height/2 + GAME_OVER_TITLE_Y_OFFSET);
-  textSize(GAME_OVER_INFO_TEXT_SIZE);
-  text(player.health <= 0 ? "Submarine Destroyed!" : "Air Supply Depleted!", width/2, height/2 + GAME_OVER_INFO_Y_OFFSET);
-  text(`Total Score: ${totalScore}`, width/2, height/2 + GAME_OVER_INFO_Y_OFFSET + 30);
-  
-  // Show appropriate restart instruction
-  if (typeof isMobileControlsEnabled === 'function' && isMobileControlsEnabled()) {
-    text("Tap to Restart", width / 2, height / 2 + GAME_OVER_PROMPT_Y_OFFSET);
-  } else {
-    text("Press ENTER to Restart", width / 2, height / 2 + GAME_OVER_PROMPT_Y_OFFSET);
-  }
-}
-
-function drawPlayingState() {
-  cameraOffsetX = player.pos.x - width / 2; cameraOffsetY = player.pos.y - height / 2;
-
-  // Render the goal square if player is inside it
-  if (cave.isGoal(player.pos.x, player.pos.y)) {
-    cave.renderGoal(cameraOffsetX, cameraOffsetY);
-  }
-
-  // Process current areas - spawn bubbles and render debug visuals
-  for (let area of currentAreas) {
-    area.spawnBubbles(cave, cameraOffsetX, cameraOffsetY);
-    area.render(cameraOffsetX, cameraOffsetY);
-  }
-
-  // Process sonar bubbles, particles, and projectiles
-  processGameObjectArray(sonarBubbles, cameraOffsetX, cameraOffsetY);
-  processGameObjectArray(particles, cameraOffsetX, cameraOffsetY);
-  processGameObjectArray(projectiles, cameraOffsetX, cameraOffsetY, cave); // Projectiles need cave context
-
-  player.update(cave, enemies);
-  
-  // Apply mobile controls movement if enabled
-  applyMobileMovement();
-  
-  // Update and render enemies - only process those near the screen
-  let margin = 100; // Extra margin for off-screen enemies
-  for (let enemy of enemies) {
-    // Always update enemy logic (AI, movement) but only render if visible
-    enemy.update(cave, player);
-    
-    // Check if enemy is near the viewport for rendering
-    if (enemy.pos.x + enemy.radius >= cameraOffsetX - margin &&
-        enemy.pos.x - enemy.radius <= cameraOffsetX + width + margin &&
-        enemy.pos.y + enemy.radius >= cameraOffsetY - margin &&
-        enemy.pos.y - enemy.radius <= cameraOffsetY + height + margin) {
-      enemy.render(cameraOffsetX, cameraOffsetY);
-    }
-  }
-  
-  // Update jellyfish (they don't render directly, only through sonar)
-  for (let jelly of jellyfish) jelly.update(cave, player);
-  
-  // Note: Jellyfish are not rendered directly - only visible through sonar hits
-  player.handleEnemyCollisions(enemies);
-  player.handleJellyfishCollisions(jellyfish);
-
-  // Projectile-Enemy Collisions (This loop needs to stay separate due to nested iteration and specific logic)
-  for (let i = projectiles.length - 1; i >= 0; i--) {
-    for (let j = enemies.length - 1; j >= 0; j--) {
-      if (projectiles[i] && enemies[j]) {
-        let d = dist(projectiles[i].pos.x, projectiles[i].pos.y, enemies[j].pos.x, enemies[j].pos.y);
-        if (d < projectiles[i].radius + enemies[j].radius) {
-          createExplosion(projectiles[i].pos.x, projecticles[i].pos.y, 'enemy'); // Create enemy explosion before splicing
-          enemies.splice(j, 1); 
-          projectiles.splice(i, 1); 
-          enemiesKilledThisLevel++;
-          playSound('creatureExplosion'); // Use creature explosion sound
-          break; 
+  // Method to find all spaces of a certain type (0 for empty, 1 for wall)
+  findAllSpaces(type = 0) {
+    const spaces = [];
+    for (let y = 0; y < this.gridHeight; y++) {
+      for (let x = 0; x < this.gridWidth; x++) {
+        if (this.grid[y] && this.grid[y][x] === type) {
+          spaces.push({ x, y });
         }
       }
     }
+    return spaces;
   }
 
-  // Projectile-Jellyfish Collisions
-  for (let i = projectiles.length - 1; i >= 0; i--) {
-    for (let j = jellyfish.length - 1; j >= 0; j--) {
-      if (projectiles[i] && jellyfish[j]) {
-        let d = dist(projectiles[i].pos.x, projecticles[i].pos.y, jellyfish[j].pos.x, jellyfish[j].pos.y);
-        if (d < projectiles[i].radius + jellyfish[j].radius) {
-          // Jellyfish takes damage instead of being destroyed immediately
-          let destroyed = jellyfish[j].takeDamage();
-          createExplosion(projectiles[i].pos.x, projecticles[i].pos.y, 'enemy');
-          projectiles.splice(i, 1);
-          
-          if (destroyed) {
-            jellyfish.splice(j, 1);
-            enemiesKilledThisLevel++;
-            playSound('creatureExplosion'); // Use creature explosion sound when destroyed
-          } else {
-            playSound('bump'); // Different sound for non-fatal hit
+  // Flood fill to identify a single connected region
+  floodFill(x, y, type, visited) {
+    const region = [];
+    const stack = [{ x, y }];
+    const key = `${x},${y}`;
+    if (visited.has(key)) return region;
+    visited.add(key);
+
+    while (stack.length > 0) {
+      const current = stack.pop();
+      region.push(current);
+
+      const neighbors = [
+        { x: current.x + 1, y: current.y },
+        { x: current.x - 1, y: current.y },
+        { x: current.x, y: current.y + 1 },
+        { x: current.x, y: current.y - 1 },
+      ];
+
+      for (const n of neighbors) {
+        const nKey = `${n.x},${n.y}`;
+        if (
+          n.x >= 0 && n.x < this.gridWidth &&
+          n.y >= 0 && n.y < this.gridHeight &&
+          this.grid[n.y] && this.grid[n.y][n.x] === type &&
+          !visited.has(nKey)
+        ) {
+          visited.add(nKey);
+          stack.push(n);
+        }
+      }
+    }
+    return region;
+  }
+
+  // Connects all significant empty spaces to ensure a navigable cave
+  connectAllSignificantSpaces(minSize = 20) {
+    const allSpaces = this.findAllSpaces(0);
+    if (allSpaces.length === 0) return;
+
+    const visited = new Set();
+    const regions = [];
+
+    for (const space of allSpaces) {
+      const key = `${space.x},${space.y}`;
+      if (!visited.has(key)) {
+        const region = this.floodFill(space.x, space.y, 0, visited);
+        if (region.length >= minSize) {
+          regions.push(region);
+        }
+      }
+    }
+
+    if (regions.length <= 1) return;
+
+    // Connect the largest region to all other significant regions
+    regions.sort((a, b) => b.length - a.length);
+    const mainRegion = regions[0];
+
+    for (let i = 1; i < regions.length; i++) {
+      const otherRegion = regions[i];
+      let closestDist = Infinity;
+      let mainPoint = null;
+      let otherPoint = null;
+
+      // A performance optimization: only check a subset of points
+      const sampleRate = 0.2; // Check 20% of points
+      const mainSample = mainRegion.filter(() => random() < sampleRate);
+      const otherSample = otherRegion.filter(() => random() < sampleRate);
+      
+      // Ensure samples are not empty
+      if (mainSample.length === 0 && mainRegion.length > 0) mainSample.push(mainRegion[0]);
+      if (otherSample.length === 0 && otherRegion.length > 0) otherSample.push(otherRegion[0]);
+      
+      if(mainSample.length === 0 || otherSample.length === 0) continue;
+
+      for (const p1 of mainSample) {
+        for (const p2 of otherSample) {
+          const d = dist(p1.x, p1.y, p2.x, p2.y);
+          if (d < closestDist) {
+            closestDist = d;
+            mainPoint = p1;
+            otherPoint = p2;
           }
-          break;
+        }
+      }
+
+      if (mainPoint && otherPoint) {
+        this.createTunnel(mainPoint, otherPoint, 2); // Tunnel with radius 2 cells
+      }
+    }
+  }
+
+  // Creates a tunnel between two points
+  createTunnel(p1, p2, radius) {
+    let x1 = p1.x, y1 = p1.y;
+    let x2 = p2.x, y2 = p2.y;
+    let dx = x2 - x1;
+    let dy = y2 - y1;
+    let distance = Math.sqrt(dx * dx + dy * dy);
+    let steps = distance; // 1-cell steps
+
+    for (let i = 0; i <= steps; i++) {
+      let t = i / steps;
+      let x = Math.round(x1 + t * dx);
+      let y = Math.round(y1 + t * dy);
+
+      for (let rx = -radius; rx <= radius; rx++) {
+        for (let ry = -radius; ry <= radius; ry++) {
+          if (rx * rx + ry * ry <= radius * radius) {
+            let nx = x + rx;
+            let ny = y + ry;
+            if (nx >= 0 && nx < this.gridWidth && ny >= 0 && ny < this.gridHeight) {
+              if (this.grid[ny]) {
+                this.grid[ny][nx] = 0; // Carve tunnel
+              }
+            }
+          }
         }
       }
     }
   }
 
-  player.render(cameraOffsetX, cameraOffsetY);
-
-  // Debug: Show cave walls
-  if (debugShowWalls) {
-    drawDebugCaveWalls(cameraOffsetX, cameraOffsetY);
-  }
-
-  // HUD
-  fill(HUD_TEXT_COLOR_H, HUD_TEXT_COLOR_S, HUD_TEXT_COLOR_B); textSize(HUD_TEXT_SIZE); textAlign(LEFT, TOP);
-  text(`Hull: ${player.health}%`, HUD_MARGIN_X, HUD_MARGIN_Y+ HUD_LINE_SPACING);
-  text(`Air: ${floor(player.airSupply / AIR_SUPPLY_FRAMES_TO_SECONDS_DIVISOR)} seconds `, HUD_MARGIN_X, HUD_MARGIN_Y + HUD_LINE_SPACING*2);
-  const killsRequired = getKillsRequiredForLevel(currentLevel);
-  let killsStillNeeded = Math.max(0, killsRequired - enemiesKilledThisLevel);
-  text(`Kills Needed: ${killsStillNeeded}`, HUD_MARGIN_X, HUD_MARGIN_Y + HUD_LINE_SPACING * 3);
-  let distanceToGoal = dist(player.pos.x, player.pos.y, cave.goalPos.x, cave.goalPos.y);
-  text(`Distance to Reactor: ${floor(distanceToGoal)} meters`, HUD_MARGIN_X, HUD_MARGIN_Y + HUD_LINE_SPACING * 4);
-
-  // Render mobile controls after HUD
-  renderMobileControls();
-
-  // Update reactor hum volume based on distance to goal (reactor)
-  updateReactorHum(distanceToGoal);
-
-  // Check Game Over / Level Complete Conditions
-  if (player.health <= 0 || player.airSupply <= 0) {
-      if(gameState === 'playing') {
-        // Player died - don't add level score to total, just calculate for display
-        let timeLeftInSeconds = Math.max(0, Math.floor(player.airSupply / 60)); // Convert frames to seconds (assuming 60 FPS)
-        levelScore = timeLeftInSeconds * 10;
-        playSound('gameOver');
+  // Ensures the main path is clear after obstacle generation
+  ensureMainPathClearance(path) {
+    if (!path) return;
+    for (const seg of path) {
+      let gridX = Math.floor(seg.x);
+      let gridY = Math.floor(seg.y);
+      let radius = Math.ceil(seg.radius);
+      for (let i = -radius; i <= radius; i++) {
+        for (let j = -radius; j <= radius; j++) {
+          if (dist(0, 0, i, j) < radius) {
+            let nx = gridX + i;
+            let ny = gridY + j;
+            if (nx >= 0 && nx < this.gridWidth && ny >= 0 && ny < this.gridHeight) {
+               if (this.grid[ny]) {
+                this.grid[ny][nx] = 0;
+              }
+            }
+          }
+        }
       }
-      gameState = 'gameOver';
-  } else if (cave.isGoal(player.pos.x, player.pos.y) && killsStillNeeded === 0) {
-    // Level completed successfully - calculate score and add to total
-    let timeLeftInSeconds = Math.max(0, Math.floor(player.airSupply / 60)); // Convert frames to seconds (assuming 60 FPS)
-    levelScore = timeLeftInSeconds * 10;
-    totalScore += levelScore;
-    gameState = (currentLevel >= MAX_LEVELS) ? 'gameComplete' : 'levelComplete';
+    }
   }
-}
 
-function draw() {
-  background(BACKGROUND_COLOR_H, BACKGROUND_COLOR_S, BACKGROUND_COLOR_B);
-
-  if (gameState === 'start') {
-    drawStartScreen();
-    return;
-  }
-  if (gameState === 'loading') {
-    drawLoadingScreen();
-    return;
-  }
-  if (gameState === 'levelComplete') {
-    drawLevelCompleteScreen();
-    return;
-  }
-  if (gameState === 'gameComplete') {
-    drawGameCompleteScreen();
-    return;
-  }
-  if (gameState === 'gameOver') {
-    drawGameOverScreen();
-    return;
-  }
-  // gameState === 'playing'
-  drawPlayingState();
-}
-function windowResized() { resizeCanvas(windowWidth, windowHeight); }
+  isWall(px, py, checkRadius = 0) {
+    // ...existing code...
 
