@@ -74,7 +74,7 @@ canvas {
   left: 0;
   width: 100vw;
   height: 100vh;
-  background-color: rgb(32, 44, 55); /* Match game's dark blue background - fully opaque */
+  background-color: rgb(11, 19, 38); /* Match exact game background HSB(220, 70, 15) */
   display: flex;
   align-items: center;
   justify-content: center;
