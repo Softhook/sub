@@ -4,7 +4,7 @@
   "description": "Destroy the mutated creatures and reach the reactor before your time runs out.",
   "start_url": "./",
   "scope": "./",
-  "display": "fullscreen",
+  "display": "standalone",
   "orientation": "landscape",
   "background_color": "#0b1326",
   "theme_color": "#0b1326",

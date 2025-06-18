@@ -1,4 +1,4 @@
-const CACHE_NAME = 'reactor-dive-cache-v4';
+const CACHE_NAME = 'reactor-dive-cache-v5';
 // Add all the files you want to cache
 const urlsToCache = [
   './',

@@ -75,18 +75,35 @@ function checkPWACriteria() {
   
   // Check if running in standalone mode (PWA)
   const isStandalone = window.matchMedia && window.matchMedia('(display-mode: standalone)').matches;
+  const isFullscreen = window.matchMedia && window.matchMedia('(display-mode: fullscreen)').matches;
+  const isMinimalUI = window.matchMedia && window.matchMedia('(display-mode: minimal-ui)').matches;
+  const isBrowser = window.matchMedia && window.matchMedia('(display-mode: browser)').matches;
+  
   logToPage('Standalone mode: ' + (isStandalone ? '✅' : '❌'));
+  logToPage('Fullscreen mode: ' + (isFullscreen ? '✅' : '❌'));
+  logToPage('Minimal-UI mode: ' + (isMinimalUI ? '✅' : '❌'));
+  logToPage('Browser mode: ' + (isBrowser ? '✅' : '❌'));
+  
+  // Check other PWA indicators
+  const isNavigatorStandalone = window.navigator.standalone;
+  logToPage('Navigator standalone: ' + (isNavigatorStandalone ? '✅' : '❌'));
+  
+  // Check if launched from home screen (iOS)
+  const isHomeScreen = window.navigator.standalone === true;
+  logToPage('iOS Home Screen: ' + (isHomeScreen ? '✅' : '❌'));
+  
+  // Check window characteristics
+  logToPage('Window outerHeight: ' + window.outerHeight);
+  logToPage('Window innerHeight: ' + window.innerHeight);
+  logToPage('Screen height: ' + screen.height);
+  
+  // Overall PWA status
+  const isPWAInstalled = isStandalone || isFullscreen || isNavigatorStandalone;
+  logToPage('PWA Installed: ' + (isPWAInstalled ? '✅' : '❌'));
   
   logToPage('Service Worker: ' + ('serviceWorker' in navigator ? '✅' : '❌'));
   logToPage('HTTPS: ' + (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1' ? '✅' : '❌'));
   logToPage('Manifest: ' + (document.querySelector('link[rel="manifest"]') ? '✅' : '❌'));
-  
-  // Check if already installed
-  if (isStandalone) {
-    logToPage('Already installed: ✅');
-  } else {
-    logToPage('Already installed: ❌');
-  }
   
   // Check if service worker is registered
   if ('serviceWorker' in navigator) {
