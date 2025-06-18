@@ -2,7 +2,7 @@
   "name": "Reactor Dive",
   "short_name": "ReactorDive",
   "description": "Destroy the mutated creatures and reach the reactor before your time runs out.",
-  "start_url": "./",
+  "start_url": "index.html",
   "scope": "./",
   "display": "fullscreen",
   "orientation": "landscape",

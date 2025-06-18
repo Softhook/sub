@@ -93,21 +93,47 @@ function checkPWACriteria() {
   // Check manifest fetch
   fetch('./manifest.json')
     .then(response => {
+      logToPage('Manifest response status: ' + response.status);
+      logToPage('Manifest content-type: ' + response.headers.get('content-type'));
       if (response.ok) {
         logToPage('Manifest fetch: ✅');
         return response.json();
       } else {
         logToPage('Manifest fetch: ❌ (Status: ' + response.status + ')');
+        throw new Error('Manifest fetch failed');
       }
     })
     .then(manifest => {
       if (manifest) {
-        logToPage('Manifest start_url: ' + manifest.start_url);
-        logToPage('Manifest scope: ' + manifest.scope);
+        logToPage('Manifest start_url: ' + (manifest.start_url || 'undefined'));
+        logToPage('Manifest scope: ' + (manifest.scope || 'undefined'));
+        logToPage('Manifest name: ' + (manifest.name || 'undefined'));
+        logToPage('Manifest display: ' + (manifest.display || 'undefined'));
+      } else {
+        logToPage('Manifest is null/undefined');
       }
     })
     .catch(err => {
       logToPage('Manifest error: ' + err.message);
+      // Try alternative manifest fetch
+      logToPage('Trying absolute path...');
+      fetch('/manifest.json')
+        .then(response => {
+          if (response.ok) {
+            logToPage('Absolute manifest fetch: ✅');
+            return response.json();
+          } else {
+            logToPage('Absolute manifest fetch: ❌');
+          }
+        })
+        .then(manifest => {
+          if (manifest) {
+            logToPage('Alt manifest scope: ' + (manifest.scope || 'undefined'));
+          }
+        })
+        .catch(err2 => {
+          logToPage('Alt manifest error: ' + err2.message);
+        });
     });
   
   logToPage('=== Waiting for install prompt... ===');
