@@ -296,7 +296,7 @@ class MobileControls {
         }
         
         this.joystickActive = true;
-        const touchId = touch.identifier !== undefined ? touch.identifier : i;
+        const touchId = touch.id; // Use p5.js touch id
         this.touches.set(touchId, { type: 'joystick', x: touchX, y: touchY });
         this.updateJoystick(touchX, touchY);
       }
@@ -304,7 +304,7 @@ class MobileControls {
       else if (this.isPointInFireButton(touchX, touchY)) {
         console.log('Fire button touch detected! Touch at:', touchX, touchY, 'Fire button at:', MOBILE_CONTROLS_CONFIG.fireButton.x, MOBILE_CONTROLS_CONFIG.fireButton.y);
         this.fireButtonPressed = true;
-        const touchId = touch.identifier !== undefined ? touch.identifier : i;
+        const touchId = touch.id; // Use p5.js touch id
         this.touches.set(touchId, { type: 'fire', x: touchX, y: touchY });
         this.handleFire();
       }
@@ -312,7 +312,7 @@ class MobileControls {
       else if (MOBILE_CONTROLS_CONFIG.sonarButton.enabled && this.isPointInSonarButton(touchX, touchY)) {
         console.log('Sonar button touch detected!');
         this.sonarButtonPressed = true;
-        const touchId = touch.identifier !== undefined ? touch.identifier : i;
+        const touchId = touch.id; // Use p5.js touch id
         this.touches.set(touchId, { type: 'sonar', x: touchX, y: touchY });
         this.handleSonar();
       } else {
@@ -334,7 +334,7 @@ class MobileControls {
     
     for (let i = 0; i < touches.length; i++) {
       const touch = touches[i];
-      const touchId = touch.identifier !== undefined ? touch.identifier : i;
+      const touchId = touch.id; // Use p5.js touch id
       const storedTouch = this.touches.get(touchId);
       
       if (storedTouch && storedTouch.type === 'joystick') {
@@ -356,29 +356,42 @@ class MobileControls {
     }
   }
 
-  handleTouchEnd(touches) {
+  handleTouchEnd(p5Touches) {
     if (!this.enabled) return;
-    
-    for (let i = 0; i < touches.length; i++) {
-      const touch = touches[i];
-      const touchId = touch.identifier !== undefined ? touch.identifier : i;
-      const storedTouch = this.touches.get(touchId);
-      
-      if (storedTouch) {
-        if (storedTouch.type === 'joystick') {
-          this.joystickActive = false;
-          this.joystickOffset = { x: 0, y: 0 };
-          this.movementVector = { x: 0, y: 0 };
-          // Reset rotation state when joystick is released
-          this.angleStabilityFrames = 0;
-        } else if (storedTouch.type === 'fire') {
-          this.fireButtonPressed = false;
-        } else if (storedTouch.type === 'sonar') {
-          this.sonarButtonPressed = false;
+
+    const remainingTouchIds = new Set();
+    // The p5Touches argument is an array of the touches that are STILL on the screen
+    for (const touch of p5Touches) {
+        remainingTouchIds.add(touch.id);
+    }
+
+    // Find which of our tracked touches are no longer on the screen
+    const liftedTouchIds = [];
+    for (const trackedId of this.touches.keys()) {
+        if (!remainingTouchIds.has(trackedId)) {
+            liftedTouchIds.push(trackedId);
         }
-        
-        this.touches.delete(touchId);
-      }
+    }
+
+    // Process the lifted touches
+    for (const liftedId of liftedTouchIds) {
+        const storedTouch = this.touches.get(liftedId);
+        if (storedTouch) {
+            if (storedTouch.type === 'joystick') {
+                this.joystickActive = false;
+                this.joystickOffset = { x: 0, y: 0 };
+                this.movementVector = { x: 0, y: 0 };
+                // Reset rotation state when joystick is released
+                this.angleStabilityFrames = 0;
+            } else if (storedTouch.type === 'fire') {
+                this.fireButtonPressed = false;
+            } else if (storedTouch.type === 'sonar') {
+                this.sonarButtonPressed = false;
+            }
+            
+            // Stop tracking this touch
+            this.touches.delete(liftedId);
+        }
     }
   }
   
