@@ -413,6 +413,7 @@ let cameraOffsetX, cameraOffsetY;
 let gameState = 'start';
 let currentLevel = 1;
 let enemiesKilledThisLevel = 0; // New variable to track enemies killed this level
+let caveGenerationProgress = 0; // Progress of cave generation (0-1)
 let startScreenPropellerAngle = 0; // Animation variable for start screen submarine propeller
 let totalScore = 0; // Total accumulated score across all completed levels
 let levelScore = 0; // Score for the current level
@@ -888,6 +889,9 @@ class CurrentArea {
 // --- Cave Class ---
 class Cave {
   constructor(worldWidth, worldHeight, cellSize) { // Accept cellSize as a parameter
+    // Reset progress at start of cave creation
+    caveGenerationProgress = 0;
+    
     // Validate constructor parameters
     if (isNaN(worldWidth) || worldWidth <= 0) worldWidth = 4000;
     if (isNaN(worldHeight) || worldHeight <= 0) worldHeight = 2000;
@@ -914,6 +918,9 @@ class Cave {
     this.goalPos.y = this.exitPathY * this.cellSize; // Use this.cellSize
   }
   generateCave() {
+    // Reset progress at start
+    caveGenerationProgress = 0;
+    
     for (let i = 0; i < this.gridWidth; i++) {
       this.grid[i] = [];
       for (let j = 0; j < this.gridHeight; j++) this.grid[i][j] = false; // Initialize as open space
@@ -925,6 +932,8 @@ class Cave {
     let mainPath = [];
     
     noiseSeed(millis() + currentLevel * 1000); // Seed for consistent cave per level, varied by run
+    
+    // Phase 1: Generate main path (30% of progress)
     for (let i = 0; i < this.gridWidth; i++) {
       pathY += (noise(i * CAVE_PATH_Y_NOISE_FACTOR_1, CAVE_PATH_Y_NOISE_OFFSET_1 + currentLevel) - 0.5) * CAVE_PATH_Y_NOISE_MULT_1;
       pathY = constrain(pathY, pathMaxRadius + 1, this.gridHeight - pathMaxRadius - 1); // Keep path within bounds
@@ -937,9 +946,15 @@ class Cave {
         if (abs(j - pathY) > currentPathRadius) this.grid[i][j] = true; // Mark as wall
       }
       if (i === this.gridWidth - 1) { this.exitPathY = pathY; this.exitPathRadius = currentPathRadius; } // Store exit path details
+      
+      // Update progress for main path generation
+      caveGenerationProgress = (i / this.gridWidth) * 0.3;
     }
     
-    // Add some random obstacles and clearings, but ensure main path remains clear
+    // Phase 2: Add obstacles and clearings (40% of progress)
+    let totalObstacleCells = (this.gridWidth - 2) * (this.gridHeight - 2);
+    let processedObstacleCells = 0;
+    
     for (let i = 1; i < this.gridWidth - 1; i++) {
       for (let j = 1; j < this.gridHeight - 1; j++) {
         if (!this.grid[i][j]) { // If it's currently open path
@@ -957,16 +972,25 @@ class Cave {
             this.grid[i][j] = false; // Carve a clearing
           }
         }
+        
+        processedObstacleCells++;
+        // Update progress for obstacles/clearings phase - update every 1000 cells for performance
+        if (processedObstacleCells % 1000 === 0 || processedObstacleCells === totalObstacleCells) {
+          caveGenerationProgress = 0.3 + (processedObstacleCells / totalObstacleCells) * 0.4;
+        }
       }
     }
     
-    // Ensure the main path has guaranteed clearance for submarine passage
+    // Phase 3: Ensure main path clearance (20% of progress)
+    caveGenerationProgress = 0.7;
     this.ensureMainPathClearance(mainPath);
     
-    // Find and connect all significant open spaces
+    // Phase 4: Connect significant spaces (10% of progress)
+    caveGenerationProgress = 0.8;
     this.connectAllSignificantSpaces();
     
-    // Ensure borders are walls
+    // Phase 5: Final border setup and goal area (10% of progress)
+    caveGenerationProgress = 0.9;
     for (let i = 0; i < this.gridWidth; i++) { this.grid[i][0] = true; this.grid[i][this.gridHeight - 1] = true; }
     for (let j = 0; j < this.gridHeight; j++) this.grid[0][j] = true;
     for (let j = 0; j < this.gridHeight; j++) {
@@ -1023,6 +1047,9 @@ class Cave {
         }
       }
     }
+    
+    // Cave generation complete (100% progress)
+    caveGenerationProgress = 1.0;
   }
 
   // Ensure the main path has guaranteed clearance for submarine passage
@@ -2402,15 +2429,29 @@ function drawLoadingScreen() {
   textSize(48);
   text("LOADING", width / 2, height / 2);
   
-  // Add spinning indicator
+  // Add progress-based spinning indicator
   push();
   translate(width / 2, height / 2 + 60);
-  rotate(millis() * 0.01); // Rotate based on time
+  
+  // Calculate spinner angle based on progress (0 to 2*PI for full circle)
+  let progressAngle = caveGenerationProgress * TWO_PI;
+  
   stroke(60, 100, 100); // Yellow color in HSB
   strokeWeight(4);
   noFill();
-  // Draw partial circle (spinner)
-  arc(0, 0, 40, 40, 0, PI * 1.5);
+  
+  // Draw background circle (faint)
+  stroke(60, 30, 50); // Dimmer yellow for background
+  strokeWeight(2);
+  circle(0, 0, 40);
+  
+  // Draw progress arc
+  stroke(60, 100, 100); // Bright yellow for progress
+  strokeWeight(4);
+  if (progressAngle > 0) {
+    arc(0, 0, 40, 40, -PI/2, -PI/2 + progressAngle); // Start from top (-PI/2) and progress clockwise
+  }
+  
   pop();
   
   // Optional: Add level information
@@ -2420,6 +2461,10 @@ function drawLoadingScreen() {
     textAlign(CENTER, CENTER);
     textSize(24);
     text(`Generating Level ${currentLevel}`, width / 2, height / 2 + 120);
+    
+    // Show progress percentage
+    textSize(16);
+    text(`${Math.round(caveGenerationProgress * 100)}%`, width / 2, height / 2 + 150);
   }
 }
 
