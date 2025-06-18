@@ -69,12 +69,20 @@ window.addEventListener('appinstalled', (evt) => {
 function checkPWACriteria() {
   logToPage('=== PWA Criteria Check ===');
   logToPage('URL: ' + window.location.href);
+  logToPage('Origin: ' + window.location.origin);
+  logToPage('Pathname: ' + window.location.pathname);
+  logToPage('Base URI: ' + document.baseURI);
+  
+  // Check if running in standalone mode (PWA)
+  const isStandalone = window.matchMedia && window.matchMedia('(display-mode: standalone)').matches;
+  logToPage('Standalone mode: ' + (isStandalone ? '✅' : '❌'));
+  
   logToPage('Service Worker: ' + ('serviceWorker' in navigator ? '✅' : '❌'));
   logToPage('HTTPS: ' + (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1' ? '✅' : '❌'));
   logToPage('Manifest: ' + (document.querySelector('link[rel="manifest"]') ? '✅' : '❌'));
   
   // Check if already installed
-  if (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) {
+  if (isStandalone) {
     logToPage('Already installed: ✅');
   } else {
     logToPage('Already installed: ❌');

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'reactor-dive-cache-v3';
+const CACHE_NAME = 'reactor-dive-cache-v4';
 // Add all the files you want to cache
 const urlsToCache = [
   './',
@@ -30,13 +30,23 @@ self.addEventListener('install', event => {
 
 // Cache and return requests
 self.addEventListener('fetch', event => {
+  console.log('SW: Fetch event for ', event.request.url);
   event.respondWith(
     caches.match(event.request)
       .then(response => {
         // Cache hit - return response
         if (response) {
+          console.log('SW: Cache hit for ', event.request.url);
           return response;
         }
+        
+        // For navigation requests to root, try to serve index.html
+        if (event.request.mode === 'navigate' && event.request.url.endsWith('/')) {
+          console.log('SW: Navigation to root, trying index.html');
+          return caches.match('./index.html') || caches.match('index.html');
+        }
+        
+        console.log('SW: Fetching from network ', event.request.url);
         return fetch(event.request);
       }
     )
