@@ -34,7 +34,12 @@
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('sw.js').then(registration => {
+          // Check if we're on GitHub Pages (softhook.github.io)
+          const isGitHubPages = location.hostname === 'softhook.github.io';
+          const swPath = 'sw.js';
+          const swOptions = isGitHubPages ? { scope: '/sub/' } : { scope: './' };
+          
+          navigator.serviceWorker.register(swPath, swOptions).then(registration => {
             console.log('ServiceWorker registration successful with scope: ', registration.scope);
           }, err => {
             console.log('ServiceWorker registration failed: ', err);

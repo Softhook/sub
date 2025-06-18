@@ -73,6 +73,11 @@ function checkPWACriteria() {
   logToPage('Pathname: ' + window.location.pathname);
   logToPage('Base URI: ' + document.baseURI);
   
+  // Detect environment
+  const isGitHubPages = location.hostname === 'softhook.github.io';
+  logToPage('GitHub Pages: ' + (isGitHubPages ? '✅' : '❌'));
+  logToPage('Base Path: ' + (isGitHubPages ? '/sub/' : './'));
+  
   // Check if running in standalone mode (PWA)
   const isStandalone = window.matchMedia && window.matchMedia('(display-mode: standalone)').matches;
   const isFullscreen = window.matchMedia && window.matchMedia('(display-mode: fullscreen)').matches;

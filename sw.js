@@ -1,19 +1,27 @@
-const CACHE_NAME = 'reactor-dive-cache-v5';
+const CACHE_NAME = 'reactor-dive-cache-v6';
+// Function to determine if we're on GitHub Pages
+function getBaseUrl() {
+  // Check if we're on GitHub Pages (softhook.github.io)
+  const isGitHubPages = self.location.hostname === 'softhook.github.io';
+  return isGitHubPages ? '/sub/' : './';
+}
+
 // Add all the files you want to cache
+const baseUrl = getBaseUrl();
 const urlsToCache = [
-  './',
-  'index.html',
-  'style.css',
-  'sketch.js',
-  'mobileControls.js',
-  'pwa-test.js',
-  'manifest.json',
-  'icon-192x192.png',
-  'icon-512x512.png',
-  'Berpatroli.otf',
-  'spinner.svg',
-  'p5.js',
-  'p5.sound.min.js'
+  baseUrl,
+  `${baseUrl}index.html`,
+  `${baseUrl}style.css`,
+  `${baseUrl}sketch.js`,
+  `${baseUrl}mobileControls.js`,
+  `${baseUrl}pwa-test.js`,
+  `${baseUrl}manifest.json`,
+  `${baseUrl}icon-192x192.png`,
+  `${baseUrl}icon-512x512.png`,
+  `${baseUrl}Berpatroli.otf`,
+  `${baseUrl}spinner.svg`,
+  `${baseUrl}p5.js`,
+  `${baseUrl}p5.sound.min.js`
 ];
 
 // Install a service worker
@@ -31,6 +39,11 @@ self.addEventListener('install', event => {
 // Cache and return requests
 self.addEventListener('fetch', event => {
   console.log('SW: Fetch event for ', event.request.url);
+  
+  // Helper function to handle GitHub Pages subdirectory
+  const isGitHubPages = location.hostname === 'softhook.github.io';
+  const basePath = isGitHubPages ? '/sub/' : '/';
+  
   event.respondWith(
     caches.match(event.request)
       .then(response => {
@@ -40,10 +53,33 @@ self.addEventListener('fetch', event => {
           return response;
         }
         
-        // For navigation requests to root, try to serve index.html
-        if (event.request.mode === 'navigate' && event.request.url.endsWith('/')) {
-          console.log('SW: Navigation to root, trying index.html');
-          return caches.match('./index.html') || caches.match('index.html');
+        // For navigation requests to root or subdirectory root, try to serve index.html
+        if (event.request.mode === 'navigate') {
+          const url = new URL(event.request.url);
+          console.log('SW: Navigation request for path:', url.pathname);
+          
+          if (url.pathname === '/' || 
+              url.pathname === '/sub/' || 
+              url.pathname === basePath || 
+              url.pathname.endsWith('/')) {
+            console.log('SW: Navigation to root, trying index.html');
+            
+            // Try multiple possible paths for index.html
+            return caches.match('index.html')
+              .then(response => {
+                if (response) return response;
+                return caches.match('./index.html');
+              })
+              .then(response => {
+                if (response) return response;
+                return caches.match(`${basePath}index.html`);
+              })
+              .then(response => {
+                if (response) return response;
+                console.log('SW: Fetching index.html from network');
+                return fetch('index.html');
+              });
+          }
         }
         
         console.log('SW: Fetching from network ', event.request.url);
