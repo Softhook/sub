@@ -22,14 +22,6 @@ const MOBILE_CONTROLS_CONFIG = {
     radius: 60,       // Button radius
     cooldownDisplay: true, // Show cooldown indicator
   },
-  
-  // Sonar button (optional - sonar is automatic but manual trigger can be useful)
-  sonarButton: {
-    x: null,          // Will be set to screen width - 120
-    y: null,          // Will be set to screen height - 250
-    radius: 45,       // Smaller than fire button
-    enabled: false,   // Disabled by default since sonar is automatic
-  },
 
   // Visual styling
   style: {
@@ -43,7 +35,6 @@ const MOBILE_CONTROLS_CONFIG = {
     joystickColor: { h: 180, s: 50, b: 70 },
     joystickKnobColor: { h: 180, s: 70, b: 90 },
     fireButtonColor: { h: 50, s: 90, b: 90 }, // Yellow for fire button
-    sonarButtonColor: { h: 120, s: 70, b: 80 },
     pressedColor: { h: 60, s: 90, b: 95 },
   },
 
@@ -64,8 +55,7 @@ class MobileControls {
     this.touches = new Map(); // Track multiple touches
     this.joystickActive = false;
     this.joystickOffset = { x: 0, y: 0 };
-    this.fireButtonPressed = false;
-    this.sonarButtonPressed = false;
+    this.fireButtonPressed = false; // Initialize property
     this.lastFireTime = 0;
     this.lastSonarTime = 0;
     
@@ -165,10 +155,6 @@ class MobileControls {
     MOBILE_CONTROLS_CONFIG.fireButton.x = canvasWidth - 120;
     MOBILE_CONTROLS_CONFIG.fireButton.y = canvasHeight - 150;
     
-    // Update sonar button position (above fire button)
-    MOBILE_CONTROLS_CONFIG.sonarButton.x = canvasWidth - 120;
-    MOBILE_CONTROLS_CONFIG.sonarButton.y = canvasHeight - 250;
-    
     console.log('Control positions updated:', {
       joystick: { x: MOBILE_CONTROLS_CONFIG.joystick.x, y: MOBILE_CONTROLS_CONFIG.joystick.y },
       fireButton: { x: MOBILE_CONTROLS_CONFIG.fireButton.x, y: MOBILE_CONTROLS_CONFIG.fireButton.y }
@@ -184,7 +170,7 @@ class MobileControls {
     // Only prevent default when absolutely necessary
     document.addEventListener('touchmove', (e) => {
       // Only prevent scrolling if we're actively using controls
-      if (this.joystickActive || this.fireButtonPressed || this.sonarButtonPressed) {
+      if (this.joystickActive || this.fireButtonPressed) {
         e.preventDefault();
       }
     }, { passive: false });
@@ -209,8 +195,7 @@ class MobileControls {
     
     // Check if touch is on any control element
     return this.isPointInJoystick(touchX, touchY) ||
-           this.isPointInFireButton(touchX, touchY) ||
-           (MOBILE_CONTROLS_CONFIG.sonarButton.enabled && this.isPointInSonarButton(touchX, touchY));
+           this.isPointInFireButton(touchX, touchY);
   }
 
   handleTouchStart(touches) {
@@ -307,14 +292,6 @@ class MobileControls {
         const touchId = touch.id; // Use p5.js touch id
         this.touches.set(touchId, { type: 'fire', x: touchX, y: touchY });
         this.handleFire();
-      }
-      // Check sonar button
-      else if (MOBILE_CONTROLS_CONFIG.sonarButton.enabled && this.isPointInSonarButton(touchX, touchY)) {
-        console.log('Sonar button touch detected!');
-        this.sonarButtonPressed = true;
-        const touchId = touch.id; // Use p5.js touch id
-        this.touches.set(touchId, { type: 'sonar', x: touchX, y: touchY });
-        this.handleSonar();
       } else {
         console.log('Touch not on any control - touch at:', touchX, touchY);
         console.log('Joystick bounds check:', 
@@ -324,7 +301,7 @@ class MobileControls {
         console.log('Fire button bounds check:', 
           'Distance to fire button center:', 
           Math.sqrt(Math.pow(touchX - MOBILE_CONTROLS_CONFIG.fireButton.x, 2) + Math.pow(touchY - MOBILE_CONTROLS_CONFIG.fireButton.y, 2)),
-          'vs fire button radius:', MOBILE_CONTROLS_CONFIG.fireButton.radius);
+          'vs fire button radius:', MOBILE_CONTROLS_CONFIG.fireButton.radius)
       }
     }
   }
@@ -385,8 +362,6 @@ class MobileControls {
                 this.angleStabilityFrames = 0;
             } else if (storedTouch.type === 'fire') {
                 this.fireButtonPressed = false;
-            } else if (storedTouch.type === 'sonar') {
-                this.sonarButtonPressed = false;
             }
             
             // Stop tracking this touch
@@ -455,12 +430,6 @@ class MobileControls {
   
   isPointInFireButton(x, y) {
     const button = MOBILE_CONTROLS_CONFIG.fireButton;
-    const distance = Math.sqrt(Math.pow(x - button.x, 2) + Math.pow(y - button.y, 2));
-    return distance <= button.radius;
-  }
-  
-  isPointInSonarButton(x, y) {
-    const button = MOBILE_CONTROLS_CONFIG.sonarButton;
     const distance = Math.sqrt(Math.pow(x - button.x, 2) + Math.pow(y - button.y, 2));
     return distance <= button.radius;
   }
@@ -575,37 +544,6 @@ class MobileControls {
     // Draw fire button
     this.renderFireButton();
     
-    // Draw sonar button if enabled
-    if (MOBILE_CONTROLS_CONFIG.sonarButton.enabled) {
-      this.renderSonarButton();
-    }
-    
-    // Add debug info at top of screen
-    if (typeof fill === 'function' && typeof text === 'function') {
-      fill(255, 255, 255, 150);
-      textAlign(LEFT, TOP);
-      textSize(12);
-      
-      const angleInfo = (typeof player !== 'undefined' && player) ? 
-        ` | Angle: ${(player.angle * 180 / Math.PI).toFixed(0)}°` : '';
-      const targetInfo = this.joystickActive ? 
-        ` | Target: ${(this.targetAngle * 180 / Math.PI).toFixed(0)}°` : '';
-      const stabilityInfo = this.joystickActive ? 
-        ` | Stability: ${this.angleStabilityFrames}/${this.requiredStabilityFrames}` : '';
-      const moveInfo = this.joystickActive ? 
-        ` | Move: ${this.movementVector.x.toFixed(2)},${this.movementVector.y.toFixed(2)}` : '';
-      
-      // Add fire cooldown info using actual player shot timing
-      const canFire = typeof player !== 'undefined' && player && 
-                     frameCount - player.lastShotTime >= player.shotCooldown;
-      const frameRemaining = typeof player !== 'undefined' && player ? 
-                           Math.max(0, player.shotCooldown - (frameCount - player.lastShotTime)) : 0;
-      const cooldownInfo = !canFire ? 
-                         ` | Cooldown: ${frameRemaining} frames` : 
-                         ' | Ready to Fire!';
-      
-      text(`Mobile: ${this.enabled ? 'ON' : 'OFF'} | Touch: ${this.joystickActive ? 'JOY' : ''}${this.fireButtonPressed ? 'FIRE' : ''}${angleInfo}${targetInfo}${stabilityInfo}${moveInfo}${cooldownInfo}`, 10, 10);
-    }
   }
   
   renderJoystick() {
@@ -684,40 +622,6 @@ class MobileControls {
     textAlign(CENTER, CENTER);
     textSize(style.textSize * 0.9);
     text("FIRE", button.x, button.y + button.radius + 25);
-    
-    pop();
-  }
-
-  renderSonarButton() {
-    if (!MOBILE_CONTROLS_CONFIG.sonarButton.enabled) return;
-    
-    const button = MOBILE_CONTROLS_CONFIG.sonarButton;
-    const style = MOBILE_CONTROLS_CONFIG.style;
-    const isPressed = this.sonarButtonPressed;
-    
-    push();
-    
-    const alpha = isPressed ? style.pressedAlpha : style.innerAlpha;
-    const color = isPressed ? style.pressedColor : style.sonarButtonColor;
-    
-    strokeWeight(style.strokeWeight);
-    stroke(color.h, color.s, color.b, alpha);
-    fill(color.h, color.s, color.b, alpha * 0.7);
-    ellipse(button.x, button.y, button.radius * 2);
-    
-    // Sonar icon (concentric circles)
-    noFill();
-    stroke(color.h, color.s, color.b + 20, alpha);
-    strokeWeight(style.strokeWeight - 1);
-    ellipse(button.x, button.y, button.radius * 0.6);
-    ellipse(button.x, button.y, button.radius * 0.9);
-    
-    // Label
-    fill(color.h, color.s, color.b + 30, alpha + 20);
-    noStroke();
-    textAlign(CENTER, CENTER);
-    textSize(style.textSize * 0.8);
-    text("SONAR", button.x, button.y + button.radius + 20);
     
     pop();
   }
