@@ -1975,12 +1975,6 @@ function setup() {
   
   // Initialize mobile controls
   initMobileControls();
-  
-  // Hide the initial loading screen now that p5.js is ready
-  const initialLoader = document.getElementById('initial-loader');
-  if (initialLoader) {
-    initialLoader.classList.add('hidden');
-  }
 
   // Attempt fullscreen and audio initialization on first user interaction
   function handleInitialInteraction() {
@@ -2408,20 +2402,23 @@ function drawLoadingScreen() {
   textSize(48);
   text("LOADING", width / 2, height / 2);
   
-  // Add animated dots
-  let dots = "";
-  let dotCount = Math.floor((frameCount / 30) % 4); // Change every 0.5 seconds at 60fps
-  for (let i = 0; i < dotCount; i++) {
-    dots += ".";
-  }
-  
-  textSize(32);
-  text(dots, width / 2, height / 2 + 60);
+  // Add spinning indicator
+  push();
+  translate(width / 2, height / 2 + 60);
+  rotate(millis() * 0.01); // Rotate based on time
+  stroke(60, 100, 100); // Yellow color in HSB
+  strokeWeight(4);
+  noFill();
+  // Draw partial circle (spinner)
+  arc(0, 0, 40, 40, 0, PI * 1.5);
+  pop();
   
   // Optional: Add level information
   if (typeof currentLevel !== 'undefined') {
-    textSize(24);
     fill(0, 0, 80, 180); // Semi-transparent white (HSB)
+    noStroke(); // Ensure no stroke for text
+    textAlign(CENTER, CENTER);
+    textSize(24);
     text(`Generating Level ${currentLevel}`, width / 2, height / 2 + 120);
   }
 }
