@@ -388,18 +388,6 @@ let reactorHumAmplitude = 0;
 // Creature Growl Audio
 let creatureGrowlOsc, creatureGrowlEnv;
 
-// --- Creature Explosion Sound Constants (less boomy than wall explosions) ---
-const CREATURE_EXPLOSION_NOISE_ENV_ADSR = { aT: 0.001, dT: 0.3, sR: 0, rT: 0.1 };
-const CREATURE_EXPLOSION_NOISE_ENV_LEVELS = { aL: 0.6, rL: 0 };
-const CREATURE_EXPLOSION_BOOM_ENV_ADSR = { aT: 0.001, dT: 0.8, sR: 0, rT: 0.1 };
-const CREATURE_EXPLOSION_BOOM_ENV_LEVELS = { aL: 0.5, rL: 0 };
-const CREATURE_EXPLOSION_BOOM_MIN_FREQ = 100;
-const CREATURE_EXPLOSION_BOOM_MAX_FREQ = 120;
-const CREATURE_EXPLOSION_BASS_ENV_ADSR = { aT: 0.002, dT: 0.6, sR: 0, rT: 0.4 };
-const CREATURE_EXPLOSION_BASS_ENV_LEVELS = { aL: 0.7, rL: 0 };
-const CREATURE_EXPLOSION_BASS_MIN_FREQ = 25;
-const CREATURE_EXPLOSION_BASS_MAX_FREQ = 45;
-
 // Game Variables
 let player;
 let cave;
@@ -889,7 +877,7 @@ class CurrentArea {
 
 // --- Cave Class ---
 class Cave {
-  constructor(worldWidth, worldHeight, cellSize, autoGenerate = true) { // Accept cellSize as a parameter
+  constructor(worldWidth, worldHeight, cellSize) { // Accept cellSize as a parameter
     // Reset progress at start of cave creation
     caveGenerationProgress = 0;
     
@@ -907,475 +895,417 @@ class Cave {
     
     // Initialize exitX before cave generation (needed for validation)
     this.exitX = worldWidth - this.cellSize * CAVE_EXIT_X_OFFSET_CELLS; // Use this.cellSize
-    
-    if (autoGenerate) {
-      this.generateCave();
-      this.goalPos.x = this.exitX + this.goalSize / 2;
-      
-      // Ensure exitPathY is valid before setting goal position
-      if (isNaN(this.exitPathY) || this.exitPathY === undefined || this.exitPathY === null) {
-        this.exitPathY = this.gridHeight / 2;
-        console.warn("exitPathY was invalid after cave generation, using grid center");
-      }
-      this.goalPos.y = this.exitPathY * this.cellSize; // Use this.cellSize
-    }
-  }
-  generateCave() {
-    // Reset progress at start
-    caveGenerationProgress = 0;
-    
-    for (let i = 0; i < this.gridWidth; i++) {
-      this.grid[i] = [];
-      for (let j = 0; j < this.gridHeight; j++) this.grid[i][j] = false; // Initialize as open space
-    }
-    let pathY = this.gridHeight / 2; let currentPathRadius = 0;
-    let pathMinRadius = CAVE_PATH_MIN_RADIUS_CELLS; let pathMaxRadius = CAVE_PATH_MAX_RADIUS_CELLS;
-    
-    // Store the main path for later validation
-    let mainPath = [];
-    
-    noiseSeed(millis() + currentLevel * 1000); // Seed for consistent cave per level, varied by run
-    
-    // Phase 1: Generate main path (30% of progress)
-    for (let i = 0; i < this.gridWidth; i++) {
-      pathY += (noise(i * CAVE_PATH_Y_NOISE_FACTOR_1, CAVE_PATH_Y_NOISE_OFFSET_1 + currentLevel) - 0.5) * CAVE_PATH_Y_NOISE_MULT_1;
-      pathY = constrain(pathY, pathMaxRadius + 1, this.gridHeight - pathMaxRadius - 1); // Keep path within bounds
-      currentPathRadius = map(noise(i * CAVE_PATH_RADIUS_NOISE_FACTOR, CAVE_PATH_RADIUS_NOISE_OFFSET + currentLevel), 0, 1, pathMinRadius, pathMaxRadius);
-      
-      // Store main path data for validation
-      mainPath.push({x: i, y: pathY, radius: currentPathRadius});
-      
-      for (let j = 0; j < this.gridHeight; j++) {
-        if (abs(j - pathY) > currentPathRadius) this.grid[i][j] = true; // Mark as wall
-      }
-      if (i === this.gridWidth - 1) { this.exitPathY = pathY; this.exitPathRadius = currentPathRadius; } // Store exit path details
-    }
-    caveGenerationProgress = 0.3; // Main path complete
-    
-    // Phase 2: Add obstacles and clearings (40% of progress)
-    for (let i = 1; i < this.gridWidth - 1; i++) {
-      for (let j = 1; j < this.gridHeight - 1; j++) {
-        if (!this.grid[i][j]) { // If it's currently open path
-          // Only add obstacles if they don't block the guaranteed main path
-          let pathPoint = mainPath[i];
-          let minClearanceFromPath = (PLAYER_RADIUS / this.cellSize) + 1; // Ensure submarine can pass
-          
-          if (noise(i * CAVE_OBSTACLE_NOISE_FACTOR_1, j * CAVE_OBSTACLE_NOISE_FACTOR_1, CAVE_OBSTACLE_NOISE_OFFSET_1 + currentLevel) > CAVE_OBSTACLE_THRESHOLD_1 && 
-              abs(j - pathPoint.y) > pathPoint.radius + CAVE_OBSTACLE_DIST_BUFFER_1 &&
-              abs(j - pathPoint.y) > minClearanceFromPath) {
-            this.grid[i][j] = true; // Add an obstacle
-          }
-        } else { // If it's currently a wall
-          if (noise(i * CAVE_CLEARING_NOISE_FACTOR, j * CAVE_CLEARING_NOISE_FACTOR, CAVE_CLEARING_NOISE_OFFSET + currentLevel) < CAVE_CLEARING_THRESHOLD) {
-            this.grid[i][j] = false; // Carve a clearing
-          }
-        }
-      }
-    }
-    caveGenerationProgress = 0.7; // Obstacles complete
-    
-    // Phase 3: Ensure main path clearance (20% of progress)
-    caveGenerationProgress = 0.7;
-    this.ensureMainPathClearance(mainPath);
-    
-    // Phase 4: Connect significant spaces (10% of progress)
-    caveGenerationProgress = 0.8;
-    this.connectAllSignificantSpaces();
-    
-    // Phase 5: Final border setup and goal area (10% of progress)
-    caveGenerationProgress = 0.9;
-    for (let i = 0; i < this.gridWidth; i++) { this.grid[i][0] = true; this.grid[i][this.gridHeight - 1] = true; }
-    for (let j = 0; j < this.gridHeight; j++) this.grid[0][j] = true;
-    for (let j = 0; j < this.gridHeight; j++) {
-      // Ensure exitPathY is valid before using it
-      if (isNaN(this.exitPathY) || this.exitPathY === undefined || this.exitPathY === null) {
-        this.exitPathY = this.gridHeight / 2;
-        this.exitPathRadius = Math.max(CAVE_PATH_MIN_RADIUS_CELLS, 3);
-        console.warn("exitPathY was invalid during border generation, using defaults");
-      }
-      if (abs(j - this.exitPathY) > this.exitPathRadius) this.grid[this.gridWidth - 1][j] = true;
-      else this.grid[this.gridWidth - 1][j] = false;
-    }
-    
-    // Validate path connectivity and regenerate if needed (max 3 attempts)
-    let attempts = 0;
-    while (!this.validatePathConnectivity() && attempts < 3) {
-      console.log("Path validation failed, regenerating cave...");
-      attempts++;
-      // Clear and regenerate with slightly different parameters
-      this.ensureMainPathClearance(mainPath);
-      // Reduce obstacle threshold to make more open space
-      for (let i = 1; i < this.gridWidth - 1; i++) {
-        for (let j = 1; j < this.gridHeight - 1; j++) {
-          if (this.grid[i][j] && !this.grid[0][j] && !this.grid[this.gridWidth-1][j] && j !== 0 && j !== this.gridHeight-1) {
-            // Clear some walls to improve connectivity
-            if (noise(i * 0.2, j * 0.2, attempts * 100) > 0.6) {
-              this.grid[i][j] = false;
-            }
-          }
-        }
-      }
-      this.ensureMainPathClearance(mainPath);
-    }
-    // Ensure the goal area itself is not a wall in the grid, if it falls within the last column
-    // This is more for logical consistency as direct drawing handles its appearance.
-    let goalGridMinX = floor((this.goalPos.x - this.goalSize / 2) / this.cellSize);
-    let goalGridMaxX = floor((this.goalPos.x + this.goalSize / 2) / this.cellSize);
-    let goalGridMinY = floor((this.goalPos.y - this.goalSize / 2) / this.cellSize);
-    let goalGridMaxY = floor((this.goalPos.y + this.goalSize / 2) / this.cellSize);
-
-    for (let i = goalGridMinX; i <= goalGridMaxX; i++) {
-      for (let j = goalGridMinY; j <= goalGridMaxY; j++) {
-        if (i >= 0 && i < this.gridWidth && j >= 0 && j < this.gridHeight) {
-          // Check if this part of the goal is within the last column where exit path is defined
-          if (i === this.gridWidth - 1) {
-             // Only clear if it's part of the intended open exit path area
-             if (abs(j - this.exitPathY) <= this.exitPathRadius) {
-                this.grid[i][j] = false; 
-             }
-          } else if (i > this.gridWidth - CAVE_EXIT_X_OFFSET_CELLS) {
-            // For parts of the goal square that might extend beyond the last column but are in the exit zone
-            this.grid[i][j] = false;
-          }
-        }
-      }
-    }
-    
-    // Cave generation complete (100% progress)
-    caveGenerationProgress = 1.0;
   }
 
-  // --- Chunked Cave Generation for Visual Progress ---
-  startChunkedCaveGeneration() {
-    // Initialize game objects but don't generate cave yet
-    currentCellSize = BASE_CELL_SIZE + (currentLevel - 1); // Increase cell size per level
+  generateMainPath() {
+    this.mainPath = [];
+    noiseSeed(random(1000));
+    let y = this.gridHeight / 2;
+    let radius = random(CAVE_PATH_MIN_RADIUS_CELLS, CAVE_PATH_MAX_RADIUS_CELLS);
+
+    for (let x = 0; x < this.gridWidth; x++) {
+      let yNoise = noise(x * CAVE_PATH_Y_NOISE_FACTOR_1, currentLevel + CAVE_PATH_Y_NOISE_OFFSET_1);
+      y += (yNoise - 0.5) * CAVE_PATH_Y_NOISE_MULT_1;
+      y = constrain(y, radius, this.gridHeight - radius);
+
+      let rNoise = noise(x * CAVE_PATH_RADIUS_NOISE_FACTOR, currentLevel + CAVE_PATH_RADIUS_NOISE_OFFSET);
+      radius = map(rNoise, 0, 1, CAVE_PATH_MIN_RADIUS_CELLS, CAVE_PATH_MAX_RADIUS_CELLS);
+
+      this.mainPath.push({ x: x, y: y, radius: radius });
+
+      if (x * this.cellSize >= this.exitX && this.exitPathY === 0) {
+        this.exitPathY = y;
+        this.exitPathRadius = radius;
+      }
+    }
+  }
+
+  generateObstacles() {
+    noiseSeed(random(1000));
+    for (let y = 0; y < this.gridHeight; y++) {
+      this.grid[y] = [];
+      for (let x = 0; x < this.gridWidth; x++) {
+        let isPath = false;
+        for (let seg of this.mainPath) {
+          if (dist(x, y, seg.x, seg.y) < seg.radius) {
+            isPath = true;
+            break;
+          }
+        }
+
+        if (isPath) {
+          this.grid[y][x] = 0;
+        } else {
+          let noiseVal = noise(x * CAVE_OBSTACLE_NOISE_FACTOR_1, y * CAVE_OBSTACLE_NOISE_FACTOR_1, currentLevel + CAVE_OBSTACLE_NOISE_OFFSET_1);
+          let distToPath = 1000;
+          for (let seg of this.mainPath) {
+            distToPath = min(distToPath, dist(x, y, seg.x, seg.y));
+          }
+
+          if (noiseVal > CAVE_OBSTACLE_THRESHOLD_1 && distToPath > CAVE_OBSTACLE_DIST_BUFFER_1) {
+            this.grid[y][x] = 1;
+          } else {
+            this.grid[y][x] = 0;
+          }
+        }
+      }
+    }
+  }
+
+  finalizeCave() {
+    this.goalPos.x = this.exitX + this.goalSize / 2;
+    if (isNaN(this.exitPathY) || this.exitPathY === undefined || this.exitPathY === null || this.exitPathY === 0) {
+      this.exitPathY = this.gridHeight / 2;
+    }
+    this.goalPos.y = this.exitPathY * this.cellSize;
+  }
+}
+
+// --- Chunked Cave Generation for Visual Progress ---
+function startChunkedCaveGeneration() {
+  // Initialize game objects but don't generate cave yet
+  currentCellSize = BASE_CELL_SIZE + (currentLevel - 1); // Increase cell size per level
+  
+  let baseAir = INITIAL_AIR_SUPPLY_BASE;
+  let airForLevel = baseAir;
+  airForLevel = max(airForLevel, MIN_AIR_SUPPLY_PER_LEVEL);
+  let airDepletion = BASE_AIR_DEPLETION_RATE + (currentLevel - 1) * AIR_DEPLETION_LEVEL_INCREASE;
+  
+  // Create cave object but don't generate yet
+  cave = new Cave(WORLD_WIDTH, WORLD_HEIGHT, currentCellSize); // false = don't auto-generate
+  
+  // Reset progress and start chunked generation
+  caveGenerationProgress = 0;
+  
+  // Phase 1: Generate main path (30%)
+  setTimeout(() => {
+    cave.generateMainPath();
+    caveGenerationProgress = 0.3;
     
-    let baseAir = INITIAL_AIR_SUPPLY_BASE;
-    let airForLevel = baseAir;
-    airForLevel = max(airForLevel, MIN_AIR_SUPPLY_PER_LEVEL);
-    let airDepletion = BASE_AIR_DEPLETION_RATE + (currentLevel - 1) * AIR_DEPLETION_LEVEL_INCREASE;
-    
-    // Create cave object but don't generate yet
-    cave = new Cave(WORLD_WIDTH, WORLD_HEIGHT, currentCellSize, false); // false = don't auto-generate
-    
-    // Reset progress and start chunked generation
-    caveGenerationProgress = 0;
-    
-    // Phase 1: Generate main path (30%)
+    // Phase 2: Add obstacles (40% more = 70% total)
     setTimeout(() => {
-      cave.generateMainPath();
-      caveGenerationProgress = 0.3;
+      cave.generateObstacles();
+      caveGenerationProgress = 0.7;
       
-      // Phase 2: Add obstacles (40% more = 70% total)
+      // Phase 3: Ensure path clearance (10% more = 80% total)
       setTimeout(() => {
-        cave.generateObstacles();
-        caveGenerationProgress = 0.7;
+        cave.ensureMainPathClearance(cave.mainPath);
+        caveGenerationProgress = 0.8;
         
-        // Phase 3: Ensure path clearance (10% more = 80% total)
+        // Phase 4: Connect spaces (10% more = 90% total)
         setTimeout(() => {
-          cave.ensureMainPathClearance(cave.mainPath);
-          caveGenerationProgress = 0.8;
+          cave.connectAllSignificantSpaces();
+          caveGenerationProgress = 0.9;
           
-          // Phase 4: Connect spaces (10% more = 90% total)
+          // Phase 5: Final setup (10% more = 100% total)
           setTimeout(() => {
-            cave.connectAllSignificantSpaces();
-            caveGenerationProgress = 0.9;
+            cave.finalizeCave();
+            caveGenerationProgress = 1.0;
             
-            // Phase 5: Final setup (10% more = 100% total)
-            setTimeout(() => {
-              cave.finalizeCave();
-              caveGenerationProgress = 1.0;
-              
-              // Complete game initialization
-              completeGameInitialization(airForLevel, airDepletion);
-            }, 50);
+            // Complete game initialization
+            completeGameInitialization(airForLevel, airDepletion);
           }, 50);
         }, 50);
       }, 50);
     }, 50);
+  }, 50);
+}
+
+function completeGameInitialization(airForLevel, airDepletion) {
+  // Find safe player starting position
+  let playerStartX, playerStartY;
+  let attempts = 0;
+  let playerSpawnRadiusBuffer = currentCellSize * PLAYER_SPAWN_RADIUS_BUFFER_CELL_FACTOR;
+
+  do {
+    playerStartX = currentCellSize * (PLAYER_START_X_BASE_CELLS + attempts * PLAYER_START_X_ATTEMPT_INCREMENT_CELLS);
+    playerStartY = WORLD_HEIGHT / 2 + random(-currentCellSize * PLAYER_START_Y_RANDOM_RANGE_CELLS, currentCellSize * PLAYER_START_Y_RANDOM_RANGE_CELLS);
+    attempts++;
+    if (playerStartX > WORLD_WIDTH * PLAYER_SPAWN_MAX_X_SEARCH_FACTOR) {
+      playerStartX = currentCellSize * PLAYER_START_X_BASE_CELLS; 
+      playerStartY = WORLD_HEIGHT / 2; 
+      break;
+    }
+  } while (cave.isWall(playerStartX, playerStartY, playerSpawnRadiusBuffer) && attempts < MAX_PLAYER_SPAWN_ATTEMPTS);
+  
+  if (attempts >= MAX_PLAYER_SPAWN_ATTEMPTS) {
+    playerStartX = currentCellSize * PLAYER_START_X_BASE_CELLS; 
+    playerStartY = WORLD_HEIGHT / 2;
   }
 
-  completeGameInitialization(airForLevel, airDepletion) {
-    // Find safe player starting position
-    let playerStartX, playerStartY;
-    let attempts = 0;
-    let playerSpawnRadiusBuffer = currentCellSize * PLAYER_SPAWN_RADIUS_BUFFER_CELL_FACTOR;
-
-    do {
-      playerStartX = currentCellSize * (PLAYER_START_X_BASE_CELLS + attempts * PLAYER_START_X_ATTEMPT_INCREMENT_CELLS);
-      playerStartY = WORLD_HEIGHT / 2 + random(-currentCellSize * PLAYER_START_Y_RANDOM_RANGE_CELLS, currentCellSize * PLAYER_START_Y_RANDOM_RANGE_CELLS);
-      attempts++;
-      if (playerStartX > WORLD_WIDTH * PLAYER_SPAWN_MAX_X_SEARCH_FACTOR) {
-        playerStartX = currentCellSize * PLAYER_START_X_BASE_CELLS; 
-        playerStartY = WORLD_HEIGHT / 2; 
+  player = new PlayerSub(playerStartX, playerStartY, airForLevel, airDepletion);
+  
+  // Initialize other game objects
+  enemies = []; projectiles = [];
+  sonarBubbles = []; particles = []; 
+  let enemyCount = BASE_ENEMY_COUNT + (currentLevel - 1) * ENEMY_COUNT_PER_LEVEL_INCREASE;
+  enemyCount = min(enemyCount, MAX_ENEMY_COUNT);
+  enemiesKilledThisLevel = 0;
+  
+  // Spawn enemies
+  for (let i = 0; i < enemyCount; i++) {
+    let spawnAttempts = 0;
+    while (spawnAttempts < MAX_ENEMY_SPAWN_ATTEMPTS) {
+      let x = random(WORLD_WIDTH * ENEMY_SPAWN_MIN_X_WORLD_FACTOR, WORLD_WIDTH * ENEMY_SPAWN_MAX_X_WORLD_FACTOR);
+      let y = random(WORLD_HEIGHT * ENEMY_SPAWN_MIN_Y_WORLD_FACTOR, WORLD_HEIGHT * ENEMY_SPAWN_MAX_Y_WORLD_FACTOR);
+      
+      if (!cave.isWall(x, y, ENEMY_SPAWN_WALL_CHECK_RADIUS)) {
+        let speed = random(ENEMY_MIN_BASE_SPEED, ENEMY_MAX_BASE_SPEED) + (currentLevel - 1) * ENEMY_SPEED_LEVEL_MULTIPLIER;
+        enemies.push(new Enemy(x, y, speed));
         break;
       }
-    } while (cave.isWall(playerStartX, playerStartY, playerSpawnRadiusBuffer) && attempts < MAX_PLAYER_SPAWN_ATTEMPTS);
-    
-    if (attempts >= MAX_PLAYER_SPAWN_ATTEMPTS) {
-      playerStartX = currentCellSize * PLAYER_START_X_BASE_CELLS; 
-      playerStartY = WORLD_HEIGHT / 2;
-    }
-
-    player = new PlayerSub(playerStartX, playerStartY, airForLevel, airDepletion);
-    
-    // Initialize other game objects
-    enemies = []; projectiles = [];
-    sonarBubbles = []; particles = []; 
-    let enemyCount = BASE_ENEMY_COUNT + (currentLevel - 1) * ENEMY_COUNT_PER_LEVEL_INCREASE;
-    enemyCount = min(enemyCount, MAX_ENEMY_COUNT);
-    
-    for (let i = 0; i < enemyCount; i++) {
-      let enemyX, enemyY, eAttempts = 0;
-      do {
-        enemyX = random(WORLD_WIDTH * ENEMY_SPAWN_MIN_X_WORLD_FACTOR, WORLD_WIDTH * ENEMY_SPAWN_MAX_X_WORLD_FACTOR);
-        enemyY = random(WORLD_HEIGHT * ENEMY_SPAWN_MIN_Y_WORLD_FACTOR, WORLD_HEIGHT * ENEMY_SPAWN_MAX_Y_WORLD_FACTOR); 
-        eAttempts++;
-      } while (cave.isWall(enemyX, enemyY, ENEMY_SPAWN_WALL_CHECK_RADIUS) && eAttempts < MAX_ENEMY_SPAWN_ATTEMPTS);
-      if (eAttempts < MAX_ENEMY_SPAWN_ATTEMPTS) enemies.push(new Enemy(enemyX, enemyY));
-    }
-
-    // Initialize jellyfish creatures
-    jellyfish = [];
-    let jellyfishCount = BASE_JELLYFISH_COUNT + (currentLevel - 1) * JELLYFISH_COUNT_PER_LEVEL_INCREASE;
-    jellyfishCount = min(jellyfishCount, MAX_JELLYFISH_COUNT);
-    
-    for (let i = 0; i < jellyfishCount; i++) {
-      let jellyfishX, jellyfishY, jAttempts = 0;
-      do {
-        jellyfishX = random(WORLD_WIDTH * JELLYFISH_SPAWN_MIN_X_WORLD_FACTOR, WORLD_WIDTH * JELLYFISH_SPAWN_MAX_X_WORLD_FACTOR);
-        jellyfishY = random(WORLD_HEIGHT * JELLYFISH_SPAWN_MIN_Y_WORLD_FACTOR, WORLD_HEIGHT * JELLYFISH_SPAWN_MAX_Y_WORLD_FACTOR);
-        jAttempts++;
-      } while (cave.isWall(jellyfishX, jellyfishY, JELLYFISH_SPAWN_WALL_CHECK_RADIUS) && jAttempts < MAX_JELLYFISH_SPAWN_ATTEMPTS);
-      if (jAttempts < MAX_JELLYFISH_SPAWN_ATTEMPTS) jellyfish.push(new Jellyfish(jellyfishX, jellyfishY));
-    }
-
-    // Initialize current areas
-    currentAreas = [];
-    let currentAreaCount = BASE_CURRENT_AREA_COUNT + (currentLevel - 1) * CURRENT_AREA_COUNT_PER_LEVEL_INCREASE;
-    currentAreaCount = min(currentAreaCount, MAX_CURRENT_AREA_COUNT);
-    
-    for (let i = 0; i < currentAreaCount; i++) {
-      let areaX, areaY, aAttempts = 0;
-      do {
-        areaX = random(CURRENT_AREA_SPAWN_MIN_X_WORLD_FACTOR * WORLD_WIDTH, CURRENT_AREA_SPAWN_MAX_X_WORLD_FACTOR * WORLD_WIDTH);
-        areaY = random(CURRENT_AREA_SPAWN_MIN_Y_WORLD_FACTOR * WORLD_HEIGHT, CURRENT_AREA_SPAWN_MAX_Y_WORLD_FACTOR * WORLD_HEIGHT);
-        aAttempts++;
-      } while (cave.isWall(areaX, areaY, CURRENT_AREA_SPAWN_WALL_CHECK_RADIUS) && aAttempts < MAX_CURRENT_AREA_SPAWN_ATTEMPTS);
-      if (aAttempts < MAX_CURRENT_AREA_SPAWN_ATTEMPTS) {
-        currentAreas.push(new CurrentArea(areaX, areaY));
-      }
-    }
-
-    // Finalize player setup
-    if (gameState === 'loading') { // Only if we're still in loading state
-      player.health = PLAYER_INITIAL_HEALTH; 
-      player.airSupply = player.initialAirSupply;
-      player.lastSonarTime = frameCount - player.sonarCooldown;
-      player.lastShotTime = frameCount - player.shotCooldown;
-      gameState = 'playing';
-      
-      // Audio setup
-      if (audioInitialized && reactorHumOsc && reactorHumOsc.started) {
-        reactorHumOsc.amp(0, 0);
-      }
-      if (audioInitialized && lowAirOsc && lowAirOsc.started) lowAirEnv.triggerRelease(lowAirOsc);
-      lastLowAirBeepTime = 0;
-    }
-  }
-
-  // --- Separate Generation Methods for Chunked Progress ---
-  generateMainPath() {
-    // Initialize grid
-    for (let i = 0; i < this.gridWidth; i++) {
-      this.grid[i] = [];
-      for (let j = 0; j < this.gridHeight; j++) this.grid[i][j] = false; // Initialize as open space
-    }
-    
-    let pathY = this.gridHeight / 2; 
-    let currentPathRadius = 0;
-    let pathMinRadius = CAVE_PATH_MIN_RADIUS_CELLS; 
-    let pathMaxRadius = CAVE_PATH_MAX_RADIUS_CELLS;
-    
-    // Store the main path for later validation
-    this.mainPath = [];
-    
-    noiseSeed(millis() + currentLevel * 1000);
-    
-    // Generate main path
-    for (let i = 0; i < this.gridWidth; i++) {
-      pathY += (noise(i * CAVE_PATH_Y_NOISE_FACTOR_1, CAVE_PATH_Y_NOISE_OFFSET_1 + currentLevel) - 0.5) * CAVE_PATH_Y_NOISE_MULT_1;
-      pathY = constrain(pathY, pathMaxRadius + 1, this.gridHeight - pathMaxRadius - 1);
-      currentPathRadius = map(noise(i * CAVE_PATH_RADIUS_NOISE_FACTOR, CAVE_PATH_RADIUS_NOISE_OFFSET + currentLevel), 0, 1, pathMinRadius, pathMaxRadius);
-      
-      this.mainPath.push({x: i, y: pathY, radius: currentPathRadius});
-      
-      for (let j = 0; j < this.gridHeight; j++) {
-        if (abs(j - pathY) > currentPathRadius) this.grid[i][j] = true; // Mark as wall
-      }
-      if (i === this.gridWidth - 1) { 
-        this.exitPathY = pathY; 
-        this.exitPathRadius = currentPathRadius; 
-      }
+      spawnAttempts++;
     }
   }
   
-  generateObstacles() {
-    // Add obstacles and clearings
-    for (let i = 1; i < this.gridWidth - 1; i++) {
-      for (let j = 1; j < this.gridHeight - 1; j++) {
-        if (!this.grid[i][j]) { // If it's currently open path
-          let pathPoint = this.mainPath[i];
-          let minClearanceFromPath = (PLAYER_RADIUS / this.cellSize) + 1;
-          
-          if (noise(i * CAVE_OBSTACLE_NOISE_FACTOR_1, j * CAVE_OBSTACLE_NOISE_FACTOR_1, CAVE_OBSTACLE_NOISE_OFFSET_1 + currentLevel) > CAVE_OBSTACLE_THRESHOLD_1 && 
-              abs(j - pathPoint.y) > pathPoint.radius + CAVE_OBSTACLE_DIST_BUFFER_1 &&
-              abs(j - pathPoint.y) > minClearanceFromPath) {
-            this.grid[i][j] = true; // Add an obstacle
-          }
-        } else { // If it's currently a wall
-          if (noise(i * CAVE_CLEARING_NOISE_FACTOR, j * CAVE_CLEARING_NOISE_FACTOR, CAVE_CLEARING_NOISE_OFFSET + currentLevel) < CAVE_CLEARING_THRESHOLD) {
-            this.grid[i][j] = false; // Carve a clearing
-          }
-        }
+  // Spawn Jellyfish
+  jellyfish = []; // Clear existing jellyfish
+  let jellyfishCount = floor(currentLevel / 3); // e.g., one at level 3, two at level 6
+  for (let i = 0; i < jellyfishCount; i++) {
+    let spawnAttempts = 0;
+    while (spawnAttempts < MAX_ENEMY_SPAWN_ATTEMPTS) {
+      let x = random(WORLD_WIDTH * ENEMY_SPAWN_MIN_X_WORLD_FACTOR, WORLD_WIDTH * ENEMY_SPAWN_MAX_X_WORLD_FACTOR);
+      let y = random(WORLD_HEIGHT * ENEMY_SPAWN_MIN_Y_WORLD_FACTOR, WORLD_HEIGHT * ENEMY_SPAWN_MAX_Y_WORLD_FACTOR);
+      
+      if (!cave.isWall(x, y, JELLYFISH_RADIUS * 1.5)) { // Larger check radius for jellyfish
+        jellyfish.push(new Jellyfish(x, y));
+        break;
       }
+      spawnAttempts++;
     }
   }
   
-  finalizeCave() {
-    // Set up borders
-    for (let i = 0; i < this.gridWidth; i++) { 
-      this.grid[i][0] = true; 
-      this.grid[i][this.gridHeight - 1] = true; 
-    }
-    for (let j = 0; j < this.gridHeight; j++) this.grid[0][j] = true;
-    for (let j = 0; j < this.gridHeight; j++) {
-      if (isNaN(this.exitPathY) || this.exitPathY === undefined || this.exitPathY === null) {
-        this.exitPathY = this.gridHeight / 2;
-        this.exitPathRadius = Math.max(CAVE_PATH_MIN_RADIUS_CELLS, 3);
-      }
-      if (abs(j - this.exitPathY) > this.exitPathRadius) this.grid[this.gridWidth - 1][j] = true;
-      else this.grid[this.gridWidth - 1][j] = false;
-    }
+  // Create current areas
+  currentAreas = [];
+  let numCurrentAreas = CURRENT_AREAS_PER_LEVEL;
+  for (let i = 0; i < numCurrentAreas; i++) {
+    let areaW = random(CURRENT_AREA_MIN_WIDTH, CURRENT_AREA_MAX_WIDTH);
+    let areaH = random(CURRENT_AREA_MIN_HEIGHT, CURRENT_AREA_MAX_HEIGHT);
+    let areaX = random(player.pos.x + CURRENT_AREA_PADDING_FROM_PLAYER_START, cave.exitX - areaW - CURRENT_AREA_PADDING_FROM_GOAL);
+    let areaY = random(0, WORLD_HEIGHT - areaH);
+    let forceDir = p5.Vector.random2D();
+    let forceMag = random(CURRENT_FORCE_MAGNITUDE_MIN, CURRENT_FORCE_MAGNITUDE_MAX);
     
-    // Set goal position
-    this.goalPos.x = this.exitX + this.goalSize / 2;
-    if (isNaN(this.exitPathY) || this.exitPathY === undefined || this.exitPathY === null) {
-      this.exitPathY = this.gridHeight / 2;
-    }
-    this.goalPos.y = this.exitPathY * this.cellSize;
-    
-    // Validate and clear goal area
-    let goalGridMinX = floor((this.goalPos.x - this.goalSize / 2) / this.cellSize);
-    let goalGridMaxX = floor((this.goalPos.x + this.goalSize / 2) / this.cellSize);
-    let goalGridMinY = floor((this.goalPos.y - this.goalSize / 2) / this.cellSize);
-    let goalGridMaxY = floor((this.goalPos.y + this.goalSize / 2) / this.cellSize);
+    currentAreas.push(new CurrentArea(areaX, areaY, areaW, areaH, forceDir, forceMag));
+  }
+  
+  // Reset score for the new level
+  levelScore = 0;
+  
+  // Transition to playing state
+  gameState = 'playing';
+}
 
-    for (let i = goalGridMinX; i <= goalGridMaxX; i++) {
-      for (let j = goalGridMinY; j <= goalGridMaxY; j++) {
-        if (i >= 0 && i < this.gridWidth && j >= 0 && j < this.gridHeight) {
-          if (i === this.gridWidth - 1) {
-             if (abs(j - this.exitPathY) <= this.exitPathRadius) {
-                this.grid[i][j] = false; 
-             }
-          } else if (i > this.gridWidth - CAVE_EXIT_X_OFFSET_CELLS) {
-            this.grid[i][j] = false;
-          }
-        }
+// --- PlayerSub Class ---
+class PlayerSub {
+  constructor(x, y, airSupply, airDepletionRate) {
+    this.pos = createVector(x, y);
+    this.vel = createVector(0, 0);
+    this.radius = PLAYER_RADIUS;
+    this.health = PLAYER_INITIAL_HEALTH;
+    this.airSupply = airSupply;
+    this.initialAirSupply = airSupply;
+    this.airDepletionRate = airDepletionRate;
+    this.lastSonarTime = 0;
+    this.lastShotTime = 0;
+    this.sonarCooldown = PLAYER_SONAR_COOLDOWN_FRAMES;
+    this.shotCooldown = PLAYER_SHOT_COOLDOWN_FRAMES;
+  }
+
+  update(cave, enemies) {
+    this.handleInput();
+    this.applyPhysics();
+    this.checkBounds();
+    this.updateAirSupply();
+    this.updateSonar();
+    this.updateShots();
+    this.checkCollisions(cave, enemies);
+  }
+
+  handleInput() {
+    let thrust = this.vel.copy().mult(-PLAYER_REVERSE_THRUST_FACTOR);
+    if (keyIsDown(KEY_CODE_W)) this.vel.add(thrust);
+    if (keyIsDown(KEY_CODE_S)) this.vel.add(thrust.mult(PLAYER_THRUST_POWER));
+    if (keyIsDown(KEY_CODE_A)) this.vel.rotate(-PLAYER_TURN_SPEED);
+    if (keyIsDown(KEY_CODE_D)) this.vel.rotate(PLAYER_TURN_SPEED);
+    
+    // Debug: Reset position with R key
+    if (keyIsDown(82)) { // R key
+      this.pos.set(WORLD_WIDTH / 2, WORLD_HEIGHT / 2);
+      this.vel.set(0, 0);
+    }
+  }
+
+  applyPhysics() {
+    this.vel.limit(PLAYER_MAX_SPEED);
+    this.pos.add(this.vel);
+    this.vel.mult(PLAYER_DAMPING);
+  }
+
+  checkBounds() {
+    // Wrap around edges
+    if (this.pos.x < 0) this.pos.x = WORLD_WIDTH;
+    else if (this.pos.x > WORLD_WIDTH) this.pos.x = 0;
+    if (this.pos.y < 0) this.pos.y = WORLD_HEIGHT;
+    else if (this.pos.y > WORLD_HEIGHT) this.pos.y = 0;
+  }
+
+  updateAirSupply() {
+    if (this.airSupply > 0) {
+      this.airSupply -= this.airDepletionRate;
+    }
+  }
+
+  updateSonar() {
+    if (frameCount - this.lastSonarTime >= this.sonarCooldown) {
+      this.lastSonarTime = frameCount;
+      // Emit sonar pulse
+      let pulse = new SonarPulse(this.pos.x, this.pos.y, PLAYER_SONAR_RANGE, PLAYER_SONAR_PULSES);
+      sonarBubbles.push(pulse);
+    }
+  }
+
+  updateShots() {
+    if (frameCount - this.lastShotTime >= this.shotCooldown) {
+      this.lastShotTime = frameCount;
+      // Fire a projectile
+      let proj = new Projectile(this.pos.x, this.pos.y, this.vel.heading());
+      projectiles.push(proj);
+    }
+  }
+
+  checkCollisions(cave, enemies) {
+    // Cave collisions
+    if (cave.isWall(this.pos.x, this.pos.y, this.radius)) {
+      this.health -= PLAYER_BUMP_DAMAGE;
+      this.vel.mult(-PLAYER_BUMP_RECOIL_FACTOR);
+      playSound('bump');
+    }
+    
+    // Enemy collisions
+    for (let enemy of enemies) {
+      let d = dist(this.pos.x, this.pos.y, enemy.pos.x, enemy.pos.y);
+      if (d < this.radius + enemy.radius) {
+        this.health -= PLAYER_ENEMY_COLLISION_DAMAGE;
+        enemy.vel.add(p5.Vector.sub(this.pos, enemy.pos).normalize().mult(PLAYER_ENEMY_COLLISION_KNOCKBACK));
+        playSound('bump');
       }
     }
+  }
+
+  render(offsetX, offsetY) {
+    push();
+    translate(this.pos.x - offsetX, this.pos.y - offsetY);
+
+    // Body
+    fill(PLAYER_COLOR_BODY_H, PLAYER_COLOR_BODY_S, PLAYER_COLOR_BODY_B);
+    noStroke();
+    ellipse(0, 0, this.radius * PLAYER_BODY_WIDTH_FACTOR, this.radius * PLAYER_BODY_HEIGHT_FACTOR);
+    
+    // Sail
+    fill(PLAYER_COLOR_SAIL_H, PLAYER_COLOR_SAIL_S, PLAYER_COLOR_SAIL_B);
+    rectMode(CENTER);
+    rect(this.radius * PLAYER_SAIL_OFFSET_X_FACTOR, 0, this.radius * PLAYER_SAIL_WIDTH_FACTOR, this.radius * PLAYER_SAIL_HEIGHT_FACTOR, this.radius * PLAYER_SAIL_CORNER_RADIUS_FACTOR);
+    rectMode(CORNER); // Reset rectMode
+    
+    // Fin
+    fill(PLAYER_COLOR_FIN_H, PLAYER_COLOR_FIN_S, PLAYER_COLOR_FIN_B);
+    beginShape();
+    vertex(-this.radius * PLAYER_FIN_X1_FACTOR, -this.radius * PLAYER_FIN_Y1_FACTOR);
+    vertex(-this.radius * PLAYER_FIN_X2_FACTOR, this.radius * PLAYER_FIN_Y2_FACTOR);
+    vertex(-this.radius * PLAYER_FIN_X3_FACTOR, this.radius * PLAYER_FIN_Y3_FACTOR);
+    vertex(-this.radius * PLAYER_FIN_X4_FACTOR, -this.radius * PLAYER_FIN_Y4_FACTOR);
+    endShape(CLOSE);
+    
+    // Propeller
+    push();
+    translate(this.radius * PLAYER_PROPELLER_X_OFFSET_FACTOR, 0); // Position propeller at the back
+    
+    fill(PLAYER_COLOR_PROPELLER_H, PLAYER_COLOR_PROPELLER_S, PLAYER_COLOR_PROPELLER_B);
+    noStroke();
+    
+    let apparentHeight = this.radius * PLAYER_PROPELLER_MAX_SIDE_HEIGHT_FACTOR * abs(sin(startScreenPropellerAngle));
+    let thickness = this.radius * PLAYER_PROPELLER_THICKNESS_FACTOR;
+
+    rectMode(CENTER);
+    rect(0, 0, thickness, apparentHeight);
+    rectMode(CORNER); // Reset rectMode
+    pop();
+    
+    pop();
   }
 }
 
-// --- Helper function to create explosions ---
-function createExplosion(x, y, type) {
-  let particleCount = 0;
-  let colorH, colorS, colorB;
-
-  if (type === 'wall') {
-    particleCount = EXPLOSION_PARTICLE_COUNT_TORPEDO_WALL;
-    colorH = EXPLOSION_PARTICLE_COLOR_H_WALL;
-    colorS = EXPLOSION_PARTICLE_COLOR_S_WALL;
-    colorB = EXPLOSION_PARTICLE_COLOR_B_WALL;
-  } else if (type === 'enemy') {
-    particleCount = EXPLOSION_PARTICLE_COUNT_TORPEDO_ENEMY;
-    colorH = EXPLOSION_PARTICLE_COLOR_H_ENEMY;
-    colorS = EXPLOSION_PARTICLE_COLOR_S_ENEMY;
-    colorB = EXPLOSION_PARTICLE_COLOR_B_ENEMY;
-  } else if (type === 'creature') {
-    // Creature explosion uses a different set of particles and colors
-    particleCount = EXPLOSION_PARTICLE_COUNT_TORPEDO_ENEMY; // Same count as enemy for now
-    colorH = 300; // Purple hue for creature explosion
-    colorS = 80;
-    colorB = 70;
-  }
-
-  for (let i = 0; i < particleCount; i++) {
-    let angle = random(TWO_PI);
-    let speed = random(EXPLOSION_PARTICLE_SPEED_MIN, EXPLOSION_PARTICLE_SPEED_MAX);
-    let vel = p5.Vector.fromAngle(angle, speed);
-    particles.push(new Particle(
-      x, y, 
-      vel.x, vel.y, 
-      EXPLOSION_PARTICLE_MAX_LIFESPAN, 
-      EXPLOSION_PARTICLE_MIN_SIZE, 
-      EXPLOSION_PARTICLE_MAX_SIZE, 
-      colorH, colorS, colorB, 
-      EXPLOSION_PARTICLE_ALPHA_MAX
-    ));
-  }
-}
-
-function prepareNextLevel() {
-  currentLevel++;
-  enemiesKilledThisLevel = 0; // Reset kills tracking
-  levelScore = 0; // Reset level score for new level
+// --- Setup and Initialization ---
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  colorMode(HSB, 360, 100, 100, 100);
+  noStroke();
   
-  // Set loading state and defer heavy initialization
-  gameState = 'loading';
-  loadingStartTime = millis(); // Record when loading started
-  
-  // Use setTimeout to allow loading screen to render
-  setTimeout(() => {
-    // Start chunked cave generation instead of synchronous generation
-    startChunkedCaveGeneration();
-  }, 100); // Small delay to allow loading screen to render
-}
-
-function startAudioRoutine() {
-    function startAllSoundObjects() {
-        const soundObjects = [
-            sonarOsc, explosionNoise, explosionBoomOsc, explosionBassOsc, 
-            creatureExplosionNoise, creatureExplosionBoomOsc, creatureExplosionBassOsc,
-            bumpOsc, torpedoNoise, 
-            currentFlowNoise, currentFlowBassOsc,
-            lowAirOsc, reactorHumOsc, creatureGrowlOsc, gameOverImpactNoise, gameOverGroanOsc, gameOverFinalBoomNoise
-        ];
-        for (const soundObj of soundObjects) {
-            if (soundObj && !soundObj.started && typeof soundObj.start === 'function') {
-                soundObj.start();
-            }
-        }
-        // Start reactor hum playing continuously
-        if (reactorHumOsc && reactorHumOsc.started) {
-            // Reactor hum plays continuously, volume controlled by amp()
-        }
-    }
-
+  // Start audio context on first interaction
+  let startAudio = () => {
     if (typeof userStartAudio === 'function') {
-        userStartAudio().then(() => { audioInitialized = true; startAllSoundObjects(); })
-                        .catch(e => { /* console.error("userStartAudio error", e); */ });
+      userStartAudio().then(() => { audioInitialized = true; })
+                      .catch(e => { /* console.error("userStartAudio error", e); */ });
     } else {
-        let ctx = getAudioContext();
-        if (ctx && ctx.state !== 'running') {
-            ctx.resume().then(() => { audioInitialized = true; startAllSoundObjects(); })
-                        .catch(e => { /* console.error("AudioContext.resume error", e); */ });
-        } else if (ctx && ctx.state === 'running') { audioInitialized = true; startAllSoundObjects(); }
+      let ctx = getAudioContext();
+      if (ctx && ctx.state !== 'running') {
+        ctx.resume().then(() => { audioInitialized = true; })
+                    .catch(e => { /* console.error("AudioContext.resume error", e); */ });
+      } else if (ctx && ctx.state === 'running') { audioInitialized = true; }
     }
+  }
+  
+  // Initial audio setup
+  startAudio();
+  
+  // Custom font loading
+  customFont = loadFont('Berpatroli.otf');
 }
 
-function preload() {
-  customFont = loadFont('Berpatroli.otf');
+// --- Creature Explosion Sound Constants (less boomy than wall explosions) ---
+const CREATURE_EXPLOSION_NOISE_ENV_ADSR = { aT: 0.001, dT: 0.3, sR: 0, rT: 0.1 };
+const CREATURE_EXPLOSION_NOISE_ENV_LEVELS = { aL: 0.6, rL: 0 };
+const CREATURE_EXPLOSION_BOOM_ENV_ADSR = { aT: 0.001, dT: 0.8, sR: 0, rT: 0.1 };
+const CREATURE_EXPLOSION_BOOM_ENV_LEVELS = { aL: 0.5, rL: 0 };
+const CREATURE_EXPLOSION_BOOM_MIN_FREQ = 100;
+const CREATURE_EXPLOSION_BOOM_MAX_FREQ = 120;
+const CREATURE_EXPLOSION_BASS_ENV_ADSR = { aT: 0.002, dT: 0.6, sR: 0, rT: 0.4 };
+const CREATURE_EXPLOSION_BASS_ENV_LEVELS = { aL: 0.7, rL: 0 };
+const CREATURE_EXPLOSION_BASS_MIN_FREQ = 25;
+const CREATURE_EXPLOSION_BASS_MAX_FREQ = 45;
+
+// --- Touch Event Forwarding for Mobile Controls ---
+function touchStarted() {
+  if (typeof handleMobileTouchStart === 'function') {
+    handleMobileTouchStart(touches);
+  }
+  // Prevent default to avoid issues on mobile
+  return false;
+}
+
+function touchMoved() {
+  if (typeof handleMobileTouchMove === 'function') {
+    handleMobileTouchMove(touches);
+  }
+  // Prevent default to avoid issues on mobile
+  return false;
+}
+
+function touchEnded() {
+  if (typeof handleMobileTouchEnd === 'function') {
+    handleMobileTouchEnd(touches);
+  }
+  // Prevent default to avoid issues on mobile
+  return false;
+}
+
+// --- Dynamic Kills Requirement Constants ---
+const BASE_KILLS_REQUIRED = 3; // Kills required for the first level
+const KILLS_INCREASE_PER_LEVEL = 3; // How many more kills needed each subsequent level
+function getKillsRequiredForLevel(level) {
+  if (level <= 0) return 0;
+  return BASE_KILLS_REQUIRED + (level - 1) * KILLS_INCREASE_PER_LEVEL;
 }
 
 function mousePressed() {
@@ -1870,37 +1800,4 @@ function draw() {
   drawPlayingState();
 }
 function windowResized() { resizeCanvas(windowWidth, windowHeight); }
-
-// --- Dynamic Kills Requirement Constants ---
-const BASE_KILLS_REQUIRED = 3; // Kills required for the first level
-const KILLS_INCREASE_PER_LEVEL = 3; // How many more kills needed each subsequent level
-function getKillsRequiredForLevel(level) {
-  if (level <= 0) return 0;
-  return BASE_KILLS_REQUIRED + (level - 1) * KILLS_INCREASE_PER_LEVEL;
-}
-
-// --- Touch Event Forwarding for Mobile Controls ---
-function touchStarted() {
-  if (typeof handleMobileTouchStart === 'function') {
-    handleMobileTouchStart(touches);
-  }
-  // Prevent default to avoid issues on mobile
-  return false;
-}
-
-function touchMoved() {
-  if (typeof handleMobileTouchMove === 'function') {
-    handleMobileTouchMove(touches);
-  }
-  // Prevent default to avoid issues on mobile
-  return false;
-}
-
-function touchEnded() {
-  if (typeof handleMobileTouchEnd === 'function') {
-    handleMobileTouchEnd(touches);
-  }
-  // Prevent default to avoid issues on mobile
-  return false;
-}
 
