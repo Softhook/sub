@@ -41,7 +41,7 @@ const MOBILE_CONTROLS_CONFIG = {
     // Colors (HSB values to match game's color scheme)
     joystickColor: { h: 180, s: 50, b: 70 },
     joystickKnobColor: { h: 180, s: 70, b: 90 },
-    fireButtonColor: { h: 0, s: 80, b: 85 },
+    fireButtonColor: { h: 50, s: 90, b: 90 }, // Yellow for fire button
     sonarButtonColor: { h: 120, s: 70, b: 80 },
     pressedColor: { h: 60, s: 90, b: 95 },
   },
@@ -621,15 +621,8 @@ class MobileControls {
     
     push();
     
-    // Determine if player can fire based on cooldown
-    const canFire = typeof player !== 'undefined' && 
-                    player && 
-                    frameCount - player.lastShotTime >= player.shotCooldown;
-    
-    // Use red when ready to fire, orange/yellow when in cooldown
-    const baseColor = canFire ? 
-      { h: 0, s: 90, b: 85 } :           // Red when ready to fire
-      { h: 30, s: 70, b: 80 };           // Orange when in cooldown
+    // Use the color from the config. A brighter yellow is used for the 'pressed' state.
+    const baseColor = style.fireButtonColor;
     
     const color = isPressed ? style.pressedColor : baseColor;
     const alpha = isPressed ? style.pressedAlpha + 50 : style.innerAlpha + 30;
@@ -702,21 +695,14 @@ class MobileControls {
       const shotCooldownFrames = player.shotCooldown;
       const framesSinceLastShot = frameCount - player.lastShotTime;
       const cooldownRatio = 1 - Math.min(1, framesSinceLastShot / shotCooldownFrames);
-      
-      // Change button color based on whether we can fire
-      if (framesSinceLastShot >= shotCooldownFrames) {
-        // Ready to fire - Red button (more saturated)
-        stroke(0, 100, 90, 220); // Bright red outline to indicate ready
-        strokeWeight(MOBILE_CONTROLS_CONFIG.style.strokeWeight + 1);
-        noFill();
-        ellipse(button.x, button.y, button.radius * 2.1, button.radius * 2.1); 
-      } else {
-        // Still in cooldown - show yellow/orange cooldown arc
-        stroke(40, 100, 90, 220); // Yellow/orange color to show "not ready"
+
+      // Only draw the arc if there's a cooldown in effect
+      if (cooldownRatio > 0) {
+        stroke(50, 100, 90, 220); // Bright yellow color for the arc
         strokeWeight(MOBILE_CONTROLS_CONFIG.style.strokeWeight + 2);
         noFill();
         
-        // Draw arc from top, going clockwise, showing remaining cooldown time
+        // Draw arc from top, going clockwise
         arc(button.x, button.y, button.radius * 2.2, button.radius * 2.2, 
             -PI/2, -PI/2 + TWO_PI * cooldownRatio);
       }

@@ -1,7 +1,12 @@
 html, body {
   margin: 0;
   padding: 0;
+  background-color: black; /* Prevent white borders in fullscreen */
+  overflow: hidden; /* Hide scrollbars */
 }
+
 canvas {
   display: block;
+  width: 100vw; /* Full viewport width */
+  height: 100vh; /* Full viewport height */
 }
