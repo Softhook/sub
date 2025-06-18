@@ -7,25 +7,26 @@ const MOBILE_CONTROLS_CONFIG = {
   // Joystick settings
   joystick: {
     x: 120,           // Position from left edge
-    y: null,          // Will be set to screen height - 120
-    outerRadius: 80,  // Outer circle radius
-    innerRadius: 25,  // Inner knob radius
-    maxDistance: 55,  // Maximum distance inner can move from center
-    sensitivity: 0.8, // Movement sensitivity multiplier
+    y: null,          // Will be set to screen height - 150
+    outerRadius: 100, // Made larger
+    deadZoneRadius: 50, // New: inner ring for dead zone
+    innerRadius: 30,  // Knob radius, made larger
+    maxDistance: 70,  // outerRadius - innerRadius
+    sensitivity: 1.0, // Using 1.0 for more direct control
   },
   
   // Fire button settings
   fireButton: {
-    x: null,          // Will be set to screen width - 100
-    y: null,          // Will be set to screen height - 120
+    x: null,          // Will be set to screen width - 120
+    y: null,          // Will be set to screen height - 150
     radius: 60,       // Button radius
     cooldownDisplay: true, // Show cooldown indicator
   },
   
   // Sonar button (optional - sonar is automatic but manual trigger can be useful)
   sonarButton: {
-    x: null,          // Will be set to screen width - 100
-    y: null,          // Will be set to screen height - 220
+    x: null,          // Will be set to screen width - 120
+    y: null,          // Will be set to screen height - 250
     radius: 45,       // Smaller than fire button
     enabled: false,   // Disabled by default since sonar is automatic
   },
@@ -51,7 +52,7 @@ const MOBILE_CONTROLS_CONFIG = {
   smoothRotation: {
     enabled: true,              // Enable/disable smooth rotation
     lerpSpeed: 0.15,           // How fast to rotate toward target (0.1 = slow, 0.3 = fast)
-    movementThreshold: 0.4,    // Minimum movement magnitude to trigger rotation (higher = less sensitive)
+    movementThreshold: 0.01,    // Minimum movement magnitude to trigger rotation. Set low for responsive rotation.
     stabilityFrames: 8,        // Frames required for stable movement before changing target (higher = less jittery)
     angleTolerance: 0.3,       // Radians tolerance for movement stability (≈17 degrees, higher = more forgiving)
   }
@@ -158,15 +159,15 @@ class MobileControls {
     console.log('Updating mobile control positions. Canvas size:', canvasWidth, 'x', canvasHeight);
     
     // Update joystick position (bottom left)
-    MOBILE_CONTROLS_CONFIG.joystick.y = canvasHeight - 120;
+    MOBILE_CONTROLS_CONFIG.joystick.y = canvasHeight - 150;
     
     // Update fire button position (bottom right)
-    MOBILE_CONTROLS_CONFIG.fireButton.x = canvasWidth - 100;
-    MOBILE_CONTROLS_CONFIG.fireButton.y = canvasHeight - 120;
+    MOBILE_CONTROLS_CONFIG.fireButton.x = canvasWidth - 120;
+    MOBILE_CONTROLS_CONFIG.fireButton.y = canvasHeight - 150;
     
     // Update sonar button position (above fire button)
-    MOBILE_CONTROLS_CONFIG.sonarButton.x = canvasWidth - 100;
-    MOBILE_CONTROLS_CONFIG.sonarButton.y = canvasHeight - 220;
+    MOBILE_CONTROLS_CONFIG.sonarButton.x = canvasWidth - 120;
+    MOBILE_CONTROLS_CONFIG.sonarButton.y = canvasHeight - 250;
     
     console.log('Control positions updated:', {
       joystick: { x: MOBILE_CONTROLS_CONFIG.joystick.x, y: MOBILE_CONTROLS_CONFIG.joystick.y },
@@ -455,23 +456,36 @@ class MobileControls {
   applyMovement() {
     if (!this.enabled || !this.joystickActive) return;
     if (typeof player === 'undefined' || !player || gameState !== 'playing') return;
-    
-    const sensitivity = MOBILE_CONTROLS_CONFIG.joystick.sensitivity;
+
+    const joystick = MOBILE_CONTROLS_CONFIG.joystick;
+    const sensitivity = joystick.sensitivity;
     const moveX = this.movementVector.x * sensitivity;
     const moveY = this.movementVector.y * sensitivity;
-    
-    // Apply direct movement (joystick-style)
-    // Horizontal movement: left/right moves the submarine left/right
-    if (Math.abs(moveX) > 0.1) {
-      player.vel.x += moveX * PLAYER_THRUST_POWER;
+
+    // --- MOVEMENT LOGIC ---
+    const knobDistance = Math.sqrt(this.joystickOffset.x**2 + this.joystickOffset.y**2);
+    if (knobDistance > joystick.deadZoneRadius) {
+        // We are outside the dead zone.
+        // Scale the movement based on distance from deadzone.
+        const movementZoneSize = joystick.maxDistance - joystick.deadZoneRadius;
+        const distanceIntoZone = knobDistance - joystick.deadZoneRadius;
+        const thrustScale = Math.min(1.0, distanceIntoZone / movementZoneSize);
+
+        const finalMoveX = moveX * thrustScale;
+        const finalMoveY = moveY * thrustScale;
+
+        if (Math.abs(finalMoveX) > 0.01) {
+            player.vel.x += finalMoveX * PLAYER_THRUST_POWER;
+        }
+        if (Math.abs(finalMoveY) > 0.01) {
+            player.vel.y += finalMoveY * PLAYER_THRUST_POWER;
+        }
     }
-    
-    // Vertical movement: up/down moves the submarine up/down
-    if (Math.abs(moveY) > 0.1) {
-      player.vel.y += moveY * PLAYER_THRUST_POWER;
-    }
-    
-    // Update submarine facing direction based on joystick input
+
+    // --- ROTATION LOGIC ---
+    // This part will now run regardless of whether movement is applied.
+    // It depends on moveX/moveY which are calculated from the raw joystick vector,
+    // which is what we want for rotation.
     if (MOBILE_CONTROLS_CONFIG.smoothRotation.enabled) {
       // Use smooth rotation with stability checking to reduce jitter
       const movementMagnitude = Math.sqrt(moveX * moveX + moveY * moveY);
@@ -506,7 +520,7 @@ class MobileControls {
     } else {
       // Original immediate rotation (for comparison/fallback)
       const movementMagnitude = Math.sqrt(moveX * moveX + moveY * moveY);
-      if (movementMagnitude > 0.2) {
+      if (movementMagnitude > 0.01) { // Use a small threshold to avoid issues with atan2(0,0)
         const targetAngle = Math.atan2(moveY, moveX);
         if (typeof player !== 'undefined' && player) {
           player.angle = targetAngle;
@@ -593,6 +607,12 @@ class MobileControls {
     fill(style.joystickColor.h, style.joystickColor.s, style.joystickColor.b, style.outerAlpha * 0.5);
     ellipse(joystick.x, joystick.y, joystick.outerRadius * 2);
     
+    // Dead zone inner circle
+    stroke(style.joystickColor.h, style.joystickColor.s, style.joystickColor.b, style.outerAlpha);
+    strokeWeight(style.strokeWeight - 1); // Thinner line
+    noFill();
+    ellipse(joystick.x, joystick.y, joystick.deadZoneRadius * 2);
+
     // Inner knob - more prominent when active
     const knobX = joystick.x + this.joystickOffset.x;
     const knobY = joystick.y + this.joystickOffset.y;
