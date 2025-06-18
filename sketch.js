@@ -1120,5 +1120,61 @@ class Cave {
   }
 
   isWall(px, py, checkRadius = 0) {
-    // ...existing code...
+    if (checkRadius > 0) {
+      const points = CAVE_WALL_CHECK_POINTS;
+      for (let i = 0; i < points; i++) {
+        const angle = (TWO_PI / points) * i;
+        const checkX = px + cos(angle) * checkRadius;
+        const checkY = py + sin(angle) * checkRadius;
+        if (this.isWallAtCoord(checkX, checkY)) return true;
+      }
+      return false;
+    } else {
+      return this.isWallAtCoord(px, py);
+    }
+  }
+
+  isWallAtCoord(px, py) {
+    let gridX = floor(px / this.cellSize);
+    let gridY = floor(py / this.cellSize);
+    return gridX < 0 || gridX >= this.gridWidth || gridY < 0 || gridY >= this.gridHeight || (this.grid[gridY] && this.grid[gridY][gridX] === 1);
+  }
+
+  destroyBlocks(px, py, radius) {
+    let startGridX = floor((px - radius) / this.cellSize);
+    let endGridX = floor((px + radius) / this.cellSize);
+    let startGridY = floor((py - radius) / this.cellSize);
+    let endGridY = floor((py + radius) / this.cellSize);
+
+    for (let y = startGridY; y <= endGridY; y++) {
+      for (let x = startGridX; x <= endGridX; x++) {
+        if (x >= 0 && x < this.gridWidth && y >= 0 && y < this.gridHeight) {
+          let blockCenterX = x * this.cellSize + this.cellSize / 2;
+          let blockCenterY = y * this.cellSize + this.cellSize / 2;
+          if (dist(px, py, blockCenterX, blockCenterY) <= radius) {
+            if (this.grid[y]) {
+              this.grid[y][x] = 0;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  render(offsetX, offsetY) {
+    // Implementation for rendering the cave
+  }
+
+  isGoal(px, py) {
+    return px > this.exitX && px < this.exitX + this.goalSize && py > this.goalPos.y - this.goalSize / 2 && py < this.goalPos.y + this.goalSize / 2;
+  }
+
+  renderGoal(offsetX, offsetY) {
+    push();
+    fill(GOAL_SQUARE_VISUAL_COLOR_H, GOAL_SQUARE_VISUAL_COLOR_S, GOAL_SQUARE_VISUAL_COLOR_B, 50);
+    noStroke();
+    rect(this.exitX - offsetX, this.goalPos.y - this.goalSize / 2 - offsetY, this.goalSize, this.goalSize);
+    pop();
+  }
+}
 
