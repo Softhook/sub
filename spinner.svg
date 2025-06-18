@@ -1,0 +1,20 @@
+<svg width="100" height="100" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs>
+    <!-- Simple yellow gradient matching game colors -->
+    <linearGradient id="yellowGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ffcc00;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#ff9900;stop-opacity:0.8" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Simple spinning ring -->
+  <circle cx="50" cy="50" r="35" fill="none" stroke="url(#yellowGradient)" stroke-width="4" stroke-dasharray="30 15" stroke-linecap="round">
+    <animateTransform attributeName="transform" attributeType="XML" type="rotate" from="0 50 50" to="360 50 50" dur="1.5s" repeatCount="indefinite"/>
+  </circle>
+  
+  <!-- Inner pulsing dot -->
+  <circle cx="50" cy="50" r="8" fill="#ffcc00">
+    <animate attributeName="r" values="6;10;6" dur="1.2s" repeatCount="indefinite"/>
+    <animate attributeName="opacity" values="0.7;1;0.7" dur="1.2s" repeatCount="indefinite"/>
+  </circle>
+</svg>

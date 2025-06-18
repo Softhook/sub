@@ -1,7 +1,7 @@
 const CACHE_NAME = 'reactor-dive-cache-v1';
 // Add all the files you want to cache
 const urlsToCache = [
-  '/',
+  './',
   'index.html',
   'style.css',
   'sketch.js',
@@ -9,7 +9,10 @@ const urlsToCache = [
   'manifest.json',
   'icon-192x192.png',
   'icon-512x512.png',
-  'Berpatroli.otf'
+  'Berpatroli.otf',
+  'spinner.svg',
+  'p5.js',
+  'p5.sound.min.js'
 ];
 
 // Install a service worker

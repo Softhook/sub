@@ -16,6 +16,17 @@
 
   </head>
   <body>
+    <!-- Loading overlay that shows before p5.js loads -->
+    <div id="loadingOverlay" class="loading-overlay">
+      <div class="loading-content">
+        <img src="spinner.svg" alt="Loading..." class="spinner" width="100" height="100">
+        <div class="loading-text">GENERATING LEVEL</div>
+        <div class="loading-dots">
+          <span>.</span><span>.</span><span>.</span>
+        </div>
+      </div>
+    </div>
+    
     <main>
     </main>
     <script src="mobileControls.js"></script>
@@ -23,7 +34,7 @@
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js').then(registration => {
+          navigator.serviceWorker.register('sw.js').then(registration => {
             console.log('ServiceWorker registration successful with scope: ', registration.scope);
           }, err => {
             console.log('ServiceWorker registration failed: ', err);

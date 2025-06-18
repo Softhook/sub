@@ -1966,6 +1966,40 @@ function updateReactorHum(distanceToGoal) {
   reactorHumAmplitude = volume;
 }
 
+// --- Loading overlay control functions ---
+function showLoadingOverlay(text = "GENERATING LEVEL") {
+  const overlay = document.getElementById('loadingOverlay');
+  const loadingText = overlay.querySelector('.loading-text');
+  if (overlay) {
+    if (loadingText) {
+      loadingText.textContent = text;
+    }
+    overlay.classList.remove('hidden');
+    overlay.style.display = 'flex';
+  }
+}
+
+function hideLoadingOverlay() {
+  const overlay = document.getElementById('loadingOverlay');
+  if (overlay) {
+    overlay.classList.add('hidden');
+    // Completely hide after transition
+    setTimeout(() => {
+      if (overlay.classList.contains('hidden')) {
+        overlay.style.display = 'none';
+      }
+    }, 500);
+  }
+}
+
+function updateLoadingText(text) {
+  const overlay = document.getElementById('loadingOverlay');
+  const loadingText = overlay.querySelector('.loading-text');
+  if (loadingText) {
+    loadingText.textContent = text;
+  }
+}
+
 // --- Main Game Functions ---
 function setup() {
   createCanvas(windowWidth, windowHeight);
@@ -2001,10 +2035,17 @@ function setup() {
     textFont(customFont);
   }
   resetGame();
+  
+  // Hide the initial loading overlay once p5.js is ready
+  setTimeout(() => {
+    hideLoadingOverlay();
+  }, 100);
   // Initialize audio after a user gesture (e.g., click or key press)
 }
 
 function initGameObjects() {
+  showLoadingOverlay("GENERATING LEVEL");
+  
   currentCellSize = BASE_CELL_SIZE + (currentLevel - 1) * 2; // Calculate current cell size
 
   let baseAir = INITIAL_AIR_SUPPLY_BASE;
@@ -2038,6 +2079,7 @@ function initGameObjects() {
   enemies = []; projectiles = [];
   sonarBubbles = []; // Initialize sonar bubbles array
   particles = []; // Initialize global particles array
+  
   let enemyCount = BASE_ENEMY_COUNT + (currentLevel - 1) * ENEMY_COUNT_PER_LEVEL_INCREASE;
   enemyCount = min(enemyCount, MAX_ENEMY_COUNT); // Cap enemy count
   for (let i = 0; i < enemyCount; i++) {
@@ -2072,6 +2114,11 @@ function initGameObjects() {
   
   // Spawn current areas
   spawnCurrentAreas();
+  
+  // Hide loading overlay after a short delay
+  setTimeout(() => {
+    hideLoadingOverlay();
+  }, 200);
 }
 
 function spawnCurrentAreas() {
@@ -2195,6 +2242,7 @@ function prepareNextLevel() {
   
   // Set loading state and defer heavy initialization
   gameState = 'loading';
+  showLoadingOverlay(`LEVEL ${currentLevel}`);
   
   // Use setTimeout to allow loading screen to render
   setTimeout(() => {
@@ -2278,6 +2326,7 @@ function keyPressed() {
   if (gameState === 'start' && keyCode === ENTER) {
     // Set loading state and defer heavy initialization
     gameState = 'loading';
+    showLoadingOverlay("GENERATING LEVEL");
     
     // Use setTimeout to allow loading screen to render
     setTimeout(() => {
