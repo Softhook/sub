@@ -1,4 +1,4 @@
-const CACHE_NAME = 'reactor-dive-cache-v9'; // Bump version
+const CACHE_NAME = 'reactor-dive-cache-v11'; // Bump version
 const URLS_TO_CACHE = [
   './', // The start URL
   'index.html',
@@ -47,6 +47,12 @@ self.addEventListener('activate', event => {
 
 // Fetch: serve from cache, or network, with a fallback for navigation
 self.addEventListener('fetch', event => {
+  const requestUrl = new URL(event.request.url);
+  const scopeUrl = new URL(self.registration.scope);
+
+  // Check if the request is for the root of the scope (the start_url)
+  const isStartUrlRequest = event.request.method === 'GET' && requestUrl.pathname === scopeUrl.pathname;
+
   event.respondWith(
     caches.match(event.request)
       .then(response => {
@@ -55,10 +61,11 @@ self.addEventListener('fetch', event => {
           return response;
         }
 
-        // For navigation requests, fall back to the main page
-        if (event.request.mode === 'navigate') {
-          console.log('[SW] Navigation request, serving index.html from cache.');
-          return caches.match('index.html');
+        // If the request is for the start_url, or any other navigation,
+        // serve the app shell from the cache. This is the crucial fallback.
+        if (isStartUrlRequest || event.request.mode === 'navigate') {
+          console.log(`[SW] Fallback for ${event.request.mode} to ${event.request.url}. Serving root from cache.`);
+          return caches.match('./');
         }
 
         // Otherwise, fetch from network
