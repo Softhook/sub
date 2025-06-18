@@ -615,14 +615,7 @@ class MobileControls {
     
     // Cooldown indicator
     this.renderFireCooldown(button, alpha);
-    
-    // Label
-    fill(color.h, color.s, color.b + 40, alpha + 30);
-    noStroke();
-    textAlign(CENTER, CENTER);
-    textSize(style.textSize * 0.9);
-    text("FIRE", button.x, button.y + button.radius + 25);
-    
+  
     pop();
   }
 
