@@ -888,15 +888,29 @@ class CurrentArea {
 // --- Cave Class ---
 class Cave {
   constructor(worldWidth, worldHeight, cellSize) { // Accept cellSize as a parameter
+    // Validate constructor parameters
+    if (isNaN(worldWidth) || worldWidth <= 0) worldWidth = 4000;
+    if (isNaN(worldHeight) || worldHeight <= 0) worldHeight = 2000;
+    if (isNaN(cellSize) || cellSize <= 0) cellSize = 20;
+    
     this.worldWidth = worldWidth; this.worldHeight = worldHeight; this.cellSize = cellSize; // Use passed cellSize
     this.gridWidth = Math.ceil(worldWidth / this.cellSize); // Use this.cellSize
     this.gridHeight = Math.ceil(worldHeight / this.cellSize); // Use this.cellSize
     this.grid = []; this.exitPathY = 0; this.exitPathRadius = 0;
     this.goalPos = createVector(0,0);
     this.goalSize = GOAL_SQUARE_SIZE_CELLS * this.cellSize; // Use this.cellSize
-    this.generateCave();
+    
+    // Initialize exitX before cave generation (needed for validation)
     this.exitX = worldWidth - this.cellSize * CAVE_EXIT_X_OFFSET_CELLS; // Use this.cellSize
+    
+    this.generateCave();
     this.goalPos.x = this.exitX + this.goalSize / 2;
+    
+    // Ensure exitPathY is valid before setting goal position
+    if (isNaN(this.exitPathY) || this.exitPathY === undefined || this.exitPathY === null) {
+      this.exitPathY = this.gridHeight / 2;
+      console.warn("exitPathY was invalid after cave generation, using grid center");
+    }
     this.goalPos.y = this.exitPathY * this.cellSize; // Use this.cellSize
   }
   generateCave() {
@@ -956,6 +970,12 @@ class Cave {
     for (let i = 0; i < this.gridWidth; i++) { this.grid[i][0] = true; this.grid[i][this.gridHeight - 1] = true; }
     for (let j = 0; j < this.gridHeight; j++) this.grid[0][j] = true;
     for (let j = 0; j < this.gridHeight; j++) {
+      // Ensure exitPathY is valid before using it
+      if (isNaN(this.exitPathY) || this.exitPathY === undefined || this.exitPathY === null) {
+        this.exitPathY = this.gridHeight / 2;
+        this.exitPathRadius = Math.max(CAVE_PATH_MIN_RADIUS_CELLS, 3);
+        console.warn("exitPathY was invalid during border generation, using defaults");
+      }
       if (abs(j - this.exitPathY) > this.exitPathRadius) this.grid[this.gridWidth - 1][j] = true;
       else this.grid[this.gridWidth - 1][j] = false;
     }
@@ -1206,8 +1226,30 @@ class Cave {
     let submarineRadiusInCells = Math.ceil(PLAYER_RADIUS / this.cellSize);
     let startX = Math.floor(this.cellSize * 5 / this.cellSize); // Approximate player start
     let startY = Math.floor(this.gridHeight / 2);
+    
+    // Ensure exitX is valid
+    if (isNaN(this.exitX) || this.exitX === undefined || this.exitX === null) {
+      this.exitX = this.worldWidth - this.cellSize * CAVE_EXIT_X_OFFSET_CELLS;
+      console.warn("exitX was invalid, recalculating");
+    }
     let goalX = Math.floor(this.exitX / this.cellSize);
+    
+    // Ensure exitPathY is valid, use center if not
+    if (isNaN(this.exitPathY) || this.exitPathY === undefined || this.exitPathY === null) {
+      this.exitPathY = this.gridHeight / 2;
+      console.warn("exitPathY was invalid, using grid center");
+    }
     let goalY = Math.floor(this.exitPathY);
+    
+    // Validate all calculated values are numbers
+    if (isNaN(startX)) startX = 5;
+    if (isNaN(startY)) startY = Math.floor(this.gridHeight / 2);
+    if (isNaN(goalX)) goalX = this.gridWidth - 10;
+    if (isNaN(goalY)) goalY = Math.floor(this.gridHeight / 2);
+    
+    // Validate goalX and goalY are within bounds
+    goalX = constrain(goalX, 0, this.gridWidth - 1);
+    goalY = constrain(goalY, 0, this.gridHeight - 1);
     
     // Use a simple flood fill to check connectivity
     let visited = [];
@@ -1933,6 +1975,12 @@ function setup() {
   
   // Initialize mobile controls
   initMobileControls();
+  
+  // Hide the initial loading screen now that p5.js is ready
+  const initialLoader = document.getElementById('initial-loader');
+  if (initialLoader) {
+    initialLoader.classList.add('hidden');
+  }
 
   // Attempt fullscreen and audio initialization on first user interaction
   function handleInitialInteraction() {
@@ -2089,14 +2137,12 @@ function resetGame() {
   enemiesKilledThisLevel = 0; // Reset kills tracking
   totalScore = 0; // Reset total score for new game
   levelScore = 0; // Reset level score
-  // currentCellSize will be set in initGameObjects based on currentLevel
-  initGameObjects();
-  player.health = PLAYER_INITIAL_HEALTH; player.airSupply = player.initialAirSupply; // Reset to full for new game
-  player.lastSonarTime = frameCount - player.sonarCooldown; // Allow immediate sonar
-  player.lastShotTime = frameCount - player.shotCooldown;   // Allow immediate shot
+  
+  // Clear any existing game state
   sonarBubbles = []; // Clear bubbles on reset
   particles = []; // Clear global particles on reset
-  gameState = 'start';
+  
+  // Stop any audio that might be playing
   if (audioInitialized && lowAirOsc && lowAirOsc.started) lowAirEnv.triggerRelease(lowAirOsc);
   // Reset reactor hum to zero volume when resetting game
   if (audioInitialized && reactorHumOsc && reactorHumOsc.started) {
@@ -2104,6 +2150,9 @@ function resetGame() {
     reactorHumAmplitude = 0;
   }
   lastLowAirBeepTime = 0; // Reset beep timer
+  
+  // Return to start screen (don't initialize game objects yet)
+  gameState = 'start';
 }
 
 // --- Helper function to create explosions ---
@@ -2149,20 +2198,27 @@ function prepareNextLevel() {
   currentLevel++;
   enemiesKilledThisLevel = 0; // Reset kills tracking
   levelScore = 0; // Reset level score for new level
-  initGameObjects(); // This will create new cave, player (with new air), enemies
-  // Player position is set by initGameObjects to a safe start in the new cave
-  player.vel = createVector(0,0); player.angle = 0; // Reset movement
-  player.health = PLAYER_INITIAL_HEALTH; // Replenish health
-  // Air supply is set by initGameObjects based on the new level
-  player.lastSonarTime = frameCount - player.sonarCooldown;
-  player.lastShotTime = frameCount - player.shotCooldown;
-  gameState = 'playing';
-  // Reactor hum is continuously playing, just reset to zero volume
-  if (audioInitialized && reactorHumOsc && reactorHumOsc.started) {
-    reactorHumOsc.amp(0, 0);
-  }
-  if (audioInitialized && lowAirOsc && lowAirOsc.started) lowAirEnv.triggerRelease(lowAirOsc);
-  lastLowAirBeepTime = 0;
+  
+  // Set loading state and defer heavy initialization
+  gameState = 'loading';
+  
+  // Use setTimeout to allow loading screen to render
+  setTimeout(() => {
+    initGameObjects(); // This will create new cave, player (with new air), enemies
+    // Player position is set by initGameObjects to a safe start in the new cave
+    player.vel = createVector(0,0); player.angle = 0; // Reset movement
+    player.health = PLAYER_INITIAL_HEALTH; // Replenish health
+    // Air supply is set by initGameObjects based on the new level
+    player.lastSonarTime = frameCount - player.sonarCooldown;
+    player.lastShotTime = frameCount - player.shotCooldown;
+    gameState = 'playing';
+    // Reactor hum is continuously playing, just reset to zero volume
+    if (audioInitialized && reactorHumOsc && reactorHumOsc.started) {
+      reactorHumOsc.amp(0, 0);
+    }
+    if (audioInitialized && lowAirOsc && lowAirOsc.started) lowAirEnv.triggerRelease(lowAirOsc);
+    lastLowAirBeepTime = 0;
+  }, 100); // Small delay to allow loading screen to render
 }
 
 function startAudioRoutine() {
@@ -2226,12 +2282,24 @@ function keyPressed() {
   }
   
   if (gameState === 'start' && keyCode === ENTER) {
-    gameState = 'playing';
-    player.lastSonarTime = frameCount - player.sonarCooldown; // Ensure sonar is ready
-    // Reactor hum is continuously playing, just needs to be started if not already
-    if (audioInitialized && reactorHumOsc && reactorHumOsc.started) {
-      reactorHumOsc.amp(0, 0); // Start at zero volume, will be controlled by updateReactorHum
-    }
+    // Set loading state and defer heavy initialization
+    gameState = 'loading';
+    
+    // Use setTimeout to allow loading screen to render
+    setTimeout(() => {
+      // currentCellSize will be set in initGameObjects based on currentLevel
+      initGameObjects();
+      player.health = PLAYER_INITIAL_HEALTH; 
+      player.airSupply = player.initialAirSupply; // Reset to full for new game
+      player.lastSonarTime = frameCount - player.sonarCooldown; // Allow immediate sonar
+      player.lastShotTime = frameCount - player.shotCooldown;   // Allow immediate shot
+      player.lastSonarTime = frameCount - player.sonarCooldown; // Ensure sonar is ready
+      gameState = 'playing';
+      // Reactor hum is continuously playing, just needs to be started if not already
+      if (audioInitialized && reactorHumOsc && reactorHumOsc.started) {
+        reactorHumOsc.amp(0, 0); // Start at zero volume, will be controlled by updateReactorHum
+      }
+    }, 100); // Small delay to allow loading screen to render
  }  else if ((gameState === 'gameOver' || gameState === 'gameComplete') && keyCode === ENTER) {
     resetGame();
   } else if (gameState === 'levelComplete' && keyCode === ENTER) {
@@ -2328,6 +2396,34 @@ function drawDebugCaveWalls(offsetX, offsetY) {
   text(`Enemies: ${enemies.length}, Jellyfish: ${jellyfish.length}`, width - 10, 50);
 
   pop();
+}
+
+function drawLoadingScreen() {
+  background(BACKGROUND_COLOR_H, BACKGROUND_COLOR_S, BACKGROUND_COLOR_B); // Use same background as game
+  
+  // Center the loading text
+  fill(60, 100, 90); // Yellow color (HSB)
+  noStroke();
+  textAlign(CENTER, CENTER);
+  textSize(48);
+  text("LOADING", width / 2, height / 2);
+  
+  // Add animated dots
+  let dots = "";
+  let dotCount = Math.floor((frameCount / 30) % 4); // Change every 0.5 seconds at 60fps
+  for (let i = 0; i < dotCount; i++) {
+    dots += ".";
+  }
+  
+  textSize(32);
+  text(dots, width / 2, height / 2 + 60);
+  
+  // Optional: Add level information
+  if (typeof currentLevel !== 'undefined') {
+    textSize(24);
+    fill(0, 0, 80, 180); // Semi-transparent white (HSB)
+    text(`Generating Level ${currentLevel}`, width / 2, height / 2 + 120);
+  }
 }
 
 function drawStartScreen() {
@@ -2614,6 +2710,10 @@ function draw() {
 
   if (gameState === 'start') {
     drawStartScreen();
+    return;
+  }
+  if (gameState === 'loading') {
+    drawLoadingScreen();
     return;
   }
   if (gameState === 'levelComplete') {
