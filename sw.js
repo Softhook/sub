@@ -1,10 +1,12 @@
 const CACHE_NAME = 'reactor-dive-cache-v1';
 // Add all the files you want to cache
 const urlsToCache = [
-  '/',
+  './', // Changed from '/' to be relative
   'index.html',
   'style.css',
   'sketch.js',
+  'p5.js', // Added p5 library
+  'p5.sound.min.js', // Added p5.sound library
   'mobileControls.js',
   'manifest.json',
   'icon-192x192.png',
