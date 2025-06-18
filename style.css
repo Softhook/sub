@@ -74,7 +74,7 @@ canvas {
   left: 0;
   width: 100vw;
   height: 100vh;
-  background-color: rgba(32, 44, 55, 0.95); /* Match game's dark blue background */
+  background-color: rgb(32, 44, 55); /* Match game's dark blue background - fully opaque */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -89,52 +89,22 @@ canvas {
 
 .loading-content {
   text-align: center;
-  color: #ffcc00; /* Match game's yellow/gold */
+  color: #ffff00; /* Match game's HSB(60, 100, 100) - pure yellow */
   font-family: 'Berpatroli', monospace; /* Use game's custom font with fallback */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
 }
 
 .spinner {
   margin-bottom: 20px;
-  filter: drop-shadow(0 0 8px rgba(255, 204, 0, 0.4));
+  filter: drop-shadow(0 0 8px rgba(255, 255, 0, 0.4));
 }
 
 .loading-text {
   font-size: 18px;
   font-weight: bold;
-  margin-bottom: 10px;
-  text-shadow: 0 0 6px rgba(255, 204, 0, 0.5);
   letter-spacing: 1px;
-}
-
-.loading-dots {
-  font-size: 20px;
-  font-weight: bold;
-}
-
-.loading-dots span {
-  animation: loadingDots 1.5s infinite;
-  animation-fill-mode: both;
-}
-
-.loading-dots span:nth-child(1) {
-  animation-delay: 0s;
-}
-
-.loading-dots span:nth-child(2) {
-  animation-delay: 0.5s;
-}
-
-.loading-dots span:nth-child(3) {
-  animation-delay: 1s;
-}
-
-@keyframes loadingDots {
-  0%, 80%, 100% {
-    opacity: 0.4;
-    transform: scale(1);
-  }
-  40% {
-    opacity: 1;
-    transform: scale(1.1);
-  }
+  text-shadow: 0 0 6px rgba(255, 255, 0, 0.5);
 }
