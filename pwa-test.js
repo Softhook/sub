@@ -68,6 +68,7 @@ window.addEventListener('appinstalled', (evt) => {
 // Check PWA criteria
 function checkPWACriteria() {
   logToPage('=== PWA Criteria Check ===');
+  logToPage('URL: ' + window.location.href);
   logToPage('Service Worker: ' + ('serviceWorker' in navigator ? '✅' : '❌'));
   logToPage('HTTPS: ' + (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1' ? '✅' : '❌'));
   logToPage('Manifest: ' + (document.querySelector('link[rel="manifest"]') ? '✅' : '❌'));
@@ -83,8 +84,31 @@ function checkPWACriteria() {
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.getRegistrations().then(registrations => {
       logToPage('SW Registrations: ' + registrations.length);
+      if (registrations.length > 0) {
+        logToPage('SW State: ' + registrations[0].active?.state);
+      }
     });
   }
+  
+  // Check manifest fetch
+  fetch('./manifest.json')
+    .then(response => {
+      if (response.ok) {
+        logToPage('Manifest fetch: ✅');
+        return response.json();
+      } else {
+        logToPage('Manifest fetch: ❌ (Status: ' + response.status + ')');
+      }
+    })
+    .then(manifest => {
+      if (manifest) {
+        logToPage('Manifest start_url: ' + manifest.start_url);
+        logToPage('Manifest scope: ' + manifest.scope);
+      }
+    })
+    .catch(err => {
+      logToPage('Manifest error: ' + err.message);
+    });
   
   logToPage('=== Waiting for install prompt... ===');
 }
