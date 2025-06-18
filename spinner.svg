@@ -11,10 +11,4 @@
   <circle cx="50" cy="50" r="35" fill="none" stroke="url(#yellowGradient)" stroke-width="4" stroke-dasharray="30 15" stroke-linecap="round">
     <animateTransform attributeName="transform" attributeType="XML" type="rotate" from="0 50 50" to="360 50 50" dur="1.5s" repeatCount="indefinite"/>
   </circle>
-  
-  <!-- Inner pulsing dot -->
-  <circle cx="50" cy="50" r="8" fill="#ffff00">
-    <animate attributeName="r" values="6;10;6" dur="1.2s" repeatCount="indefinite"/>
-    <animate attributeName="opacity" values="0.7;1;0.7" dur="1.2s" repeatCount="indefinite"/>
-  </circle>
 </svg>
