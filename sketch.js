@@ -424,6 +424,9 @@ let isSubmittingHighScore = false; // Track if we're in high score entry mode
 let playerNameInput = ''; // Store the player's name input
 let isHighScoreResult = false; // Whether the current score qualifies as a high score
 
+// Mobile input handling
+let highscoreInputElement = null; // Reference to the HTML input element
+
 // Highscore system variables
 let highScores = null; // Will hold the array of high scores
 
@@ -2007,6 +2010,24 @@ function setup() {
   
   // Initialize mobile controls
   initMobileControls();
+  
+  // Initialize highscore input element
+  highscoreInputElement = document.getElementById('highscoreInput');
+  if (highscoreInputElement) {
+    // Setup input event listener
+    highscoreInputElement.addEventListener('input', function(e) {
+      if (isSubmittingHighScore) {
+        playerNameInput = e.target.value;
+      }
+    });
+    
+    // Setup enter key listener for mobile
+    highscoreInputElement.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' && isSubmittingHighScore && playerNameInput.trim().length > 0) {
+        submitHighScore();
+      }
+    });
+  }
 
   // Attempt fullscreen and audio initialization on first user interaction
   function handleInitialInteraction() {
@@ -2360,16 +2381,8 @@ function keyPressed() {
     }, 100); // Small delay to allow loading screen to render
  }  else if (gameState === 'gameOver' && keyCode === ENTER) {
     if (isSubmittingHighScore && playerNameInput.trim().length > 0) {
-      // Submit the high score
-      console.log('Submitting high score:', playerNameInput, totalScore);
-      highScoreManager.submitScore(playerNameInput.trim(), totalScore).then(() => {
-        console.log('High score submitted successfully!');
-        isSubmittingHighScore = false;
-        // Could show a success message here
-      }).catch(error => {
-        console.error('Error submitting high score:', error);
-        isSubmittingHighScore = false;
-      });
+      // Submit the high score (desktop)
+      submitHighScore();
     } else if (!isSubmittingHighScore) {
       resetGame();
     }
@@ -2381,8 +2394,8 @@ function keyPressed() {
 }
 
 function keyTyped() {
-  // Handle name input for high score submission
-  if (gameState === 'gameOver' && isSubmittingHighScore) {
+  // Handle name input for high score submission (desktop only)
+  if (gameState === 'gameOver' && isSubmittingHighScore && !isMobileControlsEnabled()) {
     if (key.length === 1 && key.match(/[a-zA-Z0-9 ]/)) {
       // Allow letters, numbers, and spaces
       if (playerNameInput.length < 20) { // Limit name length
@@ -2684,7 +2697,7 @@ function drawGameCompleteScreen() {
   if (typeof isMobileControlsEnabled === 'function' && isMobileControlsEnabled()) {
     text("Tap to Play Again", width / 2, height / 2 + GAME_COMPLETE_PROMPT_Y_OFFSET);
   } else {
-    text("Press ENTER to Play Again", width / 2, height / 2 + GAME_COMPLETE_PROMPT_Y_OFFSET);
+    //text("Press ENTER to Play Again", width / 2, height / 2 + GAME_COMPLETE_PROMPT_Y_OFFSET);
   }
 }
 
@@ -2718,17 +2731,103 @@ function drawGameOverScreen() {
   
   // Handle high score submission
   if (isSubmittingHighScore) {
-    text("NEW HIGH SCORE!", width/2, height/2 + GAME_OVER_INFO_Y_OFFSET + 60);
-    text("Enter your name:", width/2, height/2 + GAME_OVER_INFO_Y_OFFSET + 90);
-    text(playerNameInput + "_", width/2, height/2 + GAME_OVER_INFO_Y_OFFSET + 120);
-    text("Press ENTER when done", width/2, height/2 + GAME_OVER_PROMPT_Y_OFFSET);
+    // Highlight "NEW HIGH SCORE!" with a background
+    push();
+    fill(60, 100, 100); // Bright yellow
+    textSize(GAME_OVER_INFO_TEXT_SIZE + 6); // Slightly larger
+    text("NEW HIGH SCORE!", width/2, height/2 + GAME_OVER_INFO_Y_OFFSET + 70);
+    pop();
+    
+    // "Enter your name:" instruction
+    fill(60, 80, 90); // Slightly dimmer yellow
+    textSize(GAME_OVER_INFO_TEXT_SIZE - 2);
+    text("Enter your name:", width/2, height/2 + GAME_OVER_INFO_Y_OFFSET + 110);
+    
+    // Show mobile input field or desktop text input
+    if (isMobileControlsEnabled()) {
+      // Position the HTML input field with better spacing for mobile
+      if (highscoreInputElement) {
+        highscoreInputElement.style.position = 'fixed';
+        highscoreInputElement.style.top = '60%'; // Lower position to avoid overlap
+        highscoreInputElement.style.left = '50%';
+        highscoreInputElement.style.transform = 'translate(-50%, -50%)';
+        highscoreInputElement.style.opacity = '1';
+        highscoreInputElement.style.pointerEvents = 'auto';
+        highscoreInputElement.style.zIndex = '10000';
+        highscoreInputElement.style.padding = '12px 20px';
+        highscoreInputElement.style.fontSize = '20px';
+        highscoreInputElement.style.textAlign = 'center';
+        highscoreInputElement.style.border = '3px solid #ffff00';
+        highscoreInputElement.style.borderRadius = '8px';
+        highscoreInputElement.style.backgroundColor = 'rgba(0, 0, 0, 0.9)';
+        highscoreInputElement.style.color = '#ffff00';
+        highscoreInputElement.style.boxShadow = '0 0 15px rgba(255, 255, 0, 0.5)';
+        highscoreInputElement.style.outline = 'none';
+        highscoreInputElement.style.minWidth = '250px';
+        highscoreInputElement.focus();
+      }
+      // Instructions positioned lower to avoid overlap
+      fill(60, 60, 80); // Dimmer for instructions
+      textSize(GAME_OVER_INFO_TEXT_SIZE - 4);
+      text("Type your name and tap ✓", width/2, height/2 + GAME_OVER_PROMPT_Y_OFFSET + 20);
+    } else {
+      // Desktop - show the typed name with highlighting
+      push();
+      // Background rectangle for the text input area
+      fill(0, 0, 20, 200); // Dark background with some transparency
+      stroke(60, 100, 100); // Bright yellow border
+      strokeWeight(2);
+      rectMode(CENTER);
+      let textWidth = max(200, playerNameInput.length * 12 + 40);
+      rect(width/2, height/2 + GAME_OVER_INFO_Y_OFFSET + 150, textWidth, 40, 5);
+      
+      // The actual text input
+      fill(60, 100, 100); // Bright yellow text
+      noStroke();
+      textSize(GAME_OVER_INFO_TEXT_SIZE);
+      text(playerNameInput + "_", width/2, height/2 + GAME_OVER_INFO_Y_OFFSET + 150);
+      pop();
+      
+      // Instructions positioned lower
+      fill(60, 60, 80);
+      textSize(GAME_OVER_INFO_TEXT_SIZE - 4);
+      //text("Press ENTER when done", width/2, height/2 + GAME_OVER_PROMPT_Y_OFFSET + 20);
+    }
   } else {
+    // Hide the input field when not needed
+    if (highscoreInputElement) {
+      highscoreInputElement.style.position = 'fixed';
+      highscoreInputElement.style.top = '-1000px';
+      highscoreInputElement.style.left = '-1000px';
+      highscoreInputElement.style.opacity = '0';
+      highscoreInputElement.style.pointerEvents = 'none';
+    }
+    
     // Show appropriate restart instruction
     if (typeof isMobileControlsEnabled === 'function' && isMobileControlsEnabled()) {
       text("Tap to Restart", width / 2, height / 2 + GAME_OVER_PROMPT_Y_OFFSET);
     } else {
       text("Press ENTER to Restart", width / 2, height / 2 + GAME_OVER_PROMPT_Y_OFFSET);
     }
+  }
+}
+
+// Function to submit high score (used by both desktop and mobile)
+function submitHighScore() {
+  if (playerNameInput.trim().length > 0) {
+    console.log('Submitting high score:', playerNameInput, totalScore);
+    highScoreManager.submitScore(playerNameInput.trim(), totalScore).then(() => {
+      console.log('High score submitted successfully!');
+      isSubmittingHighScore = false;
+      // Clear the input field
+      if (highscoreInputElement) {
+        highscoreInputElement.value = '';
+      }
+      playerNameInput = '';
+    }).catch(error => {
+      console.error('Error submitting high score:', error);
+      isSubmittingHighScore = false;
+    });
   }
 }
 
