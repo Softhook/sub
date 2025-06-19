@@ -5,7 +5,6 @@ const URLS_TO_CACHE = [
   'style.css',
   'sketch.js',
   'mobileControls.js',
-  'pwa-test.js',
   'manifest.json',
   'icon-192x192.png',
   'icon-512x512.png',
