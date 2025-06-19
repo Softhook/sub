@@ -2579,9 +2579,11 @@ function drawLevelCompleteScreen() {
   // Show score information
   textSize(LEVEL_COMPLETE_INFO_TEXT_SIZE);
   let timeLeftInSeconds = Math.max(0, Math.floor(player.airSupply / 60));
-  text(`Time bonus: ${timeLeftInSeconds} seconds x 10 = ${levelScore} points`, width / 2, height / 2 + LEVEL_COMPLETE_INFO_Y_OFFSET);
+  let timeBonus = timeLeftInSeconds * 10;
+  let levelBonus = 500;
+  text(`Time bonus: ${timeLeftInSeconds} seconds`, width / 2, height / 2 + LEVEL_COMPLETE_INFO_Y_OFFSET);
   let killsForNextLevel = getKillsRequiredForLevel(currentLevel+1);
-  text(`Next Level: Destroy ${killsForNextLevel} enemies and reach the reactor`, width/2, height / 2 + LEVEL_COMPLETE_INFO_Y_OFFSET + 40);
+  text(`Next Level: Destroy ${killsForNextLevel} enemies and reach the reactor`, width/2, height / 2 + LEVEL_COMPLETE_INFO_Y_OFFSET + 60);
   
   // Show appropriate continue instruction
   if (typeof isMobileControlsEnabled === 'function' && isMobileControlsEnabled()) {
@@ -2745,7 +2747,7 @@ function drawPlayingState() {
   } else if (cave.isGoal(player.pos.x, player.pos.y) && killsStillNeeded === 0) {
     // Level completed successfully - calculate score and add to total
     let timeLeftInSeconds = Math.max(0, Math.floor(player.airSupply / 60)); // Convert frames to seconds (assuming 60 FPS)
-    levelScore = timeLeftInSeconds * 10;
+    levelScore = (timeLeftInSeconds * 10) + 500; // Time bonus + 500 points for completing level
     totalScore += levelScore;
     gameState = (currentLevel >= MAX_LEVELS) ? 'gameComplete' : 'levelComplete';
   }
