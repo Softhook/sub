@@ -434,73 +434,33 @@ class JSONBinHighScores {
     this.apiKey = '$2a$10$XRHnUXHeO2GrvFemcCQxvOZTa9EyvkQsd8HELile0yws/UkuVIC46'; // X-Master-Key
     this.accessKey = '$2a$10$7wznneBgwFUQbnCsNIQ.eO/O9UBheBQomVH6oNlSv7voOtxDaawFW'; // X-Access-Key
     this.accessKeyId = '684eb2228960c979a5aa3f65'; // Access Key ID
-    this.binId = null;
+    // Use a fixed bin ID for global highscores across all devices
+    this.binId = '6853faef8960c979a5acc795'; // Fixed global bin ID
     this.baseUrl = 'https://api.jsonbin.io/v3/b';
     this.binName = 'SUBMARINE';
   }
 
   async initializeBin() {
     try {
-      const existingBin = await this.findExistingBin();
-      if (existingBin) {
-        this.binId = existingBin;
-        console.log('Found existing SUBMARINE highscore bin:', this.binId);
-        return true;
-      }
-
-      const response = await fetch('https://api.jsonbin.io/v3/b', {
-        method: 'POST',
+      // First, try to access the fixed global bin
+      const response = await fetch(`${this.baseUrl}/${this.binId}`, {
         headers: {
-          'Content-Type': 'application/json',
           'X-Master-Key': this.apiKey,
-          'X-Access-Key': this.accessKey,
-          'X-Bin-Name': this.binName
-        },
-        body: JSON.stringify({
-          scores: [],
-          gameInfo: {
-            name: 'Submarine Cave Explorer',
-            created: new Date().toISOString(),
-            version: '1.0',
-            description: 'High scores for the submarine cave exploration game'
-          }
-        })
+          'X-Access-Key': this.accessKey
+        }
       });
-
+      
       if (response.ok) {
-        const data = await response.json();
-        this.binId = data.metadata.id;
-        console.log('Created new SUBMARINE highscore bin:', this.binId);
-        localStorage.setItem('submarine-highscore-bin-id', this.binId);
+        console.log('Using existing global SUBMARINE highscore bin:', this.binId);
         return true;
       } else {
-        console.error('Failed to create bin:', response.status);
+        console.error('Global bin not accessible, status:', response.status);
         return false;
       }
     } catch (error) {
-      console.error('Error initializing bin:', error);
+      console.error('Error accessing global bin:', error);
       return false;
     }
-  }
-
-  async findExistingBin() {
-    const savedBinId = localStorage.getItem('submarine-highscore-bin-id');
-    if (savedBinId) {
-      try {
-        const response = await fetch(`${this.baseUrl}/${savedBinId}`, {
-          headers: {
-            'X-Master-Key': this.apiKey,
-            'X-Access-Key': this.accessKey
-          }
-        });
-        if (response.ok) {
-          return savedBinId;
-        }
-      } catch (error) {
-        localStorage.removeItem('submarine-highscore-bin-id');
-      }
-    }
-    return null;
   }
 
   async getHighScores() {
