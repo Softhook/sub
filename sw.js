@@ -1,4 +1,4 @@
-const CACHE_NAME = 'reactor-dive-cache-v11'; // Bump version
+const CACHE_NAME = 'reactor-dive-cache-v13'; // Bump version for display_override
 const URLS_TO_CACHE = [
   './', // The start URL
   'index.html',
