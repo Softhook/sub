@@ -2025,7 +2025,7 @@ function setup() {
     
     // Setup enter key listener for mobile
     highscoreInputElement.addEventListener('keydown', function(e) {
-      if (e.key === 'Enter' && isSubmittingHighScore && playerNameInput.trim().length > 0) {
+      if (e.key === 'Enter' && isSubmittingHighScore && playerNameInput.trim().length > 0 && !isSubmissionInProgress) {
         submitHighScore();
       }
     });
@@ -2383,7 +2383,7 @@ function keyPressed() {
       }
     }, 100); // Small delay to allow loading screen to render
  }  else if (gameState === 'gameOver' && keyCode === ENTER) {
-    if (isSubmittingHighScore && playerNameInput.trim().length > 0) {
+    if (isSubmittingHighScore && playerNameInput.trim().length > 0 && !isSubmissionInProgress) {
       // Submit the high score (desktop)
       submitHighScore();
     } else if (!isSubmittingHighScore) {
@@ -2772,11 +2772,15 @@ function drawGameOverScreen() {
         highscoreInputElement.style.outline = 'none';
         highscoreInputElement.style.minWidth = '250px';
         // highscoreInputElement.focus(); // REMOVED: Focus is now handled by touchStarted
-      }
-      // Instructions positioned lower to avoid overlap
-      fill(60, 60, 80); // Dimmer for instructions
-      textSize(GAME_OVER_INFO_TEXT_SIZE - 4);
+      }    // Instructions positioned lower to avoid overlap
+    fill(60, 60, 80); // Dimmer for instructions
+    textSize(GAME_OVER_INFO_TEXT_SIZE - 4);
+    if (isSubmissionInProgress) {
+      fill(60, 100, 100); // Bright yellow when submitting
+      text("SUBMITTING SCORE...", width/2, height/2 + GAME_OVER_PROMPT_Y_OFFSET + 20);
+    } else {
       text("Tap to enter name, then type", width/2, height/2 + GAME_OVER_PROMPT_Y_OFFSET + 20);
+    }
     } else {
       // Desktop - show the typed name with highlighting
       push();
@@ -2792,13 +2796,19 @@ function drawGameOverScreen() {
       fill(60, 100, 100); // Bright yellow text
       noStroke();
       textSize(GAME_OVER_INFO_TEXT_SIZE);
-      text(playerNameInput + "_", width/2, height/2 + GAME_OVER_INFO_Y_OFFSET + 150);
+      if (isSubmissionInProgress) {
+        text("SUBMITTING...", width/2, height/2 + GAME_OVER_INFO_Y_OFFSET + 150);
+      } else {
+        text(playerNameInput + "_", width/2, height/2 + GAME_OVER_INFO_Y_OFFSET + 150);
+      }
       pop();
       
       // Instructions positioned lower
       fill(60, 60, 80);
       textSize(GAME_OVER_INFO_TEXT_SIZE - 4);
-      //text("Press ENTER when done", width/2, height/2 + GAME_OVER_PROMPT_Y_OFFSET + 20);
+      if (!isSubmissionInProgress) {
+        //text("Press ENTER when done", width/2, height/2 + GAME_OVER_PROMPT_Y_OFFSET + 20);
+      }
     }
   } else {
     // Hide the input field when not needed
@@ -2829,21 +2839,52 @@ function submitHighScore() {
   if (playerNameInput.trim().length > 0) {
     console.log('Submitting high score:', playerNameInput, totalScore);
     isSubmissionInProgress = true; // Set flag to prevent duplicate submissions
+    
+    // Immediately disable input field and show loading
+    if (highscoreInputElement) {
+      highscoreInputElement.disabled = true;
+      highscoreInputElement.style.backgroundColor = 'rgba(100, 100, 100, 0.5)';
+      highscoreInputElement.style.color = '#999999';
+      highscoreInputElement.style.pointerEvents = 'none';
+    }
+    
+    // Show loading overlay with submission message
+    showLoadingOverlay("SUBMITTING SCORE...");
+    
     highScoreManager.submitScore(playerNameInput.trim(), totalScore).then(() => {
       console.log('High score submitted successfully!');
+      hideLoadingOverlay();
       isSubmittingHighScore = false;
       isMobileInputFocused = false; // Reset flag
-      // Clear the input field
+      isSubmissionInProgress = false; // Reset flag after submission
+      
+      // Clear and reset the input field
       if (highscoreInputElement) {
         highscoreInputElement.value = '';
+        highscoreInputElement.disabled = false;
+        highscoreInputElement.style.backgroundColor = 'rgba(0, 0, 0, 0.9)';
+        highscoreInputElement.style.color = '#ffff00';
+        highscoreInputElement.style.pointerEvents = 'auto';
       }
       playerNameInput = '';
-      isSubmissionInProgress = false; // Reset flag after submission
+      
     }).catch(error => {
       console.error('Error submitting high score:', error);
-      isSubmittingHighScore = false;
-      isMobileInputFocused = false; // Also reset on error
+      hideLoadingOverlay();
       isSubmissionInProgress = false; // Reset flag on error
+      
+      // Re-enable input field for retry
+      if (highscoreInputElement) {
+        highscoreInputElement.disabled = false;
+        highscoreInputElement.style.backgroundColor = 'rgba(0, 0, 0, 0.9)';
+        highscoreInputElement.style.color = '#ffff00';
+        highscoreInputElement.style.pointerEvents = 'auto';
+      }
+      
+      // Show error message
+      setTimeout(() => {
+        alert("Failed to submit high score. Please check your connection and try again.");
+      }, 100);
     });
   }
 }
@@ -3031,7 +3072,7 @@ function touchStarted() {
   }
 
   // Handle high score input focus on mobile. A tap anywhere on the screen will trigger it.
-  if (gameState === 'gameOver' && isSubmittingHighScore && isMobileControlsEnabled() && !isMobileInputFocused) {
+  if (gameState === 'gameOver' && isSubmittingHighScore && isMobileControlsEnabled() && !isMobileInputFocused && !isSubmissionInProgress) {
     if (highscoreInputElement) {
       console.log("User tapped, focusing high score input element.");
       highscoreInputElement.focus();
@@ -3039,7 +3080,7 @@ function touchStarted() {
     } else {
       // Fallback if the element doesn't exist for some reason
       const name = prompt("NEW HIGH SCORE! Enter your name (20 chars max):", "");
-      if (name) {
+      if (name && !isSubmissionInProgress) {
         playerNameInput = name;
         submitHighScore();
       }
