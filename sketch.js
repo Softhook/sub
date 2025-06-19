@@ -2755,7 +2755,7 @@ function drawGameOverScreen() {
       // Position the HTML input field with better spacing for mobile
       if (highscoreInputElement) {
         highscoreInputElement.style.position = 'fixed';
-        highscoreInputElement.style.top = '60%'; // Lower position to avoid overlap
+        highscoreInputElement.style.top = '65%'; // Moved down to avoid overlap
         highscoreInputElement.style.left = '50%';
         highscoreInputElement.style.transform = 'translate(-50%, -50%)';
         highscoreInputElement.style.opacity = '1';
@@ -2772,33 +2772,40 @@ function drawGameOverScreen() {
         highscoreInputElement.style.outline = 'none';
         highscoreInputElement.style.minWidth = '250px';
         // highscoreInputElement.focus(); // REMOVED: Focus is now handled by touchStarted
-      }    // Instructions positioned lower to avoid overlap
-    fill(60, 60, 80); // Dimmer for instructions
-    textSize(GAME_OVER_INFO_TEXT_SIZE - 4);
-    if (isSubmissionInProgress) {
-      fill(60, 100, 100); // Bright yellow when submitting
-      text("SUBMITTING SCORE...", width/2, height/2 + GAME_OVER_PROMPT_Y_OFFSET + 20);
-    } else {
-      text("Tap to enter name, then type", width/2, height/2 + GAME_OVER_PROMPT_Y_OFFSET + 20);
-    }
+      }
+      // Instructions positioned lower to avoid overlap
+      fill(60, 60, 80); // Dimmer for instructions
+      textSize(GAME_OVER_INFO_TEXT_SIZE - 4);
+      if (isSubmissionInProgress) {
+        fill(60, 100, 100); // Bright yellow when submitting
+        text("SUBMITTING SCORE...", width/2, height/2 + GAME_OVER_PROMPT_Y_OFFSET + 60);
+      } else {
+        text("Tap to enter name, then type", width/2, height/2 + GAME_OVER_PROMPT_Y_OFFSET + 60);
+      }
     } else {
       // Desktop - show the typed name with highlighting
       push();
       // Background rectangle for the text input area
-      fill(0, 0, 20, 200); // Dark background with some transparency
-      stroke(60, 100, 100); // Bright yellow border
+      if (isSubmissionInProgress) {
+        fill(0, 0, 20, 200); // Dark background with some transparency
+        stroke(60, 60, 60); // Dimmer border when submitting
+      } else {
+        fill(0, 0, 20, 200); // Dark background with some transparency
+        stroke(60, 100, 100); // Bright yellow border
+      }
       strokeWeight(2);
       rectMode(CENTER);
       let textWidth = max(200, playerNameInput.length * 12 + 40);
       rect(width/2, height/2 + GAME_OVER_INFO_Y_OFFSET + 150, textWidth, 40, 5);
       
       // The actual text input
-      fill(60, 100, 100); // Bright yellow text
       noStroke();
       textSize(GAME_OVER_INFO_TEXT_SIZE);
       if (isSubmissionInProgress) {
+        fill(60, 60, 80); // Dimmer text when submitting
         text("SUBMITTING...", width/2, height/2 + GAME_OVER_INFO_Y_OFFSET + 150);
       } else {
+        fill(60, 100, 100); // Bright yellow text
         text(playerNameInput + "_", width/2, height/2 + GAME_OVER_INFO_Y_OFFSET + 150);
       }
       pop();
