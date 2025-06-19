@@ -426,6 +426,7 @@ let isHighScoreResult = false; // Whether the current score qualifies as a high 
 
 // Mobile input handling
 let highscoreInputElement = null; // Reference to the HTML input element
+let isMobileInputFocused = false; // New flag to track focus state
 
 // Highscore system variables
 let highScores = null; // Will hold the array of high scores
@@ -2203,6 +2204,7 @@ function resetGame() {
   isSubmittingHighScore = false;
   playerNameInput = '';
   isHighScoreResult = false;
+  isMobileInputFocused = false; // Reset flag
   
   // Clear any existing game state
   sonarBubbles = []; // Clear bubbles on reset
@@ -2372,7 +2374,6 @@ function keyPressed() {
       player.airSupply = player.initialAirSupply; // Reset to full for new game
       player.lastSonarTime = frameCount - player.sonarCooldown; // Allow immediate sonar
       player.lastShotTime = frameCount - player.shotCooldown;   // Allow immediate shot
-      player.lastSonarTime = frameCount - player.sonarCooldown; // Ensure sonar is ready
       gameState = 'playing';
       // Reactor hum is continuously playing, just needs to be started if not already
       if (audioInitialized && reactorHumOsc && reactorHumOsc.started) {
@@ -2567,7 +2568,7 @@ function drawStartScreen() {
   
   fill(PLAYER_COLOR_PROPELLER_H, PLAYER_COLOR_PROPELLER_S, PLAYER_COLOR_PROPELLER_B);
   noStroke();
-  
+
   let apparentHeight = subRadius * PLAYER_PROPELLER_MAX_SIDE_HEIGHT_FACTOR * abs(sin(startScreenPropellerAngle));
   let thickness = subRadius * PLAYER_PROPELLER_THICKNESS_FACTOR;
 
@@ -2660,7 +2661,11 @@ function drawHighScoreScreen() {
   // Instructions
   textSize(20);
   fill(60, 100, 100); // Yellow prompt text
-  text("Press ENTER to Play", width / 2, height / 2 + 200);
+  if (typeof isMobileControlsEnabled === 'function' && isMobileControlsEnabled()) {
+    text("Tap to Play", width / 2, height / 2 + 200);
+  } else {
+    text("Press ENTER to Play", width / 2, height / 2 + 200);
+  }
 }
 
 function drawLevelCompleteScreen() {
@@ -2697,7 +2702,7 @@ function drawGameCompleteScreen() {
   if (typeof isMobileControlsEnabled === 'function' && isMobileControlsEnabled()) {
     text("Tap to Play Again", width / 2, height / 2 + GAME_COMPLETE_PROMPT_Y_OFFSET);
   } else {
-    //text("Press ENTER to Play Again", width / 2, height / 2 + GAME_COMPLETE_PROMPT_Y_OFFSET);
+    text("Press ENTER to Play Again", width / 2, height / 2 + GAME_COMPLETE_PROMPT_Y_OFFSET);
   }
 }
 
@@ -2764,12 +2769,12 @@ function drawGameOverScreen() {
         highscoreInputElement.style.boxShadow = '0 0 15px rgba(255, 255, 0, 0.5)';
         highscoreInputElement.style.outline = 'none';
         highscoreInputElement.style.minWidth = '250px';
-        highscoreInputElement.focus();
+        // highscoreInputElement.focus(); // REMOVED: Focus is now handled by touchStarted
       }
       // Instructions positioned lower to avoid overlap
       fill(60, 60, 80); // Dimmer for instructions
       textSize(GAME_OVER_INFO_TEXT_SIZE - 4);
-      text("Type your name and tap ✓", width/2, height/2 + GAME_OVER_PROMPT_Y_OFFSET + 20);
+      text("Tap to enter name, then type", width/2, height/2 + GAME_OVER_PROMPT_Y_OFFSET + 20);
     } else {
       // Desktop - show the typed name with highlighting
       push();
@@ -2819,6 +2824,7 @@ function submitHighScore() {
     highScoreManager.submitScore(playerNameInput.trim(), totalScore).then(() => {
       console.log('High score submitted successfully!');
       isSubmittingHighScore = false;
+      isMobileInputFocused = false; // Reset flag
       // Clear the input field
       if (highscoreInputElement) {
         highscoreInputElement.value = '';
@@ -2827,6 +2833,7 @@ function submitHighScore() {
     }).catch(error => {
       console.error('Error submitting high score:', error);
       isSubmittingHighScore = false;
+      isMobileInputFocused = false; // Also reset on error
     });
   }
 }
@@ -2902,7 +2909,7 @@ function drawPlayingState() {
         if (d < projectiles[i].radius + jellyfish[j].radius) {
           // Jellyfish takes damage instead of being destroyed immediately
           let destroyed = jellyfish[j].takeDamage();
-          createExplosion(projectiles[i].pos.x, projectiles[i].pos.y, 'enemy');
+          createExplosion(projectiles[i].pos.x, projectiles[i].pos.y, 'creature');
           projectiles.splice(i, 1);
           
           if (destroyed) {
@@ -3008,6 +3015,68 @@ function getKillsRequiredForLevel(level) {
 
 // --- Touch Event Forwarding for Mobile Controls ---
 function touchStarted() {
+  // --- New logic for game state transitions and input focus ---
+  if (!audioInitialized) {
+    startAudioRoutine();
+  }
+
+  // Handle high score input focus on mobile. A tap anywhere on the screen will trigger it.
+  if (gameState === 'gameOver' && isSubmittingHighScore && isMobileControlsEnabled() && !isMobileInputFocused) {
+    if (highscoreInputElement) {
+      console.log("User tapped, focusing high score input element.");
+      highscoreInputElement.focus();
+      isMobileInputFocused = true;
+    } else {
+      // Fallback if the element doesn't exist for some reason
+      const name = prompt("NEW HIGH SCORE! Enter your name (20 chars max):", "");
+      if (name) {
+        playerNameInput = name;
+        submitHighScore();
+      }
+    }
+    return false; // Consume this touch to prevent other actions
+  }
+
+  // Handle screen transitions on tap for mobile
+  if (isMobileControlsEnabled()) {
+    if (gameState === 'start') {
+      gameState = 'highScores';
+      highScores = null;
+      highScoreManager.getHighScores().then(scores => { highScores = scores; })
+        .catch(error => { console.error('Failed to load high scores:', error); highScores = []; });
+      return false;
+    }
+    if (gameState === 'highScores') {
+      gameState = 'loading';
+      showLoadingOverlay("GENERATING LEVEL");
+      setTimeout(() => {
+        initGameObjects();
+        player.health = PLAYER_INITIAL_HEALTH;
+        player.airSupply = player.initialAirSupply;
+        player.lastSonarTime = frameCount - player.sonarCooldown;
+        player.lastShotTime = frameCount - player.shotCooldown;
+        gameState = 'playing';
+        if (audioInitialized && reactorHumOsc && reactorHumOsc.started) {
+          reactorHumOsc.amp(0, 0);
+        }
+      }, 100);
+      return false;
+    }
+    if (gameState === 'gameOver' && !isSubmittingHighScore) {
+      resetGame();
+      return false;
+    }
+    if (gameState === 'gameComplete') {
+      resetGame();
+      return false;
+    }
+    if (gameState === 'levelComplete') {
+      prepareNextLevel();
+      return false;
+    }
+  }
+  // --- End of new logic ---
+
   if (typeof handleMobileTouchStart === 'function') {
     handleMobileTouchStart(touches);
   }
@@ -3029,20 +3098,5 @@ function touchEnded() {
   }
   // Prevent default to avoid issues on mobile
   return false;
-}
-
-// Submit highscore using XMLHttpRequest (JSONBin API)
-function submitHighScoreXHR(binId, apiKey, accessKey, scoreData, callback) {
-  let req = new XMLHttpRequest();
-  req.onreadystatechange = () => {
-    if (req.readyState == XMLHttpRequest.DONE) {
-      if (callback) callback(req.responseText, req.status);
-    }
-  };
-  req.open("PUT", `https://api.jsonbin.io/v3/b/${binId}`, true);
-  req.setRequestHeader("Content-Type", "application/json");
-  req.setRequestHeader("X-Master-Key", apiKey);
-  if (accessKey) req.setRequestHeader("X-Access-Key", accessKey);
-  req.send(JSON.stringify(scoreData));
 }
 
