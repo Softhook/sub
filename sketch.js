@@ -418,6 +418,9 @@ let totalScore = 0; // Total accumulated score across all completed levels
 let levelScore = 0; // Score for the current level
 let debugShowWalls = false; // Debug mode to show all cave walls
 
+// Highscore system variables
+let highScores = null; // Will hold the array of high scores
+
 // --- JSONBin HighScore Manager ---
 class JSONBinHighScores {
   constructor() {
@@ -2309,7 +2312,7 @@ function mousePressed() {
 
 function keyPressed() {
   // Start audio on Enter press from certain game states if not already started
-  if (!audioInitialized && (keyCode === ENTER && (gameState === 'start' || gameState === 'levelComplete' || gameState === 'gameOver' || gameState === 'gameComplete'))) {
+  if (!audioInitialized && (keyCode === ENTER && (gameState === 'start' || gameState === 'highScores' || gameState === 'levelComplete' || gameState === 'gameOver' || gameState === 'gameComplete'))) {
     startAudioRoutine();
   }
 
@@ -2324,7 +2327,18 @@ function keyPressed() {
   }
   
   if (gameState === 'start' && keyCode === ENTER) {
-    // Set loading state and defer heavy initialization
+    // Transition from start screen to high scores
+    gameState = 'highScores';
+    highScores = null; // Reset to show loading
+    // Load high scores asynchronously
+    highScoreManager.getHighScores().then(scores => {
+      highScores = scores;
+    }).catch(error => {
+      console.error('Failed to load high scores:', error);
+      highScores = []; // Set to empty array on error
+    });
+  } else if (gameState === 'highScores' && keyCode === ENTER) {
+    // Transition from high scores to game
     gameState = 'loading';
     showLoadingOverlay("GENERATING LEVEL");
     
@@ -2571,6 +2585,41 @@ function drawStartScreen() {
  }
 }
 
+function drawHighScoreScreen() {
+  background(BACKGROUND_COLOR_H, BACKGROUND_COLOR_S, BACKGROUND_COLOR_B);
+  textAlign(CENTER, CENTER);
+  
+  // Title
+  fill(0, 0, 100); // White text
+  textSize(48);
+  text("HIGH SCORES", width / 2, height / 2 - 200);
+  
+  // High scores list
+  textSize(24);
+  if (!highScores) {
+    // Loading state
+    fill(60, 100, 80); // Yellow loading text
+    text("Loading scores...", width / 2, height / 2);
+  } else if (highScores.length === 0) {
+    // No scores yet
+    fill(0, 0, 60); // Gray text
+    text("No scores yet. Be the first!", width / 2, height / 2);
+  } else {
+    // Display scores
+    fill(0, 0, 90); // Light gray for scores
+    for (let i = 0; i < Math.min(highScores.length, 10); i++) {
+      let score = highScores[i];
+      let yPos = height / 2 - 150 + i * 30;
+      text(`${i + 1}. ${score.name}: ${score.score}`, width / 2, yPos);
+    }
+  }
+  
+  // Instructions
+  textSize(20);
+  fill(60, 100, 100); // Yellow prompt text
+  text("Press ENTER to Play", width / 2, height / 2 + 200);
+}
+
 function drawLevelCompleteScreen() {
   textAlign(CENTER, CENTER); 
   fill(LEVEL_COMPLETE_TITLE_COLOR_H, LEVEL_COMPLETE_TITLE_COLOR_S, LEVEL_COMPLETE_TITLE_COLOR_B); textSize(LEVEL_COMPLETE_TITLE_TEXT_SIZE);
@@ -2758,6 +2807,10 @@ function draw() {
 
   if (gameState === 'start') {
     drawStartScreen();
+    return;
+  }
+  if (gameState === 'highScores') {
+    drawHighScoreScreen();
     return;
   }
   if (gameState === 'loading') {

@@ -230,7 +230,7 @@ class MobileControls {
       
       // Handle start screen and other non-gameplay screens - tap anywhere to continue
       if (typeof gameState !== 'undefined' && 
-          (gameState === 'start' || gameState === 'levelComplete' || 
+          (gameState === 'start' || gameState === 'highScores' || gameState === 'levelComplete' || 
            gameState === 'gameOver' || gameState === 'gameComplete')) {
         
         console.log('Touch detected on non-gameplay screen, simulating ENTER key');
