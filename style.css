@@ -23,6 +23,9 @@ html, body {
   backface-visibility: hidden;
   /* Prevent overscroll bounce */
   overscroll-behavior: none;
+  /* Handle Android status bar in fullscreen */
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
 body {
@@ -32,14 +35,16 @@ body {
   left: 0;
   right: 0;
   bottom: 0;
-  /* Ensure no gaps on any device */
-  min-height: 100vh;
+  /* Use the actual screen height including status bar areas */
+  min-height: 100svh; /* Small viewport height - actual screen */
+  height: 100svh;
 }
 
-/* Dynamic viewport height fallback */
-@supports (height: 100dvh) {
+/* Fallback for browsers without small viewport support */
+@supports not (height: 100svh) {
   body {
-    min-height: 100dvh;
+    min-height: 100vh;
+    height: 100vh;
   }
 }
 
@@ -49,7 +54,7 @@ canvas {
   top: 0;
   left: 0;
   width: 100vw; /* Use viewport width */
-  height: 100vh; /* Use viewport height */
+  height: 100svh; /* Use small viewport height for true fullscreen */
   /* Prevent overscroll bounce - redundant but safe */
   overscroll-behavior: none;
   /* Ensure canvas is above everything */
@@ -58,12 +63,15 @@ canvas {
   transform: translateZ(0);
   -webkit-backface-visibility: hidden;
   backface-visibility: hidden;
+  /* Handle safe areas on devices with notches */
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
-/* Dynamic viewport height fallback */
-@supports (height: 100dvh) {
+/* Fallback for browsers without small viewport support */
+@supports not (height: 100svh) {
   canvas {
-    height: 100dvh;
+    height: 100vh;
   }
 }
 
@@ -73,13 +81,23 @@ canvas {
   top: 0;
   left: 0;
   width: 100vw;
-  height: 100vh;
+  height: 100svh; /* Use small viewport height for true fullscreen */
   background-color: rgb(11, 19, 38); /* Match exact game background HSB(220, 70, 15) */
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 9999;
   transition: opacity 0.5s ease-out;
+  /* Handle safe areas */
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Fallback for browsers without small viewport support */
+@supports not (height: 100svh) {
+  .loading-overlay {
+    height: 100vh;
+  }
 }
 
 .loading-overlay.hidden {
