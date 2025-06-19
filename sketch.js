@@ -424,7 +424,10 @@ let highScores = null; // Will hold the array of high scores
 // --- JSONBin HighScore Manager ---
 class JSONBinHighScores {
   constructor() {
-    this.apiKey = '$2a$10$7wznneBgwFUQbnCsNIQ.eO/O9UBheBQomVH6oNlSv7voOtxDaawFW';
+    // Provided credentials
+    this.apiKey = '$2a$10$XRHnUXHeO2GrvFemcCQxvOZTa9EyvkQsd8HELile0yws/UkuVIC46'; // X-Master-Key
+    this.accessKey = '$2a$10$7wznneBgwFUQbnCsNIQ.eO/O9UBheBQomVH6oNlSv7voOtxDaawFW'; // X-Access-Key
+    this.accessKeyId = '684eb2228960c979a5aa3f65'; // Access Key ID
     this.binId = null;
     this.baseUrl = 'https://api.jsonbin.io/v3/b';
     this.binName = 'SUBMARINE';
@@ -444,6 +447,7 @@ class JSONBinHighScores {
         headers: {
           'Content-Type': 'application/json',
           'X-Master-Key': this.apiKey,
+          'X-Access-Key': this.accessKey,
           'X-Bin-Name': this.binName
         },
         body: JSON.stringify({
@@ -478,7 +482,10 @@ class JSONBinHighScores {
     if (savedBinId) {
       try {
         const response = await fetch(`${this.baseUrl}/${savedBinId}`, {
-          headers: { 'X-Master-Key': this.apiKey }
+          headers: {
+            'X-Master-Key': this.apiKey,
+            'X-Access-Key': this.accessKey
+          }
         });
         if (response.ok) {
           return savedBinId;
@@ -498,7 +505,10 @@ class JSONBinHighScores {
 
     try {
       const response = await fetch(`${this.baseUrl}/${this.binId}/latest`, {
-        headers: { 'X-Master-Key': this.apiKey }
+        headers: {
+          'X-Master-Key': this.apiKey,
+          'X-Access-Key': this.accessKey
+        }
       });
 
       if (response.ok) {
@@ -541,7 +551,8 @@ class JSONBinHighScores {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'X-Master-Key': this.apiKey
+          'X-Master-Key': this.apiKey,
+          'X-Access-Key': this.accessKey
         },
         body: JSON.stringify(currentData)
       });
@@ -556,7 +567,10 @@ class JSONBinHighScores {
   async getCurrentBinData() {
     try {
       const response = await fetch(`${this.baseUrl}/${this.binId}/latest`, {
-        headers: { 'X-Master-Key': this.apiKey }
+        headers: {
+          'X-Master-Key': this.apiKey,
+          'X-Access-Key': this.accessKey
+        }
       });
       return response.ok ? (await response.json()).record : null;
     } catch (error) {
@@ -572,6 +586,21 @@ class JSONBinHighScores {
 
 // Initialize the highscore manager
 const highScoreManager = new JSONBinHighScores();
+
+// Submit highscore using XMLHttpRequest (JSONBin API)
+function submitHighScoreXHR(binId, apiKey, accessKey, scoreData, callback) {
+  let req = new XMLHttpRequest();
+  req.onreadystatechange = () => {
+    if (req.readyState == XMLHttpRequest.DONE) {
+      if (callback) callback(req.responseText, req.status);
+    }
+  };
+  req.open("PUT", `https://api.jsonbin.io/v3/b/${binId}`, true);
+  req.setRequestHeader("Content-Type", "application/json");
+  req.setRequestHeader("X-Master-Key", apiKey);
+  if (accessKey) req.setRequestHeader("X-Access-Key", accessKey);
+  req.send(JSON.stringify(scoreData));
+}
 
 // Helper function to process game object arrays (update, render, remove offscreen)
 function processGameObjectArray(arr, offsetX, offsetY, caveContext = null) {
@@ -2757,6 +2786,7 @@ function drawPlayingState() {
           }
           break;
         }
+
       }
     }
   }
@@ -2865,5 +2895,20 @@ function touchEnded() {
   }
   // Prevent default to avoid issues on mobile
   return false;
+}
+
+// Submit highscore using XMLHttpRequest (JSONBin API)
+function submitHighScoreXHR(binId, apiKey, accessKey, scoreData, callback) {
+  let req = new XMLHttpRequest();
+  req.onreadystatechange = () => {
+    if (req.readyState == XMLHttpRequest.DONE) {
+      if (callback) callback(req.responseText, req.status);
+    }
+  };
+  req.open("PUT", `https://api.jsonbin.io/v3/b/${binId}`, true);
+  req.setRequestHeader("Content-Type", "application/json");
+  req.setRequestHeader("X-Master-Key", apiKey);
+  if (accessKey) req.setRequestHeader("X-Access-Key", accessKey);
+  req.send(JSON.stringify(scoreData));
 }
 
