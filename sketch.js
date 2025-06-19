@@ -2872,6 +2872,8 @@ function submitHighScore() {
         highscoreInputElement.style.backgroundColor = 'rgba(0, 0, 0, 0.9)';
         highscoreInputElement.style.color = '#ffff00';
         highscoreInputElement.style.pointerEvents = 'auto';
+        // Hide the on-screen keyboard on mobile by blurring the input
+        highscoreInputElement.blur();
       }
       playerNameInput = '';
       
