@@ -418,6 +418,12 @@ let totalScore = 0; // Total accumulated score across all completed levels
 let levelScore = 0; // Score for the current level
 let debugShowWalls = false; // Debug mode to show all cave walls
 
+// Highscore submission variables
+let isHighScoreChecked = false; // Track if we've checked for high score
+let isSubmittingHighScore = false; // Track if we're in high score entry mode
+let playerNameInput = ''; // Store the player's name input
+let isHighScoreResult = false; // Whether the current score qualifies as a high score
+
 // Highscore system variables
 let highScores = null; // Will hold the array of high scores
 
@@ -2211,6 +2217,12 @@ function resetGame() {
   totalScore = 0; // Reset total score for new game
   levelScore = 0; // Reset level score
   
+  // Reset highscore submission variables
+  isHighScoreChecked = false;
+  isSubmittingHighScore = false;
+  playerNameInput = '';
+  isHighScoreResult = false;
+  
   // Clear any existing game state
   sonarBubbles = []; // Clear bubbles on reset
   particles = []; // Clear global particles on reset
@@ -2386,10 +2398,39 @@ function keyPressed() {
         reactorHumOsc.amp(0, 0); // Start at zero volume, will be controlled by updateReactorHum
       }
     }, 100); // Small delay to allow loading screen to render
- }  else if ((gameState === 'gameOver' || gameState === 'gameComplete') && keyCode === ENTER) {
+ }  else if (gameState === 'gameOver' && keyCode === ENTER) {
+    if (isSubmittingHighScore && playerNameInput.trim().length > 0) {
+      // Submit the high score
+      console.log('Submitting high score:', playerNameInput, totalScore);
+      highScoreManager.submitScore(playerNameInput.trim(), totalScore).then(() => {
+        console.log('High score submitted successfully!');
+        isSubmittingHighScore = false;
+        // Could show a success message here
+      }).catch(error => {
+        console.error('Error submitting high score:', error);
+        isSubmittingHighScore = false;
+      });
+    } else if (!isSubmittingHighScore) {
+      resetGame();
+    }
+  } else if (gameState === 'gameComplete' && keyCode === ENTER) {
     resetGame();
   } else if (gameState === 'levelComplete' && keyCode === ENTER) {
     prepareNextLevel();
+  }
+}
+
+function keyTyped() {
+  // Handle name input for high score submission
+  if (gameState === 'gameOver' && isSubmittingHighScore) {
+    if (key.length === 1 && key.match(/[a-zA-Z0-9 ]/)) {
+      // Allow letters, numbers, and spaces
+      if (playerNameInput.length < 20) { // Limit name length
+        playerNameInput += key;
+      }
+    } else if (keyCode === BACKSPACE && playerNameInput.length > 0) {
+      playerNameInput = playerNameInput.slice(0, -1);
+    }
   }
 }
 
@@ -2688,6 +2729,26 @@ function drawGameCompleteScreen() {
 }
 
 function drawGameOverScreen() {
+  // Check if this is a high score (only do this once)
+  if (!isHighScoreChecked) {
+    isHighScoreChecked = true;
+    console.log('Checking if score', totalScore, 'is a high score...');
+    
+    highScoreManager.isHighScore(totalScore).then(result => {
+      isHighScoreResult = result;
+      if (result) {
+        console.log('Score qualifies as a high score!');
+        isSubmittingHighScore = true;
+        playerNameInput = '';
+      } else {
+        console.log('Score does not qualify as a high score.');
+      }
+    }).catch(error => {
+      console.error('Error checking high score:', error);
+      isHighScoreResult = false;
+    });
+  }
+
   textAlign(CENTER, CENTER);
   fill(GAME_OVER_TITLE_COLOR_H, GAME_OVER_TITLE_COLOR_S, GAME_OVER_TITLE_COLOR_B); textSize(GAME_OVER_TITLE_TEXT_SIZE);
   text("MISSION FAILED", width/2, height/2 + GAME_OVER_TITLE_Y_OFFSET);
@@ -2695,11 +2756,19 @@ function drawGameOverScreen() {
   text(player.health <= 0 ? "Submarine Destroyed!" : "Air Supply Depleted!", width/2, height/2 + GAME_OVER_INFO_Y_OFFSET);
   text(`Total Score: ${totalScore}`, width/2, height/2 + GAME_OVER_INFO_Y_OFFSET + 30);
   
-  // Show appropriate restart instruction
-  if (typeof isMobileControlsEnabled === 'function' && isMobileControlsEnabled()) {
-    text("Tap to Restart", width / 2, height / 2 + GAME_OVER_PROMPT_Y_OFFSET);
+  // Handle high score submission
+  if (isSubmittingHighScore) {
+    text("NEW HIGH SCORE!", width/2, height/2 + GAME_OVER_INFO_Y_OFFSET + 60);
+    text("Enter your name:", width/2, height/2 + GAME_OVER_INFO_Y_OFFSET + 90);
+    text(playerNameInput + "_", width/2, height/2 + GAME_OVER_INFO_Y_OFFSET + 120);
+    text("Press ENTER when done", width/2, height/2 + GAME_OVER_PROMPT_Y_OFFSET);
   } else {
-    text("Press ENTER to Restart", width / 2, height / 2 + GAME_OVER_PROMPT_Y_OFFSET);
+    // Show appropriate restart instruction
+    if (typeof isMobileControlsEnabled === 'function' && isMobileControlsEnabled()) {
+      text("Tap to Restart", width / 2, height / 2 + GAME_OVER_PROMPT_Y_OFFSET);
+    } else {
+      text("Press ENTER to Restart", width / 2, height / 2 + GAME_OVER_PROMPT_Y_OFFSET);
+    }
   }
 }
 
@@ -2821,6 +2890,12 @@ function drawPlayingState() {
         let timeLeftInSeconds = Math.max(0, Math.floor(player.airSupply / 60)); // Convert frames to seconds (assuming 60 FPS)
         levelScore = timeLeftInSeconds * 10;
         playSound('gameOver');
+        
+        // Reset highscore checking variables
+        isHighScoreChecked = false;
+        isSubmittingHighScore = false;
+        playerNameInput = '';
+        isHighScoreResult = false;
       }
       gameState = 'gameOver';
   } else if (cave.isGoal(player.pos.x, player.pos.y) && killsStillNeeded === 0) {
