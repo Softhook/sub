@@ -423,6 +423,7 @@ let isHighScoreChecked = false; // Track if we've checked for high score
 let isSubmittingHighScore = false; // Track if we're in high score entry mode
 let playerNameInput = ''; // Store the player's name input
 let isHighScoreResult = false; // Whether the current score qualifies as a high score
+let isSubmissionInProgress = false; // To prevent multiple submissions
 
 // Mobile input handling
 let highscoreInputElement = null; // Reference to the HTML input element
@@ -1477,7 +1478,7 @@ class PlayerSub {
           if (p5.Vector.dist(createVector(checkX, checkY), enemy.pos) < enemy.radius) {
             this.sonarHits.push({ x: checkX, y: checkY, type: 'enemy', receivedAt: frameCount, intensity: map(dist, 0, this.sonarRange, PLAYER_SONAR_ENEMY_INTENSITY_MAX, PLAYER_SONAR_ENEMY_INTENSITY_MIN) });
             hitDetectedOnRay = true; 
-                // Play creature growl when enemy hit by sonar
+            // Play creature growl when enemy hit by sonar
             playSound('creatureGrowl');
             break;
           }
@@ -2197,7 +2198,7 @@ function resetGame() {
   currentLevel = 1;
   enemiesKilledThisLevel = 0; // Reset kills tracking
   totalScore = 0; // Reset total score for new game
-  levelScore = 0; // Reset level score
+  levelScore = 0; // Reset level score for the current level
   
   // Reset highscore submission variables
   isHighScoreChecked = false;
@@ -2205,6 +2206,7 @@ function resetGame() {
   playerNameInput = '';
   isHighScoreResult = false;
   isMobileInputFocused = false; // Reset flag
+  isSubmissionInProgress = false; // Reset submission flag
   
   // Clear any existing game state
   sonarBubbles = []; // Clear bubbles on reset
@@ -2377,7 +2379,7 @@ function keyPressed() {
       gameState = 'playing';
       // Reactor hum is continuously playing, just needs to be started if not already
       if (audioInitialized && reactorHumOsc && reactorHumOsc.started) {
-        reactorHumOsc.amp(0, 0); // Start at zero volume, will be controlled by updateReactorHum
+        reactorHumOsc.amp(0, 0);
       }
     }, 100); // Small delay to allow loading screen to render
  }  else if (gameState === 'gameOver' && keyCode === ENTER) {
@@ -2819,8 +2821,14 @@ function drawGameOverScreen() {
 
 // Function to submit high score (used by both desktop and mobile)
 function submitHighScore() {
+  if (isSubmissionInProgress) {
+    console.log("Submission already in progress. Ignoring.");
+    return;
+  }
+
   if (playerNameInput.trim().length > 0) {
     console.log('Submitting high score:', playerNameInput, totalScore);
+    isSubmissionInProgress = true; // Set flag to prevent duplicate submissions
     highScoreManager.submitScore(playerNameInput.trim(), totalScore).then(() => {
       console.log('High score submitted successfully!');
       isSubmittingHighScore = false;
@@ -2830,10 +2838,12 @@ function submitHighScore() {
         highscoreInputElement.value = '';
       }
       playerNameInput = '';
+      isSubmissionInProgress = false; // Reset flag after submission
     }).catch(error => {
       console.error('Error submitting high score:', error);
       isSubmittingHighScore = false;
       isMobileInputFocused = false; // Also reset on error
+      isSubmissionInProgress = false; // Reset flag on error
     });
   }
 }
