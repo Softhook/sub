@@ -13,7 +13,7 @@
 html, body {
   margin: 0;
   padding: 0;
-  background-color: black; /* Prevent white borders in fullscreen */
+  background-color: #000000; /* Pure black to match status bar */
   overflow: hidden; /* Hide scrollbars */
   width: 100%;
   height: 100%;
