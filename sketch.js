@@ -435,6 +435,213 @@ let isMobileInputFocused = false; // New flag to track focus state
 let highScores = null; // Will hold the array of high scores
 let highScoreManager = null; // Will be initialized in setup()
 
+// --- Game State Management ---
+
+const gameStates = {
+  START: 'start',
+  HIGH_SCORES: 'highScores',
+  LOADING: 'loading',
+  PLAYING: 'playing',
+  LEVEL_COMPLETE: 'levelComplete',
+  GAME_COMPLETE: 'gameComplete',
+  GAME_OVER: 'gameOver'
+};
+
+function resetGame() {
+  currentLevel = 1;
+  enemiesKilledThisLevel = 0;
+  totalScore = 0;
+  levelScore = 0;
+
+  isHighScoreChecked = false;
+  isSubmittingHighScore = false;
+  playerNameInput = '';
+  isHighScoreResult = false;
+  isMobileInputFocused = false;
+  isSubmissionInProgress = false;
+
+  sonarBubbles = [];
+  particles = [];
+
+  if (audioInitialized) {
+    if (lowAirOsc && lowAirOsc.started) lowAirEnv.triggerRelease(lowAirOsc);
+    if (reactorHumOsc && reactorHumOsc.started) {
+      reactorHumOsc.amp(0, 0);
+      reactorHumAmplitude = 0;
+    }
+  }
+  lastLowAirBeepTime = 0;
+
+  gameState = gameStates.START;
+}
+
+function prepareNextLevel() {
+  currentLevel++;
+  enemiesKilledThisLevel = 0;
+  levelScore = 0;
+
+  gameState = gameStates.LOADING;
+  showLoadingOverlay(`LEVEL ${currentLevel}`);
+
+  setTimeout(() => {
+    initGameObjects();
+    player.vel = createVector(0, 0);
+    player.angle = 0;
+    player.health = PLAYER_INITIAL_HEALTH;
+    player.lastSonarTime = frameCount - player.sonarCooldown;
+    player.lastShotTime = frameCount - player.shotCooldown;
+    gameState = gameStates.PLAYING;
+
+    if (audioInitialized) {
+      if (reactorHumOsc && reactorHumOsc.started) {
+        reactorHumOsc.amp(0, 0);
+      }
+      if (lowAirOsc && lowAirOsc.started) {
+        lowAirEnv.triggerRelease(lowAirOsc);
+      }
+    }
+    lastLowAirBeepTime = 0;
+  }, 100);
+}
+
+function initGameObjects() {
+  showLoadingOverlay("GENERATING LEVEL");
+
+  const levelSettings = calculateLevelSettings();
+  currentCellSize = levelSettings.cellSize;
+
+  cave = new Cave(WORLD_WIDTH, WORLD_HEIGHT, currentCellSize);
+  
+  const playerStartPos = findPlayerStartPosition(cave, currentCellSize);
+  player = new PlayerSub(playerStartPos.x, playerStartPos.y, levelSettings.airSupply, levelSettings.airDepletion);
+
+  projectiles = [];
+  sonarBubbles = [];
+  particles = [];
+
+  enemies = spawnEnemies(cave);
+  jellyfish = spawnJellyfish(cave, playerStartPos.x, playerStartPos.y);
+  currentAreas = spawnCurrentAreas(cave);
+
+  setTimeout(() => {
+    hideLoadingOverlay();
+  }, 200);
+}
+
+function calculateLevelSettings() {
+    const cellSize = BASE_CELL_SIZE + (currentLevel - 1) * 2;
+    const airSupply = max(INITIAL_AIR_SUPPLY_BASE, MIN_AIR_SUPPLY_PER_LEVEL);
+    const airDepletion = BASE_AIR_DEPLETION_RATE + (currentLevel - 1) * AIR_DEPLETION_LEVEL_INCREASE;
+    return { cellSize, airSupply, airDepletion };
+}
+
+function findPlayerStartPosition(caveContext, cellSize) {
+    let playerStartX, playerStartY;
+    let attempts = 0;
+    const playerSpawnRadiusBuffer = cellSize * PLAYER_SPAWN_RADIUS_BUFFER_CELL_FACTOR;
+
+    do {
+        playerStartX = cellSize * (PLAYER_START_X_BASE_CELLS + attempts * PLAYER_START_X_ATTEMPT_INCREMENT_CELLS);
+        playerStartY = WORLD_HEIGHT / 2 + random(-cellSize * PLAYER_START_Y_RANDOM_RANGE_CELLS, cellSize * PLAYER_START_Y_RANDOM_RANGE_CELLS);
+        attempts++;
+        if (playerStartX > WORLD_WIDTH * PLAYER_SPAWN_MAX_X_SEARCH_FACTOR) {
+            playerStartX = cellSize * PLAYER_START_X_BASE_CELLS;
+            playerStartY = WORLD_HEIGHT / 2;
+            break;
+        }
+    } while (caveContext.isWall(playerStartX, playerStartY, playerSpawnRadiusBuffer) && attempts < MAX_PLAYER_SPAWN_ATTEMPTS);
+    
+    if (attempts >= MAX_PLAYER_SPAWN_ATTEMPTS) {
+        playerStartX = cellSize * PLAYER_START_X_BASE_CELLS;
+        playerStartY = WORLD_HEIGHT / 2;
+    }
+    return { x: playerStartX, y: playerStartY };
+}
+
+function spawnEnemies(caveContext) {
+    const enemiesArray = [];
+    let enemyCount = min(BASE_ENEMY_COUNT + (currentLevel - 1) * ENEMY_COUNT_PER_LEVEL_INCREASE, MAX_ENEMY_COUNT);
+    
+    for (let i = 0; i < enemyCount; i++) {
+        let enemyX, enemyY, eAttempts = 0;
+        do {
+            enemyX = random(WORLD_WIDTH * ENEMY_SPAWN_MIN_X_WORLD_FACTOR, WORLD_WIDTH * ENEMY_SPAWN_MAX_X_WORLD_FACTOR);
+            enemyY = random(WORLD_HEIGHT * ENEMY_SPAWN_MIN_Y_WORLD_FACTOR, WORLD_HEIGHT * ENEMY_SPAWN_MAX_Y_WORLD_FACTOR);
+            eAttempts++;
+        } while (caveContext.isWall(enemyX, enemyY, ENEMY_SPAWN_WALL_CHECK_RADIUS) && eAttempts < MAX_ENEMY_SPAWN_ATTEMPTS);
+        
+        if (eAttempts < MAX_ENEMY_SPAWN_ATTEMPTS) {
+            enemiesArray.push(new Enemy(enemyX, enemyY));
+        }
+    }
+    return enemiesArray;
+}
+
+function spawnJellyfish(caveContext, playerStartX, playerStartY) {
+    const jellyfishArray = [];
+    const jellyfishCount = currentLevel;
+    
+    for (let i = 0; i < jellyfishCount; i++) {
+        let jellyfishX, jellyfishY, jAttempts = 0;
+        do {
+            jellyfishX = random(WORLD_WIDTH * 0.3, WORLD_WIDTH * 0.9);
+            jellyfishY = random(WORLD_HEIGHT * 0.2, WORLD_HEIGHT * 0.8);
+            jAttempts++;
+        } while (caveContext.isWall(jellyfishX, jellyfishY, JELLYFISH_RADIUS + 10) && jAttempts < MAX_ENEMY_SPAWN_ATTEMPTS);
+        
+        if (jAttempts < MAX_ENEMY_SPAWN_ATTEMPTS) {
+            if (dist(jellyfishX, jellyfishY, playerStartX, playerStartY) > 150) {
+                jellyfishArray.push(new Jellyfish(jellyfishX, jellyfishY));
+            }
+        }
+    }
+    return jellyfishArray;
+}
+
+function spawnCurrentAreas(caveContext) {
+  const newCurrentAreas = [];
+  for (let i = 0; i < CURRENT_AREAS_PER_LEVEL; i++) {
+    let attempts = 0;
+    let areaX, areaY, areaWidth, areaHeight;
+    let validArea = false;
+    
+    while (!validArea && attempts < 50) {
+      areaWidth = random(CURRENT_AREA_MIN_WIDTH, CURRENT_AREA_MAX_WIDTH);
+      areaHeight = random(CURRENT_AREA_MIN_HEIGHT, CURRENT_AREA_MAX_HEIGHT);
+      areaX = random(CURRENT_AREA_PADDING_FROM_PLAYER_START, WORLD_WIDTH - areaWidth - CURRENT_AREA_PADDING_FROM_GOAL);
+      areaY = random(areaHeight / 2, WORLD_HEIGHT - areaHeight / 2);
+      
+      let openCells = 0;
+      let totalCells = 0;
+      let checkStep = 20;
+      
+      for (let checkX = areaX; checkX < areaX + areaWidth; checkX += checkStep) {
+        for (let checkY = areaY; checkY < areaY + areaHeight; checkY += checkStep) {
+          totalCells++;
+          if (!caveContext.isWall(checkX, checkY)) {
+            openCells++;
+          }
+        }
+      }
+      
+      if (totalCells > 0 && (openCells / totalCells) > 0.7) {
+        validArea = true;
+      }
+      attempts++;
+    }
+    
+    if (validArea) {
+      let forceDirection = p5.Vector.random2D();
+      let forceMagnitude = random(CURRENT_FORCE_MAGNITUDE_MIN, CURRENT_FORCE_MAGNITUDE_MAX);
+      newCurrentAreas.push(new CurrentArea(areaX, areaY, areaWidth, areaHeight, forceDirection, forceMagnitude));
+    }
+  }
+  console.log(`Spawned ${newCurrentAreas.length} current areas for level ${currentLevel}`);
+  return newCurrentAreas;
+}
+
+// --- UI & DOM Functions ---
+
 // Submit highscore using XMLHttpRequest (JSONBin API)
 function submitHighScoreXHR(binId, apiKey, accessKey, scoreData, callback) {
   let req = new XMLHttpRequest();
@@ -449,6 +656,95 @@ function submitHighScoreXHR(binId, apiKey, accessKey, scoreData, callback) {
   if (accessKey) req.setRequestHeader("X-Access-Key", accessKey);
   req.send(JSON.stringify(scoreData));
 }
+
+function showLoadingOverlay(text = "GENERATING LEVEL") {
+  const overlay = document.getElementById('loadingOverlay');
+  const loadingText = overlay.querySelector('.loading-text');
+  if (overlay) {
+    if (loadingText) {
+      loadingText.textContent = text;
+    }
+    overlay.classList.remove('hidden');
+    overlay.style.display = 'flex';
+  }
+}
+
+function hideLoadingOverlay() {
+  const overlay = document.getElementById('loadingOverlay');
+  if (overlay) {
+    overlay.classList.add('hidden');
+    setTimeout(() => {
+      if (overlay.classList.contains('hidden')) {
+        overlay.style.display = 'none';
+      }
+    }, 500);
+  }
+}
+
+function updateLoadingText(text) {
+  const overlay = document.getElementById('loadingOverlay');
+  const loadingText = overlay.querySelector('.loading-text');
+  if (loadingText) {
+    loadingText.textContent = text;
+  }
+}
+
+function submitHighScore() {
+  if (isSubmissionInProgress) {
+    console.log("Submission already in progress. Ignoring.");
+    return;
+  }
+
+  if (playerNameInput.trim().length > 0) {
+    console.log('Submitting high score:', playerNameInput, totalScore);
+    isSubmissionInProgress = true;
+    
+    if (highscoreInputElement) {
+      highscoreInputElement.disabled = true;
+      highscoreInputElement.style.backgroundColor = 'rgba(100, 100, 100, 0.5)';
+      highscoreInputElement.style.color = '#999999';
+      highscoreInputElement.style.pointerEvents = 'none';
+    }
+    
+    showLoadingOverlay("SUBMITTING SCORE...");
+    
+    highScoreManager.submitScore(playerNameInput.trim(), totalScore).then(() => {
+      console.log('High score submitted successfully!');
+      hideLoadingOverlay();
+      isSubmittingHighScore = false;
+      isMobileInputFocused = false;
+      isSubmissionInProgress = false;
+      
+      if (highscoreInputElement) {
+        highscoreInputElement.value = '';
+        highscoreInputElement.disabled = false;
+        highscoreInputElement.style.backgroundColor = 'rgba(0, 0, 0, 0.9)';
+        highscoreInputElement.style.color = '#ffff00';
+        highscoreInputElement.style.pointerEvents = 'auto';
+        highscoreInputElement.blur();
+      }
+      playerNameInput = '';
+      
+    }).catch(error => {
+      console.error('Error submitting high score:', error);
+      hideLoadingOverlay();
+      isSubmissionInProgress = false;
+      
+      if (highscoreInputElement) {
+        highscoreInputElement.disabled = false;
+        highscoreInputElement.style.backgroundColor = 'rgba(0, 0, 0, 0.9)';
+        highscoreInputElement.style.color = '#ffff00';
+        highscoreInputElement.style.pointerEvents = 'auto';
+      }
+      
+      setTimeout(() => {
+        alert("Failed to submit high score. Please check your connection and try again.");
+      }, 100);
+    });
+  }
+}
+
+// --- Helper Functions ---
 
 // Helper function to process game object arrays (update, render, remove offscreen)
 function processGameObjectArray(arr, offsetX, offsetY, caveContext = null) {
@@ -488,9 +784,50 @@ function processGameObjectArray(arr, offsetX, offsetY, caveContext = null) {
   }
 }
 
+function createExplosion(x, y, type) {
+  let particleCount = 0;
+  let colorH, colorS, colorB;
 
+  if (type === 'wall') {
+    particleCount = EXPLOSION_PARTICLE_COUNT_TORPEDO_WALL;
+    colorH = EXPLOSION_PARTICLE_COLOR_H_WALL;
+    colorS = EXPLOSION_PARTICLE_COLOR_S_WALL;
+    colorB = EXPLOSION_PARTICLE_COLOR_B_WALL;
+  } else if (type === 'enemy') {
+    particleCount = EXPLOSION_PARTICLE_COUNT_TORPEDO_ENEMY;
+    colorH = EXPLOSION_PARTICLE_COLOR_H_ENEMY;
+    colorS = EXPLOSION_PARTICLE_COLOR_S_ENEMY;
+    colorB = EXPLOSION_PARTICLE_COLOR_B_ENEMY;
+  } else if (type === 'creature') {
+    particleCount = EXPLOSION_PARTICLE_COUNT_TORPEDO_ENEMY;
+    colorH = 300;
+    colorS = 80;
+    colorB = 70;
+  }
 
-// --- Sound Setup and Functions ---
+  for (let i = 0; i < particleCount; i++) {
+    let angle = random(TWO_PI);
+    let speed = random(EXPLOSION_PARTICLE_SPEED_MIN, EXPLOSION_PARTICLE_SPEED_MAX);
+    let vel = p5.Vector.fromAngle(angle, speed);
+    particles.push(new Particle(
+      x, y, 
+      vel.x, vel.y, 
+      EXPLOSION_PARTICLE_MAX_LIFESPAN, 
+      EXPLOSION_PARTICLE_MIN_SIZE, 
+      EXPLOSION_PARTICLE_MAX_SIZE, 
+      colorH, colorS, colorB, 
+      EXPLOSION_PARTICLE_ALPHA_MAX
+    ));
+  }
+}
+
+function getKillsRequiredForLevel(level) {
+  if (level <= 0) return 0;
+  return BASE_KILLS_REQUIRED + (level - 1) * KILLS_INCREASE_PER_LEVEL;
+}
+
+// --- Sound Functions ---
+
 function initializeSounds() {
   function setupSound(type, freqOrNoiseType, adsr, levels) {
     let soundObj;
@@ -639,332 +976,6 @@ function updateReactorHum(distanceToGoal) {
   reactorHumAmplitude = volume;
 }
 
-// --- Loading overlay control functions ---
-function showLoadingOverlay(text = "GENERATING LEVEL") {
-  const overlay = document.getElementById('loadingOverlay');
-  const loadingText = overlay.querySelector('.loading-text');
-  if (overlay) {
-    if (loadingText) {
-      loadingText.textContent = text;
-    }
-    overlay.classList.remove('hidden');
-    overlay.style.display = 'flex';
-  }
-}
-
-function hideLoadingOverlay() {
-  const overlay = document.getElementById('loadingOverlay');
-  if (overlay) {
-    overlay.classList.add('hidden');
-    // Completely hide after transition
-    setTimeout(() => {
-      if (overlay.classList.contains('hidden')) {
-        overlay.style.display = 'none';
-      }
-    }, 500);
-  }
-}
-
-function updateLoadingText(text) {
-  const overlay = document.getElementById('loadingOverlay');
-  const loadingText = overlay.querySelector('.loading-text');
-  if (loadingText) {
-    loadingText.textContent = text;
-  }
-}
-
-// --- Main Game Functions ---
-function setup() {
-  createCanvas(windowWidth, windowHeight);
-  colorMode(HSB, 360, 100, 100, 255); // Max values for HSB and Alpha
-  textAlign(CENTER, CENTER); textFont('monospace');
-  initializeSounds(); 
-  
-  // Initialize the highscore manager (after all files are loaded)
-  highScoreManager = new JSONBinHighScores();
-  
-  // Initialize mobile controls
-  initMobileControls();
-  
-  // Initialize highscore input element
-  highscoreInputElement = document.getElementById('highscoreInput');
-  if (highscoreInputElement) {
-    // Setup input event listener
-    highscoreInputElement.addEventListener('input', function(e) {
-      if (isSubmittingHighScore) {
-        playerNameInput = e.target.value;
-      }
-    });
-    
-    // Setup enter key listener for mobile
-    highscoreInputElement.addEventListener('keydown', function(e) {
-      if (e.key === 'Enter' && isSubmittingHighScore && playerNameInput.trim().length > 0 && !isSubmissionInProgress) {
-        submitHighScore();
-      }
-    });
-  }
-
-  // Attempt fullscreen and audio initialization on first user interaction
-  function handleInitialInteraction() {
-    if (initialInteractionDone) return;
-    initialInteractionDone = true;
-    // Start audio if not already initialized
-    if (typeof startAudioRoutine === 'function' && !audioInitialized) {
-      startAudioRoutine();
-    }
-    // Attempt to go fullscreen
-    if (!fullscreen()) {
-      fullscreen(true);
-    }
-    console.log('Initial interaction: Audio started and fullscreen requested');
-  }
-  // Add one-time event listeners to canvas
-  const canvasElt = document.querySelector('canvas');
-  if (canvasElt) {
-    canvasElt.addEventListener('click', handleInitialInteraction, { once: true });
-    canvasElt.addEventListener('touchstart', handleInitialInteraction, { once: true });
-  }
-  
-  if (customFont) {
-    textFont(customFont);
-  }
-  resetGame();
-  
-  // Hide the initial loading overlay once p5.js is ready
-  setTimeout(() => {
-    hideLoadingOverlay();
-  }, 100);
-  // Initialize audio after a user gesture (e.g., click or key press)
-}
-
-function initGameObjects() {
-  showLoadingOverlay("GENERATING LEVEL");
-  
-  currentCellSize = BASE_CELL_SIZE + (currentLevel - 1) * 2; // Calculate current cell size
-
-  let baseAir = INITIAL_AIR_SUPPLY_BASE;
-  let airForLevel = baseAir; // Initialize airForLevel with baseAir
-  airForLevel = max(airForLevel, MIN_AIR_SUPPLY_PER_LEVEL); // Ensure minimum air
-  let airDepletion = BASE_AIR_DEPLETION_RATE + (currentLevel - 1) * AIR_DEPLETION_LEVEL_INCREASE;
-  
-  let playerStartX, playerStartY;
-  let attempts = 0;
-  // MAX_PLAYER_SPAWN_ATTEMPTS is defined in Spawning constants
-  let playerSpawnRadiusBuffer = currentCellSize * PLAYER_SPAWN_RADIUS_BUFFER_CELL_FACTOR; // Use currentCellSize
-
-  cave = new Cave(WORLD_WIDTH, WORLD_HEIGHT, currentCellSize); // Pass currentCellSize to Cave constructor
-
-  // Find a safe starting position for the player
-  do {
-    playerStartX = currentCellSize * (PLAYER_START_X_BASE_CELLS + attempts * PLAYER_START_X_ATTEMPT_INCREMENT_CELLS); // Use currentCellSize
-    playerStartY = WORLD_HEIGHT / 2 + random(-currentCellSize * PLAYER_START_Y_RANDOM_RANGE_CELLS, currentCellSize * PLAYER_START_Y_RANDOM_RANGE_CELLS); // Use currentCellSize
-    attempts++;
-    if (playerStartX > WORLD_WIDTH * PLAYER_SPAWN_MAX_X_SEARCH_FACTOR) {
-        playerStartX = currentCellSize * PLAYER_START_X_BASE_CELLS; playerStartY = WORLD_HEIGHT / 2; break; // Use currentCellSize
-    }
-  } while (cave.isWall(playerStartX, playerStartY, playerSpawnRadiusBuffer) && attempts < MAX_PLAYER_SPAWN_ATTEMPTS);
-  
-  if (attempts >= MAX_PLAYER_SPAWN_ATTEMPTS) { // If still no safe spot, use a default
-      playerStartX = currentCellSize * PLAYER_START_X_BASE_CELLS; playerStartY = WORLD_HEIGHT / 2; // Use currentCellSize
-  }
-
-  player = new PlayerSub(playerStartX, playerStartY, airForLevel, airDepletion);
-  
-  enemies = []; projectiles = [];
-  sonarBubbles = []; // Initialize sonar bubbles array
-  particles = []; // Initialize global particles array
-  
-  let enemyCount = BASE_ENEMY_COUNT + (currentLevel - 1) * ENEMY_COUNT_PER_LEVEL_INCREASE;
-  enemyCount = min(enemyCount, MAX_ENEMY_COUNT); // Cap enemy count
-  for (let i = 0; i < enemyCount; i++) {
-    let enemyX, enemyY, eAttempts = 0;
-    do { // Try to spawn enemy in a clear area
-      enemyX = random(WORLD_WIDTH * ENEMY_SPAWN_MIN_X_WORLD_FACTOR, WORLD_WIDTH * ENEMY_SPAWN_MAX_X_WORLD_FACTOR);
-      enemyY = random(WORLD_HEIGHT * ENEMY_SPAWN_MIN_Y_WORLD_FACTOR, WORLD_HEIGHT * ENEMY_SPAWN_MAX_Y_WORLD_FACTOR); eAttempts++;
-    } while (cave.isWall(enemyX, enemyY, ENEMY_SPAWN_WALL_CHECK_RADIUS) && eAttempts < MAX_ENEMY_SPAWN_ATTEMPTS);
-    if (eAttempts < MAX_ENEMY_SPAWN_ATTEMPTS) enemies.push(new Enemy(enemyX, enemyY));
-
-  }
-  
-  // Spawn jellyfish - 1 on level 1, +1 each level
-  jellyfish = [];
-  let jellyfishCount = currentLevel; // 1 on level 1, 2 on level 2, etc.
-  for (let i = 0; i < jellyfishCount; i++) {
-    let jellyfishX, jellyfishY, jAttempts = 0;
-    do { // Try to spawn jellyfish in a clear area, away from player
-      jellyfishX = random(WORLD_WIDTH * 0.3, WORLD_WIDTH * 0.9); // Spawn in middle to right area
-      jellyfishY = random(WORLD_HEIGHT * 0.2, WORLD_HEIGHT * 0.8);
-      jAttempts++;
-    } while (cave.isWall(jellyfishX, jellyfishY, JELLYFISH_RADIUS + 10) && jAttempts < MAX_ENEMY_SPAWN_ATTEMPTS);
-    
-    if (jAttempts < MAX_ENEMY_SPAWN_ATTEMPTS) {
-      // Make sure jellyfish isn't too close to player start
-      let distFromPlayer = dist(jellyfishX, jellyfishY, playerStartX, playerStartY);
-      if (distFromPlayer > 150) { // Minimum distance from player
-        jellyfish.push(new Jellyfish(jellyfishX, jellyfishY));
-      }
-    }
-  }
-  
-  // Spawn current areas
-  spawnCurrentAreas();
-  
-  // Hide loading overlay after a short delay
-  setTimeout(() => {
-    hideLoadingOverlay();
-  }, 200);
-}
-
-function spawnCurrentAreas() {
-  currentAreas = []; // Clear existing areas
-  
-  for (let i = 0; i < CURRENT_AREAS_PER_LEVEL; i++) {
-    let attempts = 0;
-    let areaX, areaY, areaWidth, areaHeight;
-    let validArea = false;
-    
-    while (!validArea && attempts < 50) {
-      // Random dimensions
-      areaWidth = random(CURRENT_AREA_MIN_WIDTH, CURRENT_AREA_MAX_WIDTH);
-      areaHeight = random(CURRENT_AREA_MIN_HEIGHT, CURRENT_AREA_MAX_HEIGHT);
-      
-      // Random position, avoiding player start and goal areas
-      areaX = random(CURRENT_AREA_PADDING_FROM_PLAYER_START, 
-                    WORLD_WIDTH - areaWidth - CURRENT_AREA_PADDING_FROM_GOAL);
-      areaY = random(areaHeight / 2, WORLD_HEIGHT - areaHeight / 2);
-      
-      // Check if the area is mostly in open water
-      let openCells = 0;
-      let totalCells = 0;
-      let checkStep = 20; // Check every 20 pixels for performance
-      
-      for (let checkX = areaX; checkX < areaX + areaWidth; checkX += checkStep) {
-        for (let checkY = areaY; checkY < areaY + areaHeight; checkY += checkStep) {
-          totalCells++;
-          if (!cave.isWall(checkX, checkY)) {
-            openCells++;
-          }
-        }
-      }
-      
-      // Area is valid if at least 70% is open water
-      if (totalCells > 0 && (openCells / totalCells) > 0.7) {
-        validArea = true;
-      }
-      
-      attempts++;
-    }
-    
-    if (validArea) {
-      // Create random force direction
-      let forceDirection = p5.Vector.random2D();
-      let forceMagnitude = random(CURRENT_FORCE_MAGNITUDE_MIN, CURRENT_FORCE_MAGNITUDE_MAX);
-      
-      currentAreas.push(new CurrentArea(areaX, areaY, areaWidth, areaHeight, forceDirection, forceMagnitude));
-    }
-  }
-  
-  console.log(`Spawned ${currentAreas.length} current areas for level ${currentLevel}`);
-}
-
-function resetGame() {
-  currentLevel = 1;
-  enemiesKilledThisLevel = 0; // Reset kills tracking
-  totalScore = 0; // Reset total score for new game
-  levelScore = 0; // Reset level score for the current level
-  
-  // Reset highscore submission variables
-  isHighScoreChecked = false;
-  isSubmittingHighScore = false;
-  playerNameInput = '';
-  isHighScoreResult = false;
-  isMobileInputFocused = false; // Reset flag
-  isSubmissionInProgress = false; // Reset submission flag
-  
-  // Clear any existing game state
-  sonarBubbles = []; // Clear bubbles on reset
-  particles = []; // Clear global particles on reset
-  
-  // Stop any audio that might be playing
-  if (audioInitialized && lowAirOsc && lowAirOsc.started) lowAirEnv.triggerRelease(lowAirOsc);
-  // Reset reactor hum to zero volume when resetting game
-  if (audioInitialized && reactorHumOsc && reactorHumOsc.started) {
-    reactorHumOsc.amp(0, 0);
-    reactorHumAmplitude = 0;
-  }
-  lastLowAirBeepTime = 0; // Reset beep timer
-  
-  // Return to start screen (don't initialize game objects yet)
-  gameState = 'start';
-}
-
-// --- Helper function to create explosions ---
-function createExplosion(x, y, type) {
-  let particleCount = 0;
-  let colorH, colorS, colorB;
-
-  if (type === 'wall') {
-    particleCount = EXPLOSION_PARTICLE_COUNT_TORPEDO_WALL;
-    colorH = EXPLOSION_PARTICLE_COLOR_H_WALL;
-    colorS = EXPLOSION_PARTICLE_COLOR_S_WALL;
-    colorB = EXPLOSION_PARTICLE_COLOR_B_WALL;
-  } else if (type === 'enemy') {
-    particleCount = EXPLOSION_PARTICLE_COUNT_TORPEDO_ENEMY;
-    colorH = EXPLOSION_PARTICLE_COLOR_H_ENEMY;
-    colorS = EXPLOSION_PARTICLE_COLOR_S_ENEMY;
-    colorB = EXPLOSION_PARTICLE_COLOR_B_ENEMY;
-  } else if (type === 'creature') {
-    // Creature explosion uses a different set of particles and colors
-    particleCount = EXPLOSION_PARTICLE_COUNT_TORPEDO_ENEMY; // Same count as enemy for now
-    colorH = 300; // Purple hue for creature explosion
-    colorS = 80;
-    colorB = 70;
-  }
-
-  for (let i = 0; i < particleCount; i++) {
-    let angle = random(TWO_PI);
-    let speed = random(EXPLOSION_PARTICLE_SPEED_MIN, EXPLOSION_PARTICLE_SPEED_MAX);
-    let vel = p5.Vector.fromAngle(angle, speed);
-    particles.push(new Particle(
-      x, y, 
-      vel.x, vel.y, 
-      EXPLOSION_PARTICLE_MAX_LIFESPAN, 
-      EXPLOSION_PARTICLE_MIN_SIZE, 
-      EXPLOSION_PARTICLE_MAX_SIZE, 
-      colorH, colorS, colorB, 
-      EXPLOSION_PARTICLE_ALPHA_MAX
-    ));
-  }
-}
-
-function prepareNextLevel() {
-  currentLevel++;
-  enemiesKilledThisLevel = 0; // Reset kills tracking
-  levelScore = 0; // Reset level score for new level
-  
-  // Set loading state and defer heavy initialization
-  gameState = 'loading';
-  showLoadingOverlay(`LEVEL ${currentLevel}`);
-  
-  // Use setTimeout to allow loading screen to render
-  setTimeout(() => {
-    initGameObjects(); // This will create new cave, player (with new air), enemies
-    // Player position is set by initGameObjects to a safe start in the new cave
-    player.vel = createVector(0,0); player.angle = 0; // Reset movement
-    player.health = PLAYER_INITIAL_HEALTH; // Replenish health
-    // Air supply is set by initGameObjects based on the new level
-    player.lastSonarTime = frameCount - player.sonarCooldown;
-    player.lastShotTime = frameCount - player.shotCooldown;
-    gameState = 'playing';
-    // Reactor hum is continuously playing, just reset to zero volume
-    if (audioInitialized && reactorHumOsc && reactorHumOsc.started) {
-      reactorHumOsc.amp(0, 0);
-    }
-    if (audioInitialized && lowAirOsc && lowAirOsc.started) lowAirEnv.triggerRelease(lowAirOsc);
-    lastLowAirBeepTime = 0;
-  }, 100); // Small delay to allow loading screen to render
-}
-
 function startAudioRoutine() {
     function startAllSoundObjects() {
         const soundObjects = [
@@ -979,7 +990,6 @@ function startAudioRoutine() {
                 soundObj.start();
             }
         }
-        // Start reactor hum playing continuously
         if (reactorHumOsc && reactorHumOsc.started) {
             // Reactor hum plays continuously, volume controlled by amp()
         }
@@ -997,85 +1007,178 @@ function startAudioRoutine() {
     }
 }
 
+// --- Main p5.js Functions ---
+
 function preload() {
   customFont = loadFont('Berpatroli.otf');
 }
 
-function mousePressed() {
-    if (!audioInitialized) { // If audio not started, mouse click can also start it
-        startAudioRoutine();
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  colorMode(HSB, 360, 100, 100, 255);
+  textAlign(CENTER, CENTER);
+  textFont('monospace');
+  
+  initializeSounds(); 
+  highScoreManager = new JSONBinHighScores();
+  initMobileControls();
+  
+  highscoreInputElement = document.getElementById('highscoreInput');
+  if (highscoreInputElement) {
+    highscoreInputElement.addEventListener('input', function(e) {
+      if (isSubmittingHighScore) {
+        playerNameInput = e.target.value;
+      }
+    });
+    highscoreInputElement.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' && isSubmittingHighScore && playerNameInput.trim().length > 0 && !isSubmissionInProgress) {
+        submitHighScore();
+      }
+    });
+  }
+
+  function handleInitialInteraction() {
+    if (initialInteractionDone) return;
+    initialInteractionDone = true;
+    if (typeof startAudioRoutine === 'function' && !audioInitialized) {
+      startAudioRoutine();
     }
-    let fs = fullscreen();
-    fullscreen(!fs);
+    if (!fullscreen()) {
+      fullscreen(true);
+    }
+    console.log('Initial interaction: Audio started and fullscreen requested');
+  }
+
+  const canvasElt = document.querySelector('canvas');
+  if (canvasElt) {
+    canvasElt.addEventListener('click', handleInitialInteraction, { once: true });
+    canvasElt.addEventListener('touchstart', handleInitialInteraction, { once: true });
+  }
+  
+  if (customFont) {
+    textFont(customFont);
+  }
+  
+  resetGame();
+  
+  setTimeout(() => {
+    hideLoadingOverlay();
+  }, 100);
 }
 
-function keyPressed() {
-  // Start audio on Enter press from certain game states if not already started
-  if (!audioInitialized && (keyCode === ENTER && (gameState === 'start' || gameState === 'highScores' || gameState === 'levelComplete' || gameState === 'gameOver' || gameState === 'gameComplete'))) {
-    startAudioRoutine();
-  }
+const drawFunctions = {
+  [gameStates.START]: drawStartScreen,
+  [gameStates.HIGH_SCORES]: drawHighScoreScreen,
+  [gameStates.LOADING]: drawLoadingScreen,
+  [gameStates.LEVEL_COMPLETE]: drawLevelCompleteScreen,
+  [gameStates.GAME_COMPLETE]: drawGameCompleteScreen,
+  [gameStates.GAME_OVER]: drawGameOverScreen,
+  [gameStates.PLAYING]: drawPlayingState,
+};
 
-  if (gameState === 'playing') {
-    if (keyCode === KEY_CODE_SPACE) player.shoot(); // Use constant for space key
+function draw() {
+  background(BACKGROUND_COLOR_H, BACKGROUND_COLOR_S, BACKGROUND_COLOR_B);
+
+  const drawFunction = drawFunctions[gameState];
+  if (drawFunction) {
+    drawFunction();
   }
-  
-  // Debug toggle for showing cave walls (works in any state)
-  if (key === ']') {
-    debugShowWalls = !debugShowWalls;
-    console.log("Debug wall view:", debugShowWalls ? "ON" : "OFF");
-  }
-  
-  if (gameState === 'start' && keyCode === ENTER) {
-    // Transition from start screen to high scores
-    gameState = 'highScores';
-    highScores = null; // Reset to show loading
-    // Load high scores asynchronously
+}
+
+function windowResized() { 
+  resizeCanvas(windowWidth, windowHeight); 
+}
+
+// --- Input Handlers ---
+
+function handleKeyPressedStart() {
+  if (keyCode === ENTER) {
+    gameState = gameStates.HIGH_SCORES;
+    highScores = null;
     highScoreManager.getHighScores().then(scores => {
       highScores = scores;
     }).catch(error => {
       console.error('Failed to load high scores:', error);
-      highScores = []; // Set to empty array on error
+      highScores = [];
     });
-  } else if (gameState === 'highScores' && keyCode === ENTER) {
-    // Transition from high scores to game
-    gameState = 'loading';
+  }
+}
+
+function handleKeyPressedHighScores() {
+  if (keyCode === ENTER) {
+    gameState = gameStates.LOADING;
     showLoadingOverlay("GENERATING LEVEL");
-    
-    // Use setTimeout to allow loading screen to render
     setTimeout(() => {
-      // currentCellSize will be set in initGameObjects based on currentLevel
       initGameObjects();
-      player.health = PLAYER_INITIAL_HEALTH; 
-      player.airSupply = player.initialAirSupply; // Reset to full for new game
-      player.lastSonarTime = frameCount - player.sonarCooldown; // Allow immediate sonar
-      player.lastShotTime = frameCount - player.shotCooldown;   // Allow immediate shot
-      gameState = 'playing';
-      // Reactor hum is continuously playing, just needs to be started if not already
+      player.health = PLAYER_INITIAL_HEALTH;
+      player.airSupply = player.initialAirSupply;
+      player.lastSonarTime = frameCount - player.sonarCooldown;
+      player.lastShotTime = frameCount - player.shotCooldown;
+      gameState = gameStates.PLAYING;
       if (audioInitialized && reactorHumOsc && reactorHumOsc.started) {
         reactorHumOsc.amp(0, 0);
       }
-    }, 100); // Small delay to allow loading screen to render
- }  else if (gameState === 'gameOver' && keyCode === ENTER) {
+    }, 100);
+  }
+}
+
+function handleKeyPressedPlaying() {
+  if (keyCode === KEY_CODE_SPACE) {
+    player.shoot();
+  }
+}
+
+function handleKeyPressedGameOver() {
+  if (keyCode === ENTER) {
     if (isSubmittingHighScore && playerNameInput.trim().length > 0 && !isSubmissionInProgress) {
-      // Submit the high score (desktop)
       submitHighScore();
     } else if (!isSubmittingHighScore) {
       resetGame();
     }
-    // If isSubmittingHighScore is true but no name entered, do nothing (block the action)
-  } else if (gameState === 'gameComplete' && keyCode === ENTER) {
-    resetGame();
-  } else if (gameState === 'levelComplete' && keyCode === ENTER) {
+  }
+}
+
+function handleKeyPressedLevelComplete() {
+  if (keyCode === ENTER) {
     prepareNextLevel();
   }
 }
 
+function handleKeyPressedGameComplete() {
+  if (keyCode === ENTER) {
+    resetGame();
+  }
+}
+
+const keyPressedHandlers = {
+  [gameStates.START]: handleKeyPressedStart,
+  [gameStates.HIGH_SCORES]: handleKeyPressedHighScores,
+  [gameStates.PLAYING]: handleKeyPressedPlaying,
+  [gameStates.GAME_OVER]: handleKeyPressedGameOver,
+  [gameStates.LEVEL_COMPLETE]: handleKeyPressedLevelComplete,
+  [gameStates.GAME_COMPLETE]: handleKeyPressedGameComplete,
+};
+
+function keyPressed() {
+  if (!audioInitialized && (keyCode === ENTER && (gameState === gameStates.START || gameState === gameStates.HIGH_SCORES || gameState === gameStates.LEVEL_COMPLETE || gameState === gameStates.GAME_OVER || gameState === gameStates.GAME_COMPLETE))) {
+    startAudioRoutine();
+  }
+
+  if (key === ']') {
+    debugShowWalls = !debugShowWalls;
+    console.log("Debug wall view:", debugShowWalls ? "ON" : "OFF");
+  }
+
+  const handler = keyPressedHandlers[gameState];
+  if (handler) {
+    handler();
+  }
+}
+
 function keyTyped() {
-  // Handle name input for high score submission (desktop only)
-  if (gameState === 'gameOver' && isSubmittingHighScore && !isMobileControlsEnabled()) {
+  if (gameState === gameStates.GAME_OVER && isSubmittingHighScore && !isMobileControlsEnabled()) {
     if (key.length === 1 && key.match(/[a-zA-Z0-9 ]/)) {
-      // Allow letters, numbers, and spaces
-      if (playerNameInput.length < 20) { // Limit name length
+      if (playerNameInput.length < 20) {
         playerNameInput += key;
       }
     } else if (keyCode === BACKSPACE && playerNameInput.length > 0) {
@@ -1083,6 +1186,101 @@ function keyTyped() {
     }
   }
 }
+
+function handleTouchStart() {
+  if (!audioInitialized) {
+    startAudioRoutine();
+  }
+
+  if (gameState === gameStates.GAME_OVER && isSubmittingHighScore && isMobileControlsEnabled() && !isMobileInputFocused && !isSubmissionInProgress) {
+    if (highscoreInputElement) {
+      console.log("User tapped, focusing high score input element.");
+      highscoreInputElement.focus();
+      isMobileInputFocused = true;
+    } else {
+      const name = prompt("NEW HIGH SCORE! Enter your name (20 chars max):", "");
+      if (name && !isSubmissionInProgress) {
+        playerNameInput = name;
+        submitHighScore();
+      }
+    }
+    return true;
+  }
+
+  const touchHandlers = {
+    [gameStates.START]: () => {
+      gameState = gameStates.HIGH_SCORES;
+      highScores = null;
+      highScoreManager.getHighScores().then(scores => { highScores = scores; }).catch(error => { console.error('Failed to load high scores:', error); highScores = []; });
+      return true;
+    },
+    [gameStates.HIGH_SCORES]: () => {
+      gameState = gameStates.LOADING;
+      showLoadingOverlay("GENERATING LEVEL");
+      setTimeout(() => {
+        initGameObjects();
+        player.health = PLAYER_INITIAL_HEALTH;
+        player.airSupply = player.initialAirSupply;
+        player.lastSonarTime = frameCount - player.sonarCooldown;
+        player.lastShotTime = frameCount - player.shotCooldown;
+        gameState = gameStates.PLAYING;
+        if (audioInitialized && reactorHumOsc && reactorHumOsc.started) {
+          reactorHumOsc.amp(0, 0);
+        }
+      }, 100);
+      return true;
+    },
+    [gameStates.GAME_OVER]: () => {
+      if (!isSubmittingHighScore) {
+        resetGame();
+      }
+      return true;
+    },
+    [gameStates.GAME_COMPLETE]: () => {
+      resetGame();
+      return true;
+    },
+    [gameStates.LEVEL_COMPLETE]: () => {
+      prepareNextLevel();
+      return true;
+    }
+  };
+
+  if (isMobileControlsEnabled()) {
+    const handler = touchHandlers[gameState];
+    if (handler) {
+      return handler();
+    }
+  }
+  return false;
+}
+
+function touchStarted() {
+  if (handleTouchStart()) {
+    return false; // Consume the touch if a state transition happened
+  }
+
+  if (typeof handleMobileTouchStart === 'function') {
+    handleMobileTouchStart(touches);
+  }
+  return false;
+}
+
+function touchMoved() {
+  if (typeof handleMobileTouchMove === 'function') {
+    handleMobileTouchMove(touches);
+  }
+  return false;
+}
+
+function touchEnded() {
+  if (typeof handleMobileTouchEnd === 'function') {
+    handleMobileTouchEnd(touches);
+  }
+  return false;
+}
+
+// --- Drawing Functions ---
 
 function drawDebugCaveWalls(offsetX, offsetY) {
   push();
@@ -1452,7 +1650,6 @@ function drawGameCompleteScreen() {
 }
 
 function drawGameOverScreen() {
-  // Check if this is a high score (only do this once)
   if (!isHighScoreChecked) {
     isHighScoreChecked = true;
     console.log('Checking if score', totalScore, 'is a high score...');
@@ -1473,32 +1670,28 @@ function drawGameOverScreen() {
   }
 
   textAlign(CENTER, CENTER);
-  fill(GAME_OVER_TITLE_COLOR_H, GAME_OVER_TITLE_COLOR_S, GAME_OVER_TITLE_COLOR_B); textSize(GAME_OVER_TITLE_TEXT_SIZE);
+  fill(GAME_OVER_TITLE_COLOR_H, GAME_OVER_TITLE_COLOR_S, GAME_OVER_TITLE_COLOR_B);
+  textSize(GAME_OVER_TITLE_TEXT_SIZE);
   text("MISSION FAILED", width/2, height/2 + GAME_OVER_TITLE_Y_OFFSET);
   textSize(GAME_OVER_INFO_TEXT_SIZE);
   text(player.health <= 0 ? "Submarine Destroyed!" : "Air Supply Depleted!", width/2, height/2 + GAME_OVER_INFO_Y_OFFSET);
   text(`Total Score: ${totalScore}`, width/2, height/2 + GAME_OVER_INFO_Y_OFFSET + 30);
   
-  // Handle high score submission
   if (isSubmittingHighScore) {
-    // Highlight "NEW HIGH SCORE!" with a background
     push();
-    fill(60, 100, 100); // Bright yellow
-    textSize(GAME_OVER_INFO_TEXT_SIZE + 6); // Slightly larger
+    fill(60, 100, 100);
+    textSize(GAME_OVER_INFO_TEXT_SIZE + 6);
     text("NEW HIGH SCORE!", width/2, height/2 + GAME_OVER_INFO_Y_OFFSET + 70);
     pop();
     
-    // "Enter your name:" instruction
-    fill(60, 80, 90); // Slightly dimmer yellow
+    fill(60, 80, 90);
     textSize(GAME_OVER_INFO_TEXT_SIZE - 2);
     text("Enter your name:", width/2, height/2 + GAME_OVER_INFO_Y_OFFSET + 110);
     
-    // Show mobile input field or desktop text input
     if (isMobileControlsEnabled()) {
-      // Position the HTML input field with better spacing for mobile
       if (highscoreInputElement) {
         highscoreInputElement.style.position = 'fixed';
-        highscoreInputElement.style.top = '65%'; // Moved down to avoid overlap
+        highscoreInputElement.style.top = '65%';
         highscoreInputElement.style.left = '50%';
         highscoreInputElement.style.transform = 'translate(-50%, -50%)';
         highscoreInputElement.style.opacity = '1';
@@ -1514,54 +1707,44 @@ function drawGameOverScreen() {
         highscoreInputElement.style.boxShadow = '0 0 15px rgba(255, 255, 0, 0.5)';
         highscoreInputElement.style.outline = 'none';
         highscoreInputElement.style.minWidth = '250px';
-        // highscoreInputElement.focus(); // REMOVED: Focus is now handled by touchStarted
       }
-      // Instructions positioned lower to avoid overlap
-      fill(60, 60, 80); // Dimmer for instructions
+      fill(60, 60, 80);
       textSize(GAME_OVER_INFO_TEXT_SIZE - 4);
       if (isSubmissionInProgress) {
-        fill(60, 100, 100); // Bright yellow when submitting
+        fill(60, 100, 100);
         text("SUBMITTING SCORE...", width/2, height/2 + GAME_OVER_PROMPT_Y_OFFSET + 60);
       } else {
         text("Tap to enter name, then type", width/2, height/2 + GAME_OVER_PROMPT_Y_OFFSET + 60);
       }
     } else {
-      // Desktop - show the typed name with highlighting
       push();
-      // Background rectangle for the text input area
       if (isSubmissionInProgress) {
-        fill(0, 0, 20, 200); // Dark background with some transparency
-        stroke(60, 60, 60); // Dimmer border when submitting
+        fill(0, 0, 20, 200);
+        stroke(60, 60, 60);
       } else {
-        fill(0, 0, 20, 200); // Dark background with some transparency
-        stroke(60, 100, 100); // Bright yellow border
+        fill(0, 0, 20, 200);
+        stroke(60, 100, 100);
       }
       strokeWeight(2);
       rectMode(CENTER);
       let textWidth = max(200, playerNameInput.length * 12 + 40);
       rect(width/2, height/2 + GAME_OVER_INFO_Y_OFFSET + 150, textWidth, 40, 5);
       
-      // The actual text input
       noStroke();
       textSize(GAME_OVER_INFO_TEXT_SIZE);
       if (isSubmissionInProgress) {
-        fill(60, 60, 80); // Dimmer text when submitting
+        fill(60, 60, 80);
         text("SUBMITTING...", width/2, height/2 + GAME_OVER_INFO_Y_OFFSET + 150);
       } else {
-        fill(60, 100, 100); // Bright yellow text
+        fill(60, 100, 100);
         text(playerNameInput + "_", width/2, height/2 + GAME_OVER_INFO_Y_OFFSET + 150);
       }
       pop();
       
-      // Instructions positioned lower
       fill(60, 60, 80);
       textSize(GAME_OVER_INFO_TEXT_SIZE - 4);
-      if (!isSubmissionInProgress) {
-        //text("Press ENTER when done", width/2, height/2 + GAME_OVER_PROMPT_Y_OFFSET + 20);
-      }
     }
   } else {
-    // Hide the input field when not needed
     if (highscoreInputElement) {
       highscoreInputElement.style.position = 'fixed';
       highscoreInputElement.style.top = '-1000px';
@@ -1570,74 +1753,11 @@ function drawGameOverScreen() {
       highscoreInputElement.style.pointerEvents = 'none';
     }
     
-    // Show appropriate restart instruction
     if (typeof isMobileControlsEnabled === 'function' && isMobileControlsEnabled()) {
       text("Tap to Restart", width / 2, height / 2 + GAME_OVER_PROMPT_Y_OFFSET);
     } else {
       text("Press ENTER to Restart", width / 2, height / 2 + GAME_OVER_PROMPT_Y_OFFSET);
     }
-  }
-}
-
-// Function to submit high score (used by both desktop and mobile)
-function submitHighScore() {
-  if (isSubmissionInProgress) {
-    console.log("Submission already in progress. Ignoring.");
-    return;
-  }
-
-  if (playerNameInput.trim().length > 0) {
-    console.log('Submitting high score:', playerNameInput, totalScore);
-    isSubmissionInProgress = true; // Set flag to prevent duplicate submissions
-    
-    // Immediately disable input field and show loading
-    if (highscoreInputElement) {
-      highscoreInputElement.disabled = true;
-      highscoreInputElement.style.backgroundColor = 'rgba(100, 100, 100, 0.5)';
-      highscoreInputElement.style.color = '#999999';
-      highscoreInputElement.style.pointerEvents = 'none';
-    }
-    
-    // Show loading overlay with submission message
-    showLoadingOverlay("SUBMITTING SCORE...");
-    
-    highScoreManager.submitScore(playerNameInput.trim(), totalScore).then(() => {
-      console.log('High score submitted successfully!');
-      hideLoadingOverlay();
-      isSubmittingHighScore = false;
-      isMobileInputFocused = false; // Reset flag
-      isSubmissionInProgress = false; // Reset flag after submission
-      
-      // Clear and reset the input field
-      if (highscoreInputElement) {
-        highscoreInputElement.value = '';
-        highscoreInputElement.disabled = false;
-        highscoreInputElement.style.backgroundColor = 'rgba(0, 0, 0, 0.9)';
-        highscoreInputElement.style.color = '#ffff00';
-        highscoreInputElement.style.pointerEvents = 'auto';
-        // Hide the on-screen keyboard on mobile by blurring the input
-        highscoreInputElement.blur();
-      }
-      playerNameInput = '';
-      
-    }).catch(error => {
-      console.error('Error submitting high score:', error);
-      hideLoadingOverlay();
-      isSubmissionInProgress = false; // Reset flag on error
-      
-      // Re-enable input field for retry
-      if (highscoreInputElement) {
-        highscoreInputElement.disabled = false;
-        highscoreInputElement.style.backgroundColor = 'rgba(0, 0, 0, 0.9)';
-        highscoreInputElement.style.color = '#ffff00';
-        highscoreInputElement.style.pointerEvents = 'auto';
-      }
-      
-      // Show error message
-      setTimeout(() => {
-        alert("Failed to submit high score. Please check your connection and try again.");
-      }, 100);
-    });
   }
 }
 
@@ -1754,155 +1874,22 @@ function drawPlayingState() {
 
   // Check Game Over / Level Complete Conditions
   if (player.health <= 0 || player.airSupply <= 0) {
-      if(gameState === 'playing') {
-        // Player died - don't add level score to total, just calculate for display
-        let timeLeftInSeconds = Math.max(0, Math.floor(player.airSupply / 60)); // Convert frames to seconds (assuming 60 FPS)
+      if(gameState === gameStates.PLAYING) {
+        let timeLeftInSeconds = Math.max(0, Math.floor(player.airSupply / 60));
         levelScore = timeLeftInSeconds * 10;
         playSound('gameOver');
         
-        // Reset highscore checking variables
         isHighScoreChecked = false;
         isSubmittingHighScore = false;
         playerNameInput = '';
         isHighScoreResult = false;
       }
-      gameState = 'gameOver';
+      gameState = gameStates.GAME_OVER;
   } else if (cave.isGoal(player.pos.x, player.pos.y) && killsStillNeeded === 0) {
-    // Level completed successfully - calculate score and add to total
-    let timeLeftInSeconds = Math.max(0, Math.floor(player.airSupply / 60)); // Convert frames to seconds (assuming 60 FPS)
-    levelScore = (timeLeftInSeconds * 10) + 500; // Time bonus + 500 points for completing level
+    let timeLeftInSeconds = Math.max(0, Math.floor(player.airSupply / 60));
+    levelScore = (timeLeftInSeconds * 10) + 500;
     totalScore += levelScore;
-    gameState = (currentLevel >= MAX_LEVELS) ? 'gameComplete' : 'levelComplete';
+    gameState = (currentLevel >= MAX_LEVELS) ? gameStates.GAME_COMPLETE : gameStates.LEVEL_COMPLETE;
   }
-}
-
-function draw() {
-  background(BACKGROUND_COLOR_H, BACKGROUND_COLOR_S, BACKGROUND_COLOR_B);
-
-  if (gameState === 'start') {
-    drawStartScreen();
-    return;
-  }
-  if (gameState === 'highScores') {
-    drawHighScoreScreen();
-    return;
-  }
-  if (gameState === 'loading') {
-    drawLoadingScreen();
-    return;
-  }
-  if (gameState === 'levelComplete') {
-    drawLevelCompleteScreen();
-    return;
-  }
-  if (gameState === 'gameComplete') {
-    drawGameCompleteScreen();
-    return;
-  }
-  if (gameState === 'gameOver') {
-    drawGameOverScreen();
-    return;
-  }
-  // gameState === 'playing'
-  drawPlayingState();
-}
-function windowResized() { resizeCanvas(windowWidth, windowHeight); }
-
-// --- Dynamic Kills Requirement Function ---
-function getKillsRequiredForLevel(level) {
-  if (level <= 0) return 0;
-  return BASE_KILLS_REQUIRED + (level - 1) * KILLS_INCREASE_PER_LEVEL;
-}
-
-// --- Touch Event Forwarding for Mobile Controls ---
-function touchStarted() {
-  // --- New logic for game state transitions and input focus ---
-  if (!audioInitialized) {
-    startAudioRoutine();
-  }
-
-  // Handle high score input focus on mobile. A tap anywhere on the screen will trigger it.
-  if (gameState === 'gameOver' && isSubmittingHighScore && isMobileControlsEnabled() && !isMobileInputFocused && !isSubmissionInProgress) {
-    if (highscoreInputElement) {
-      console.log("User tapped, focusing high score input element.");
-      highscoreInputElement.focus();
-      isMobileInputFocused = true;
-    } else {
-      // Fallback if the element doesn't exist for some reason
-      const name = prompt("NEW HIGH SCORE! Enter your name (20 chars max):", "");
-      if (name && !isSubmissionInProgress) {
-        playerNameInput = name;
-        submitHighScore();
-      }
-    }
-    return false; // Consume this touch to prevent other actions
-  }
-
-  // Handle screen transitions on tap for mobile
-  if (isMobileControlsEnabled()) {
-    if (gameState === 'start') {
-      gameState = 'highScores';
-      highScores = null;
-      highScoreManager.getHighScores().then(scores => { highScores = scores; })
-        .catch(error => { console.error('Failed to load high scores:', error); highScores = []; });
-      return false;
-    }
-    if (gameState === 'highScores') {
-      gameState = 'loading';
-      showLoadingOverlay("GENERATING LEVEL");
-      setTimeout(() => {
-        initGameObjects();
-        player.health = PLAYER_INITIAL_HEALTH;
-        player.airSupply = player.initialAirSupply;
-        player.lastSonarTime = frameCount - player.sonarCooldown;
-        player.lastShotTime = frameCount - player.shotCooldown;
-        gameState = 'playing';
-        if (audioInitialized && reactorHumOsc && reactorHumOsc.started) {
-          reactorHumOsc.amp(0, 0);
-        }
-      }, 100);
-      return false;
-    }
-    if (gameState === 'gameOver') {
-      if (isSubmittingHighScore) {
-        // Block any touch interaction if submitting high score but no name entered
-        return false;
-      } else {
-        resetGame();
-        return false;
-      }
-    }
-    if (gameState === 'gameComplete') {
-      resetGame();
-      return false;
-    }
-    if (gameState === 'levelComplete') {
-      prepareNextLevel();
-      return false;
-    }
-  }
-  // --- End of new logic ---
-
-  if (typeof handleMobileTouchStart === 'function') {
-    handleMobileTouchStart(touches);
-  }
-  // Prevent default to avoid issues on mobile
-  return false;
-}
-
-function touchMoved() {
-  if (typeof handleMobileTouchMove === 'function') {
-    handleMobileTouchMove(touches);
-  }
-  // Prevent default to avoid issues on mobile
-  return false;
-}
-
-function touchEnded() {
-  if (typeof handleMobileTouchEnd === 'function') {
-    handleMobileTouchEnd(touches);
-  }
-  // Prevent default to avoid issues on mobile
-  return false;
 }
 
