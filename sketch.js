@@ -2604,17 +2604,31 @@ function drawStartScreen() {
   fill(START_SCREEN_TITLE_COLOR_H, START_SCREEN_TITLE_COLOR_S, START_SCREEN_TITLE_COLOR_B); textSize(START_SCREEN_TITLE_TEXT_SIZE);
   text(`Reactor Dive`, width / 2, height / 2 + START_SCREEN_TITLE_Y_OFFSET);
   
-  textSize(START_SCREEN_INFO_TEXT_SIZE);
+  // Responsive info text: split long lines on narrow screens
+  const isNarrow = width < 650;
+  const lineSep = START_SCREEN_INFO_TEXT_SIZE + 4;
+  textSize(isNarrow ? START_SCREEN_INFO_TEXT_SIZE - 2 : START_SCREEN_INFO_TEXT_SIZE);
+  // Credit
   text("Christian Nold 2025", width / 2, height / 2 + START_SCREEN_INFO_Y_OFFSET_3);
-
+  // Objective
   let killsForLevel1 = getKillsRequiredForLevel(1);
-  text(`Destroy ${killsForLevel1} mutated creatures and reach the flooded reactor`, width / 2, height / 2 + START_SCREEN_INFO_Y_OFFSET_1);
-  
-  // Show different control instructions based on device
-  if (typeof isMobileControlsEnabled === 'function' && isMobileControlsEnabled()) {
-    text("Touch controls: Joystick (left) and Fire button (right)", width / 2, height / 2 + START_SCREEN_INFO_Y_OFFSET_2);
+  if (isNarrow) {
+    text(`Destroy ${killsForLevel1} mutated creatures`, width / 2, height / 2 + START_SCREEN_INFO_Y_OFFSET_1 - lineSep/2);
+    text(`and reach the flooded reactor`,     width / 2, height / 2 + START_SCREEN_INFO_Y_OFFSET_1 + lineSep/2);
   } else {
-    text("WASD/Arrows: Move. SPACE: Shoot.", width / 2, height / 2 + START_SCREEN_INFO_Y_OFFSET_2);
+    text(`Destroy ${killsForLevel1} mutated creatures and reach the flooded reactor`, width / 2, height / 2 + START_SCREEN_INFO_Y_OFFSET_1);
+  }
+  // Controls
+  let ctrlY = height / 2 + START_SCREEN_INFO_Y_OFFSET_2 + (isNarrow ? lineSep/1.2 : 0);
+  if (typeof isMobileControlsEnabled === 'function' && isMobileControlsEnabled()) {
+    if (isNarrow) {
+      text("Touch controls: Joystick (left)",      width / 2, ctrlY - lineSep/2);
+      text("and Fire button (right)",             width / 2, ctrlY + lineSep/2);
+    } else {
+      text("Touch controls: Joystick (left) and Fire button (right)", width / 2, ctrlY);
+    }
+  } else {
+    text("WASD/Arrows: Move. SPACE: Shoot.", width / 2, ctrlY);
   }
   
   textSize(START_SCREEN_PROMPT_TEXT_SIZE); fill(START_SCREEN_PROMPT_COLOR_H, START_SCREEN_PROMPT_COLOR_S, START_SCREEN_PROMPT_COLOR_B);
