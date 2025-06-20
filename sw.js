@@ -1,4 +1,4 @@
-const CACHE_NAME = 'reactor-dive-cache-v14'; // Updated for refactored files
+const CACHE_NAME = 'reactor-dive-cache-v15'; // Updated for JSONBase.js integration
 
 // Core application files
 const CORE_FILES = [
@@ -17,7 +17,7 @@ const GAME_FILES = [
   'cave.js',
   'bubbles.js',
   'mobileControls.js',
-  'JSONBIN.js'
+  'JSONBase.js' // Updated from JSONBIN.js to JSONBase.js
 ];
 
 // External libraries
