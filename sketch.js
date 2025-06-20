@@ -692,20 +692,7 @@ function setHighScoreInputState(submitting) {
   Object.assign(highscoreInputElement.style, style);
 }
 
-// Submit highscore using XMLHttpRequest (JSONBin API)
-function submitHighScoreXHR(binId, apiKey, accessKey, scoreData, callback) {
-  let req = new XMLHttpRequest();
-  req.onreadystatechange = () => {
-    if (req.readyState == XMLHttpRequest.DONE) {
-      if (callback) callback(req.responseText, req.status);
-    }
-  };
-  req.open("PUT", `https://api.jsonbin.io/v3/b/${binId}`, true);
-  req.setRequestHeader("Content-Type", "application/json");
-  req.setRequestHeader("X-Master-Key", apiKey);
-  if (accessKey) req.setRequestHeader("X-Access-Key", accessKey);
-  req.send(JSON.stringify(scoreData));
-}
+// The submitHighScoreXHR function is no longer needed as this is handled by JSONBase.js
 
 function showLoadingOverlay(text = "GENERATING LEVEL") {
   const overlay = document.getElementById('loadingOverlay');
@@ -1053,7 +1040,7 @@ function setup() {
   textFont('monospace');
   
   initializeSounds(); 
-  highScoreManager = new JSONBinHighScores();
+  highScoreManager = new JSONBaseHighScores(); // Use the new high score service
   initMobileControls();
   
   highscoreInputElement = document.getElementById('highscoreInput');
