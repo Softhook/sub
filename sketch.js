@@ -328,7 +328,7 @@ const START_SCREEN_TITLE_Y_OFFSET = -180; // Title at top
 const START_SCREEN_INFO_TEXT_SIZE = 20;
 const START_SCREEN_INFO_Y_OFFSET_1 = -60; // Game objective
 const START_SCREEN_INFO_Y_OFFSET_2 = -30; // Controls
-const START_SCREEN_INFO_Y_OFFSET_3 = -90; // Credit
+const START_SCREEN_INFO_Y_OFFSET_3 = -110; // Credit
 const START_SCREEN_INFO_Y_OFFSET_4 = 10; // Not used
 const START_SCREEN_FULLSCREEN_Y_OFFSET = 40;
 const START_SCREEN_PROMPT_TEXT_SIZE = 28;
@@ -2651,7 +2651,7 @@ function drawStartScreen() {
 
     let killsForLevel1 = getKillsRequiredForLevel(1);
     if (isNarrow) {
-      text("Christian Nold 2025", width / 2, height / 2 + START_SCREEN_INFO_Y_OFFSET_2);
+      text("Christian Nold 2025", width / 2, height / 2 + START_SCREEN_INFO_Y_OFFSET_3);
       text(`Destroy ${killsForLevel1} mutated creatures`, width / 2, height / 2 + START_SCREEN_INFO_Y_OFFSET_1 - lineSep/2);
       text(`and reach the flooded reactor`, width / 2, height / 2 + START_SCREEN_INFO_Y_OFFSET_1 + lineSep/2);
     } else {
