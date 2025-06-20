@@ -9,14 +9,74 @@ class JSONBaseHighScores {
     
     // Using the URL that responds with a proper error message
     this.baseUrl = 'https://api.jsonbase.io/o15FSkhapPNV/highscore/scores';
+    
+    // Cache for high scores
+    this.cachedScores = null;
+    this.lastCacheTime = 0;
+    this.cacheDuration = 5 * 60 * 1000; // 5 minutes in milliseconds
+    
+    // Load from localStorage first (if available)
+    this._loadCachedScoresFromStorage();
+    
+    // Start loading scores in the background immediately
+    this._preloadScores();
   }
-
+  
   /**
-   * Fetches the current high scores from JSONBase.io
-   * @returns {Promise<Array>} A promise that resolves with the high scores array.
+   * Preloads high scores in the background when the game starts
+   * @private
    */
-  async getHighScores() {
-    console.log('Fetching high scores from JSONBase.io...');
+  _preloadScores() {
+    console.log('Preloading high scores in background...');
+    setTimeout(() => {
+      this._fetchAndCacheScores()
+        .then(() => console.log('High scores preloaded successfully'))
+        .catch(error => console.error('Error preloading high scores:', error));
+    }, 500); // Small delay to not interfere with game startup
+  }
+  
+  /**
+   * Loads cached scores from localStorage
+   * @private
+   */
+  _loadCachedScoresFromStorage() {
+    try {
+      const storageData = localStorage.getItem('reactorDiveHighScores');
+      if (storageData) {
+        const data = JSON.parse(storageData);
+        this.cachedScores = data.scores;
+        this.lastCacheTime = data.timestamp;
+        console.log('Loaded high scores from localStorage');
+      }
+    } catch (e) {
+      console.error('Failed to load cached scores from localStorage:', e);
+    }
+  }
+  
+  /**
+   * Saves scores to localStorage for caching
+   * @private
+   * @param {Array} scores - Array of high score objects
+   */
+  _saveCachedScoresToStorage(scores) {
+    try {
+      const data = {
+        scores: scores,
+        timestamp: Date.now()
+      };
+      localStorage.setItem('reactorDiveHighScores', JSON.stringify(data));
+    } catch (e) {
+      console.error('Failed to save scores to localStorage:', e);
+    }
+  }
+  
+  /**
+   * Fetches scores from the remote API and updates cache
+   * @private
+   * @returns {Promise<Array>} Promise resolving to array of high scores
+   */
+  async _fetchAndCacheScores() {
+    console.log('Fetching fresh high scores from JSONBase.io...');
     try {
       const response = await fetch(this.baseUrl, {
         method: 'GET',
@@ -26,7 +86,6 @@ class JSONBaseHighScores {
       });
 
       if (!response.ok) {
-        // If the collection is not found, JSONBase returns 404, treat as empty.
         if (response.status === 404) {
           console.log('High score collection is empty or not found. Returning empty array.');
           return [];
@@ -34,14 +93,57 @@ class JSONBaseHighScores {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      const data = await response.json();
-      // The data should be an array of scores.
-      return data || [];
+      let data = await response.json();
+      
+      if (!data || !Array.isArray(data)) {
+        data = [];
+      }
+      
+      // Ensure the high scores are sorted correctly (descending by score)
+      data.sort((a, b) => {
+        const scoreA = typeof a.score === 'string' ? parseInt(a.score) : a.score;
+        const scoreB = typeof b.score === 'string' ? parseInt(b.score) : b.score;
+        return scoreB - scoreA;
+      });
+      
+      // Only keep the top 10 scores
+      const topScores = data.slice(0, 10);
+      
+      // Update cache
+      this.cachedScores = topScores;
+      this.lastCacheTime = Date.now();
+      
+      // Save to localStorage
+      this._saveCachedScoresToStorage(topScores);
+      
+      return topScores;
     } catch (error) {
       console.error("Could not fetch high scores:", error);
-      // Return an empty array on error to prevent game from crashing
-      return [];
+      // Return null to indicate fetch error
+      return null;
     }
+  }
+
+  /**
+   * Fetches the current high scores from JSONBase.io or cache
+   * @returns {Promise<Array>} A promise that resolves with the high scores array.
+   */
+  async getHighScores() {
+    // Return cached scores if they're fresh enough
+    if (this.cachedScores && Date.now() - this.lastCacheTime < this.cacheDuration) {
+      console.log('Using cached high scores');
+      return this.cachedScores;
+    }
+    
+    // Otherwise, fetch fresh scores
+    const scores = await this._fetchAndCacheScores();
+    // If fetch failed but we have cached scores, use those as fallback
+    if (scores === null && this.cachedScores) {
+      console.log('Fetch failed, using cached scores as fallback');
+      return this.cachedScores;
+    }
+    
+    return scores || [];
   }
 
   /**
@@ -59,8 +161,13 @@ class JSONBaseHighScores {
       // 2. Add the new score
       highScores.push({ name, score });
 
-      // 3. Sort the scores in descending order
-      highScores.sort((a, b) => b.score - a.score);
+      // 3. Sort the scores in descending order by score value
+      highScores.sort((a, b) => {
+        // Make sure we're comparing numbers, not strings
+        const scoreA = typeof a.score === 'string' ? parseInt(a.score) : a.score;
+        const scoreB = typeof b.score === 'string' ? parseInt(b.score) : b.score;
+        return scoreB - scoreA; // Descending order (highest first)
+      });
 
       // 4. Keep only the top 10 scores
       const updatedScores = highScores.slice(0, 10);
@@ -78,6 +185,11 @@ class JSONBaseHighScores {
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
+      
+      // Update our cache with the new scores
+      this.cachedScores = updatedScores;
+      this.lastCacheTime = Date.now();
+      this._saveCachedScoresToStorage(updatedScores);
 
       console.log('High score submitted successfully.');
     } catch (error) {
@@ -106,7 +218,11 @@ class JSONBaseHighScores {
       }
 
       // Otherwise, check if the new score is greater than the lowest score.
-      const lowestScore = highScores[highScores.length - 1].score;
+      let lowestScore = highScores[highScores.length - 1].score;
+      // Convert to number if it's stored as string
+      if (typeof lowestScore === 'string') {
+        lowestScore = parseInt(lowestScore);
+      }
       return score > lowestScore;
     } catch (error) {
       console.error("Could not verify high score:", error);
