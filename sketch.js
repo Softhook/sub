@@ -2703,7 +2703,7 @@ function drawHighScoreScreen() {
   const scoreStartY = isLandscapeMobile ? height / 2 - 80 : height / 2 - 150;
   const scoreSpacing = isLandscapeMobile ? 22 : 30;
   const instructionSize = isLandscapeMobile ? 16 : 20;
-  const instructionY = isLandscapeMobile ? height / 2 + 110 : height / 2 + 240;
+  const instructionY = isLandscapeMobile ? height / 2 + 110 : height / 2 + 280;
   
   // Title
   fill(0, 0, 100); // White text
