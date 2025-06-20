@@ -1,74 +1,155 @@
-const CACHE_NAME = 'reactor-dive-cache-v13'; // Bump version for display_override
-const URLS_TO_CACHE = [
+const CACHE_NAME = 'reactor-dive-cache-v14'; // Updated for refactored files
+
+// Core application files
+const CORE_FILES = [
   './', // The start URL
   'index.html',
   'style.css',
+  'manifest.json'
+];
+
+// Game JavaScript files
+const GAME_FILES = [
   'sketch.js',
+  'playerSub.js',
+  'enemy.js', 
+  'projectile.js',
+  'cave.js',
+  'bubbles.js',
   'mobileControls.js',
-  'manifest.json',
+  'JSONBIN.js'
+];
+
+// External libraries
+const LIBRARY_FILES = [
+  'p5.js',
+  'p5.sound.min.js'
+];
+
+// Assets
+const ASSET_FILES = [
   'icon-192x192.png',
   'icon-512x512.png',
   'Berpatroli.otf',
-  'spinner.svg',
-  'p5.js',
-  'p5.sound.min.js',
+  'spinner.svg'
+];
+
+// All files to cache
+const URLS_TO_CACHE = [
+  ...CORE_FILES,
+  ...GAME_FILES,
+  ...LIBRARY_FILES,
+  ...ASSET_FILES
 ];
 
 // Install: cache all static assets
 self.addEventListener('install', event => {
-  console.log('[SW] Install event');
+  console.log('[SW] Install event - caching resources');
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => {
-        console.log('[SW] Caching app shell:', URLS_TO_CACHE);
-        return cache.addAll(URLS_TO_CACHE);
+    installCache()
+      .then(() => {
+        console.log('[SW] Installation complete');
+        return self.skipWaiting();
       })
-      .then(() => self.skipWaiting())
+      .catch(error => {
+        console.error('[SW] Installation failed:', error);
+        throw error;
+      })
   );
 });
 
-// Activate: clean up old caches
+// Activate: clean up old caches and take control
 self.addEventListener('activate', event => {
-  console.log('[SW] Activate event');
+  console.log('[SW] Activate event - cleaning up old caches');
   event.waitUntil(
-    caches.keys().then(cacheNames => {
-      return Promise.all(
-        cacheNames.map(cacheName => {
-          if (cacheName !== CACHE_NAME) {
-            console.log('[SW] Deleting old cache:', cacheName);
-            return caches.delete(cacheName);
-          }
-        })
-      );
-    }).then(() => self.clients.claim())
+    cleanupOldCaches()
+      .then(() => {
+        console.log('[SW] Activation complete, taking control');
+        return self.clients.claim();
+      })
+      .catch(error => {
+        console.error('[SW] Activation failed:', error);
+        throw error;
+      })
   );
 });
 
-// Fetch: serve from cache, or network, with a fallback for navigation
+// Fetch: serve from cache with network fallback
 self.addEventListener('fetch', event => {
-  const requestUrl = new URL(event.request.url);
-  const scopeUrl = new URL(self.registration.scope);
-
-  // Check if the request is for the root of the scope (the start_url)
-  const isStartUrlRequest = event.request.method === 'GET' && requestUrl.pathname === scopeUrl.pathname;
+  // Skip non-GET requests and chrome-extension requests
+  if (event.request.method !== 'GET' || event.request.url.startsWith('chrome-extension://')) {
+    return;
+  }
 
   event.respondWith(
-    caches.match(event.request)
-      .then(response => {
-        // Return from cache if available
-        if (response) {
-          return response;
-        }
-
-        // If the request is for the start_url, or any other navigation,
-        // serve the app shell from the cache. This is the crucial fallback.
-        if (isStartUrlRequest || event.request.mode === 'navigate') {
-          console.log(`[SW] Fallback for ${event.request.mode} to ${event.request.url}. Serving root from cache.`);
-          return caches.match('./');
-        }
-
-        // Otherwise, fetch from network
-        return fetch(event.request);
+    handleFetchRequest(event.request)
+      .catch(error => {
+        console.error('[SW] Fetch error for', event.request.url, ':', error);
+        // Return a basic response or let it fail naturally
+        return new Response('Network error', { 
+          status: 503, 
+          statusText: 'Service Unavailable' 
+        });
       })
   );
 });
+
+// Helper function to install and cache resources
+async function installCache() {
+  const cache = await caches.open(CACHE_NAME);
+  console.log('[SW] Caching app shell:', URLS_TO_CACHE.length, 'files');
+  
+  // Cache core files first, then others
+  await cache.addAll(CORE_FILES);
+  console.log('[SW] Core files cached');
+  
+  await cache.addAll(GAME_FILES);
+  console.log('[SW] Game files cached');
+  
+  await cache.addAll(LIBRARY_FILES);
+  console.log('[SW] Library files cached');
+  
+  await cache.addAll(ASSET_FILES);
+  console.log('[SW] Asset files cached');
+  
+  return cache;
+}
+
+// Helper function to clean up old caches
+async function cleanupOldCaches() {
+  const cacheNames = await caches.keys();
+  const deletePromises = cacheNames
+    .filter(cacheName => cacheName !== CACHE_NAME)
+    .map(cacheName => {
+      console.log('[SW] Deleting old cache:', cacheName);
+      return caches.delete(cacheName);
+    });
+  
+  return Promise.all(deletePromises);
+}
+
+// Helper function to handle fetch requests
+async function handleFetchRequest(request) {
+  const requestUrl = new URL(request.url);
+  const scopeUrl = new URL(self.registration.scope);
+  const isStartUrlRequest = requestUrl.pathname === scopeUrl.pathname;
+  
+  // Try cache first
+  const cachedResponse = await caches.match(request);
+  if (cachedResponse) {
+    return cachedResponse;
+  }
+  
+  // For navigation requests or start URL, serve the app shell
+  if (isStartUrlRequest || request.mode === 'navigate') {
+    console.log(`[SW] Serving app shell for ${request.mode} request to ${request.url}`);
+    const appShell = await caches.match('./');
+    if (appShell) {
+      return appShell;
+    }
+  }
+  
+  // Try network as fallback
+  console.log('[SW] Fetching from network:', request.url);
+  return fetch(request);
+}
