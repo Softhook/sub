@@ -642,6 +642,56 @@ function spawnCurrentAreas(caveContext) {
 
 // --- UI & DOM Functions ---
 
+const highScoreInputStyles = {
+  visible: {
+    position: 'fixed',
+    top: '65%',
+    left: '50%',
+    transform: 'translate(-50%, -50%)',
+    opacity: '1',
+    pointerEvents: 'auto',
+    zIndex: '10000',
+    padding: '12px 20px',
+    fontSize: '20px',
+    textAlign: 'center',
+    border: '3px solid #ffff00',
+    borderRadius: '8px',
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+    color: '#ffff00',
+    boxShadow: '0 0 15px rgba(255, 255, 0, 0.5)',
+    outline: 'none',
+    minWidth: '250px',
+  },
+  hidden: {
+    position: 'fixed',
+    top: '-1000px',
+    left: '-1000px',
+    opacity: '0',
+    pointerEvents: 'none',
+  },
+  submitting: {
+    backgroundColor: 'rgba(100, 100, 100, 0.5)',
+    color: '#999999',
+  },
+  default: {
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+    color: '#ffff00',
+  }
+};
+
+function updateHighScoreInputVisibility(visible) {
+  if (!highscoreInputElement) return;
+  const style = visible ? highScoreInputStyles.visible : highScoreInputStyles.hidden;
+  Object.assign(highscoreInputElement.style, style);
+}
+
+function setHighScoreInputState(submitting) {
+  if (!highscoreInputElement) return;
+  highscoreInputElement.disabled = submitting;
+  const style = submitting ? highScoreInputStyles.submitting : highScoreInputStyles.default;
+  Object.assign(highscoreInputElement.style, style);
+}
+
 // Submit highscore using XMLHttpRequest (JSONBin API)
 function submitHighScoreXHR(binId, apiKey, accessKey, scoreData, callback) {
   let req = new XMLHttpRequest();
@@ -690,25 +740,17 @@ function updateLoadingText(text) {
 }
 
 function submitHighScore() {
-  if (isSubmissionInProgress) {
-    console.log("Submission already in progress. Ignoring.");
+  if (isSubmissionInProgress || playerNameInput.trim().length === 0) {
     return;
   }
 
-  if (playerNameInput.trim().length > 0) {
-    console.log('Submitting high score:', playerNameInput, totalScore);
-    isSubmissionInProgress = true;
-    
-    if (highscoreInputElement) {
-      highscoreInputElement.disabled = true;
-      highscoreInputElement.style.backgroundColor = 'rgba(100, 100, 100, 0.5)';
-      highscoreInputElement.style.color = '#999999';
-      highscoreInputElement.style.pointerEvents = 'none';
-    }
-    
-    showLoadingOverlay("SUBMITTING SCORE...");
-    
-    highScoreManager.submitScore(playerNameInput.trim(), totalScore).then(() => {
+  console.log('Submitting high score:', playerNameInput, totalScore);
+  isSubmissionInProgress = true;
+  setHighScoreInputState(true);
+  showLoadingOverlay("SUBMITTING SCORE...");
+
+  highScoreManager.submitScore(playerNameInput.trim(), totalScore)
+    .then(() => {
       console.log('High score submitted successfully!');
       hideLoadingOverlay();
       isSubmittingHighScore = false;
@@ -717,31 +759,22 @@ function submitHighScore() {
       
       if (highscoreInputElement) {
         highscoreInputElement.value = '';
-        highscoreInputElement.disabled = false;
-        highscoreInputElement.style.backgroundColor = 'rgba(0, 0, 0, 0.9)';
-        highscoreInputElement.style.color = '#ffff00';
-        highscoreInputElement.style.pointerEvents = 'auto';
         highscoreInputElement.blur();
       }
       playerNameInput = '';
+      setHighScoreInputState(false);
       
-    }).catch(error => {
+    })
+    .catch(error => {
       console.error('Error submitting high score:', error);
       hideLoadingOverlay();
       isSubmissionInProgress = false;
-      
-      if (highscoreInputElement) {
-        highscoreInputElement.disabled = false;
-        highscoreInputElement.style.backgroundColor = 'rgba(0, 0, 0, 0.9)';
-        highscoreInputElement.style.color = '#ffff00';
-        highscoreInputElement.style.pointerEvents = 'auto';
-      }
+      setHighScoreInputState(false);
       
       setTimeout(() => {
         alert("Failed to submit high score. Please check your connection and try again.");
       }, 100);
     });
-  }
 }
 
 // --- Helper Functions ---
@@ -1689,25 +1722,8 @@ function drawGameOverScreen() {
     text("Enter your name:", width/2, height/2 + GAME_OVER_INFO_Y_OFFSET + 110);
     
     if (isMobileControlsEnabled()) {
-      if (highscoreInputElement) {
-        highscoreInputElement.style.position = 'fixed';
-        highscoreInputElement.style.top = '65%';
-        highscoreInputElement.style.left = '50%';
-        highscoreInputElement.style.transform = 'translate(-50%, -50%)';
-        highscoreInputElement.style.opacity = '1';
-        highscoreInputElement.style.pointerEvents = 'auto';
-        highscoreInputElement.style.zIndex = '10000';
-        highscoreInputElement.style.padding = '12px 20px';
-        highscoreInputElement.style.fontSize = '20px';
-        highscoreInputElement.style.textAlign = 'center';
-        highscoreInputElement.style.border = '3px solid #ffff00';
-        highscoreInputElement.style.borderRadius = '8px';
-        highscoreInputElement.style.backgroundColor = 'rgba(0, 0, 0, 0.9)';
-        highscoreInputElement.style.color = '#ffff00';
-        highscoreInputElement.style.boxShadow = '0 0 15px rgba(255, 255, 0, 0.5)';
-        highscoreInputElement.style.outline = 'none';
-        highscoreInputElement.style.minWidth = '250px';
-      }
+      updateHighScoreInputVisibility(true);
+      
       fill(60, 60, 80);
       textSize(GAME_OVER_INFO_TEXT_SIZE - 4);
       if (isSubmissionInProgress) {
@@ -1717,6 +1733,7 @@ function drawGameOverScreen() {
         text("Tap to enter name, then type", width/2, height/2 + GAME_OVER_PROMPT_Y_OFFSET + 60);
       }
     } else {
+      updateHighScoreInputVisibility(false); // Hide on desktop
       push();
       if (isSubmissionInProgress) {
         fill(0, 0, 20, 200);
@@ -1745,13 +1762,7 @@ function drawGameOverScreen() {
       textSize(GAME_OVER_INFO_TEXT_SIZE - 4);
     }
   } else {
-    if (highscoreInputElement) {
-      highscoreInputElement.style.position = 'fixed';
-      highscoreInputElement.style.top = '-1000px';
-      highscoreInputElement.style.left = '-1000px';
-      highscoreInputElement.style.opacity = '0';
-      highscoreInputElement.style.pointerEvents = 'none';
-    }
+    updateHighScoreInputVisibility(false);
     
     if (typeof isMobileControlsEnabled === 'function' && isMobileControlsEnabled()) {
       text("Tap to Restart", width / 2, height / 2 + GAME_OVER_PROMPT_Y_OFFSET);
