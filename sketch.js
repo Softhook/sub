@@ -2389,6 +2389,7 @@ function keyPressed() {
     } else if (!isSubmittingHighScore) {
       resetGame();
     }
+    // If isSubmittingHighScore is true but no name entered, do nothing (block the action)
   } else if (gameState === 'gameComplete' && keyCode === ENTER) {
     resetGame();
   } else if (gameState === 'levelComplete' && keyCode === ENTER) {
@@ -2692,13 +2693,25 @@ function drawHighScoreScreen() {
   background(BACKGROUND_COLOR_H, BACKGROUND_COLOR_S, BACKGROUND_COLOR_B);
   textAlign(CENTER, CENTER);
   
+  // Detect landscape mobile (short height) for compact layout
+  const isLandscapeMobile = height < 500;
+  
+  // Adjust sizes for landscape mobile
+  const titleSize = isLandscapeMobile ? 32 : 48;
+  const titleY = isLandscapeMobile ? height / 2 - 120 : height / 2 - 200;
+  const scoreSize = isLandscapeMobile ? 18 : 24;
+  const scoreStartY = isLandscapeMobile ? height / 2 - 80 : height / 2 - 150;
+  const scoreSpacing = isLandscapeMobile ? 22 : 30;
+  const instructionSize = isLandscapeMobile ? 16 : 20;
+  const instructionY = isLandscapeMobile ? height / 2 + 110 : height / 2 + 200;
+  
   // Title
   fill(0, 0, 100); // White text
-  textSize(48);
-  text("HIGH SCORES", width / 2, height / 2 - 200);
+  textSize(titleSize);
+  text("HIGH SCORES", width / 2, titleY);
   
   // High scores list
-  textSize(24);
+  textSize(scoreSize);
   if (!highScores) {
     // Loading state
     fill(60, 100, 80); // Yellow loading text
@@ -2712,18 +2725,18 @@ function drawHighScoreScreen() {
     fill(0, 0, 90); // Light gray for scores
     for (let i = 0; i < Math.min(highScores.length, 10); i++) {
       let score = highScores[i];
-      let yPos = height / 2 - 150 + i * 30;
+      let yPos = scoreStartY + i * scoreSpacing;
       text(`${i + 1}. ${score.name}: ${score.score}`, width / 2, yPos);
     }
   }
   
   // Instructions
-  textSize(20);
+  textSize(instructionSize);
   fill(60, 100, 100); // Yellow prompt text
   if (typeof isMobileControlsEnabled === 'function' && isMobileControlsEnabled()) {
-    text("Tap to Play", width / 2, height / 2 + 200);
+    text("Tap to Play", width / 2, instructionY);
   } else {
-    text("Press ENTER to Play", width / 2, height / 2 + 200);
+    text("Press ENTER to Play", width / 2, instructionY);
   }
 }
 
@@ -3179,9 +3192,14 @@ function touchStarted() {
       }, 100);
       return false;
     }
-    if (gameState === 'gameOver' && !isSubmittingHighScore) {
-      resetGame();
-      return false;
+    if (gameState === 'gameOver') {
+      if (isSubmittingHighScore) {
+        // Block any touch interaction if submitting high score but no name entered
+        return false;
+      } else {
+        resetGame();
+        return false;
+      }
     }
     if (gameState === 'gameComplete') {
       resetGame();
