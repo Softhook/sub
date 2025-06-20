@@ -2623,7 +2623,7 @@ function drawStartScreen() {
   
   if (isLandscapeMobile) {
     // Compact landscape layout - everything closer together
-    text("Christian Nold 2025", width / 2, height / 2 - 70);
+    text("Christian Nold 2025", width / 2, height / 2 - 80);
     
     // Objective - always split in landscape
     let killsForLevel1 = getKillsRequiredForLevel(1);
@@ -2648,14 +2648,15 @@ function drawStartScreen() {
     }
   } else {
     // Standard layout for portrait and desktop
-    text("Christian Nold 2025", width / 2, height / 2 + START_SCREEN_INFO_Y_OFFSET_3);
-    
-    // Objective
+
     let killsForLevel1 = getKillsRequiredForLevel(1);
     if (isNarrow) {
+      text("Christian Nold 2025", width / 2, height / 2 + START_SCREEN_INFO_Y_OFFSET_2);
       text(`Destroy ${killsForLevel1} mutated creatures`, width / 2, height / 2 + START_SCREEN_INFO_Y_OFFSET_1 - lineSep/2);
       text(`and reach the flooded reactor`, width / 2, height / 2 + START_SCREEN_INFO_Y_OFFSET_1 + lineSep/2);
     } else {
+          
+      text("Christian Nold 2025", width / 2, height / 2 + START_SCREEN_INFO_Y_OFFSET_3);
       text(`Destroy ${killsForLevel1} mutated creatures and reach the flooded reactor`, width / 2, height / 2 + START_SCREEN_INFO_Y_OFFSET_1);
     }
     
