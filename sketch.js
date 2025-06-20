@@ -2604,40 +2604,31 @@ function drawStartScreen() {
   fill(START_SCREEN_TITLE_COLOR_H, START_SCREEN_TITLE_COLOR_S, START_SCREEN_TITLE_COLOR_B); textSize(START_SCREEN_TITLE_TEXT_SIZE);
   text(`Reactor Dive`, width / 2, height / 2 + START_SCREEN_TITLE_Y_OFFSET);
   
-  // Info text splitting based on actual width to avoid overflow
-  const lineSep = START_SCREEN_INFO_TEXT_SIZE + 6;
-  textSize(START_SCREEN_INFO_TEXT_SIZE);
-  // Credit always single line
+  // Responsive info text: split long lines on narrow screens
+  const isNarrow = width < 650;
+  const lineSep = START_SCREEN_INFO_TEXT_SIZE + 4;
+  textSize(isNarrow ? START_SCREEN_INFO_TEXT_SIZE - 2 : START_SCREEN_INFO_TEXT_SIZE);
+  // Credit
   text("Christian Nold 2025", width / 2, height / 2 + START_SCREEN_INFO_Y_OFFSET_3);
-  
-  // Objective text
+  // Objective
   let killsForLevel1 = getKillsRequiredForLevel(1);
-  const objText = `Destroy ${killsForLevel1} mutated creatures and reach the flooded reactor`;
-  if (textWidth(objText) > width * 0.9) {
-    // Split before ' and reach'
+  if (isNarrow) {
     text(`Destroy ${killsForLevel1} mutated creatures`, width / 2, height / 2 + START_SCREEN_INFO_Y_OFFSET_1 - lineSep/2);
     text(`and reach the flooded reactor`,     width / 2, height / 2 + START_SCREEN_INFO_Y_OFFSET_1 + lineSep/2);
   } else {
-    text(objText, width / 2, height / 2 + START_SCREEN_INFO_Y_OFFSET_1);
+    text(`Destroy ${killsForLevel1} mutated creatures and reach the flooded reactor`, width / 2, height / 2 + START_SCREEN_INFO_Y_OFFSET_1);
   }
-  
-  // Controls text
-  const ctrText = typeof isMobileControlsEnabled === 'function' && isMobileControlsEnabled()
-    ? "Touch controls: Joystick (left) and Fire button (right)"
-    : "WASD/Arrows: Move. SPACE: Shoot.";
-  const ctrlY = height / 2 + START_SCREEN_INFO_Y_OFFSET_2;
-  if (textWidth(ctrText) > width * 0.9) {
-    // Split around ' and '
-    if (ctrText.includes(' and ')) {
-      const parts = ctrText.split(' and ');
-      text(parts[0], width / 2, ctrlY - lineSep/2);
-      text('and ' + parts[1], width / 2, ctrlY + lineSep/2);
+  // Controls
+  let ctrlY = height / 2 + START_SCREEN_INFO_Y_OFFSET_2 + (isNarrow ? lineSep/1.2 : 0);
+  if (typeof isMobileControlsEnabled === 'function' && isMobileControlsEnabled()) {
+    if (isNarrow) {
+      text("Touch controls: Joystick (left)",      width / 2, ctrlY - lineSep/2);
+      text("and Fire button (right)",             width / 2, ctrlY + lineSep/2);
     } else {
-      // Fallback if no 'and', just single line
-      text(ctrText, width / 2, ctrlY);
+      text("Touch controls: Joystick (left) and Fire button (right)", width / 2, ctrlY);
     }
   } else {
-    text(ctrText, width / 2, ctrlY);
+    text("WASD/Arrows: Move. SPACE: Shoot.", width / 2, ctrlY);
   }
   
   textSize(START_SCREEN_PROMPT_TEXT_SIZE); fill(START_SCREEN_PROMPT_COLOR_H, START_SCREEN_PROMPT_COLOR_S, START_SCREEN_PROMPT_COLOR_B);
