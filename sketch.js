@@ -426,6 +426,7 @@ let isSubmittingHighScore = false; // Track if we're in high score entry mode
 let playerNameInput = ''; // Store the player's name input
 let isHighScoreResult = false; // Whether the current score qualifies as a high score
 let isSubmissionInProgress = false; // To prevent multiple submissions
+let showNameRequiredWarning = false; // Flag to show warning for empty name
 
 // Mobile input handling
 let highscoreInputElement = null; // Reference to the HTML input element
@@ -727,7 +728,16 @@ function updateLoadingText(text) {
 }
 
 function submitHighScore() {
-  if (isSubmissionInProgress || playerNameInput.trim().length === 0) {
+  if (isSubmissionInProgress) {
+    return;
+  }
+  
+  if (playerNameInput.trim().length === 0) {
+    console.log('Cannot submit high score: Name is empty');
+    showNameRequiredWarning = true;
+    setTimeout(() => {
+      showNameRequiredWarning = false;
+    }, 3000); // Hide warning after 3 seconds
     return;
   }
 
@@ -1051,8 +1061,16 @@ function setup() {
       }
     });
     highscoreInputElement.addEventListener('keydown', function(e) {
-      if (e.key === 'Enter' && isSubmittingHighScore && playerNameInput.trim().length > 0 && !isSubmissionInProgress) {
-        submitHighScore();
+      if (e.key === 'Enter' && isSubmittingHighScore && !isSubmissionInProgress) {
+        if (playerNameInput.trim().length > 0) {
+          submitHighScore();
+        } else {
+          // Visual feedback for empty name
+          showNameRequiredWarning = true;
+          setTimeout(() => {
+            showNameRequiredWarning = false;
+          }, 3000); // Hide warning after 3 seconds
+        }
       }
     });
   }
@@ -1150,8 +1168,16 @@ function handleKeyPressedPlaying() {
 
 function handleKeyPressedGameOver() {
   if (keyCode === ENTER) {
-    if (isSubmittingHighScore && playerNameInput.trim().length > 0 && !isSubmissionInProgress) {
-      submitHighScore();
+    if (isSubmittingHighScore && !isSubmissionInProgress) {
+      if (playerNameInput.trim().length > 0) {
+        submitHighScore();
+      } else {
+        // Visual feedback for empty name
+        showNameRequiredWarning = true;
+        setTimeout(() => {
+          showNameRequiredWarning = false;
+        }, 3000); // Hide warning after 3 seconds
+      }
     } else if (!isSubmittingHighScore) {
       resetGame();
     }
@@ -1219,9 +1245,15 @@ function handleTouchStart() {
       isMobileInputFocused = true;
     } else {
       const name = prompt("NEW HIGH SCORE! Enter your name (20 chars max):", "");
-      if (name && !isSubmissionInProgress) {
-        playerNameInput = name;
+      if (name && name.trim().length > 0 && !isSubmissionInProgress) {
+        playerNameInput = name.trim();
         submitHighScore();
+      } else if (name !== null) {
+        // They entered an empty name
+        showNameRequiredWarning = true;
+        setTimeout(() => {
+          showNameRequiredWarning = false;
+        }, 3000); // Hide warning after 3 seconds
       }
     }
     return true;
@@ -1718,6 +1750,15 @@ function drawGameOverScreen() {
         text("SUBMITTING SCORE...", width/2, height/2 + GAME_OVER_PROMPT_Y_OFFSET + 60);
       } else {
         text("Tap to enter name, then type", width/2, height/2 + GAME_OVER_PROMPT_Y_OFFSET + 60);
+        
+        // Show warning if user tried to submit without a name
+        if (showNameRequiredWarning) {
+          push();
+          fill(0, 90, 90);  // Red/orange warning color
+          textSize(GAME_OVER_INFO_TEXT_SIZE - 2);
+          text("Please enter your name!", width/2, height/2 + GAME_OVER_PROMPT_Y_OFFSET + 90);
+          pop();
+        }
       }
     } else {
       updateHighScoreInputVisibility(false); // Hide on desktop
@@ -1744,6 +1785,15 @@ function drawGameOverScreen() {
         text(playerNameInput + "_", width/2, height/2 + GAME_OVER_INFO_Y_OFFSET + 150);
       }
       pop();
+      
+      // Show warning if user tried to submit without a name
+      if (showNameRequiredWarning) {
+        push();
+        fill(0, 90, 90);  // Red/orange warning color
+        textSize(GAME_OVER_INFO_TEXT_SIZE - 2);
+        text("Please enter your name!", width/2, height/2 + GAME_OVER_INFO_Y_OFFSET + 190);
+        pop();
+      }
       
       fill(60, 60, 80);
       textSize(GAME_OVER_INFO_TEXT_SIZE - 4);
