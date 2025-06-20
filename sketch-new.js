@@ -1,31 +1,18 @@
 // --- Main Sketch File - Streamlined with Modular Components ---
 
-// Global sound function for compatibility with existing classes
-function playSound(soundName) {
-    if (soundManager && soundManager.playSound) {
-        soundManager.playSound(soundName);
-    }
-}
-
 // p5.js setup function
 function setup() {
-    console.log('Setup function started');
-    
     // Create canvas
     createCanvas(windowWidth, windowHeight);
-    console.log('Canvas created:', windowWidth, 'x', windowHeight);
     
     // Set color mode
     colorMode(HSB, 360, 100, 100, 255);
-    console.log('Color mode set to HSB');
     
     // Initialize sound manager
     soundManager = initializeSoundManager();
-    console.log('Sound manager initialized:', soundManager);
     
     // Load high scores
     if (typeof JSONBinHighScores !== 'undefined') {
-        console.log('JSONBinHighScores class found');
         highScoreManager = new JSONBinHighScores();
         highScoreManager.loadHighScores().then(scores => {
             highScores = scores;
@@ -33,23 +20,17 @@ function setup() {
         }).catch(error => {
             console.warn('Failed to load high scores:', error);
         });
-    } else {
-        console.warn('JSONBinHighScores class not found');
     }
     
     // Initialize mobile controls if needed
     if (typeof initializeMobileControls === 'function') {
         initializeMobileControls();
-        console.log('Mobile controls initialized');
-    } else {
-        console.log('Mobile controls not available');
     }
     
     // Initialize game state
     initializeGameState();
-    console.log('Game state initialized');
     
-    console.log('Game setup complete');
+    console.log('Game initialized');
 }
 
 // p5.js draw function
@@ -57,11 +38,6 @@ function draw() {
     // Set background
     colorMode(HSB, 360, 100, 100, 255);
     background(BACKGROUND_COLOR_H, BACKGROUND_COLOR_S, BACKGROUND_COLOR_B);
-    
-    // Debug: Log every 60 frames (once per second at 60fps)
-    if (frameCount % 60 === 0) {
-        console.log('Draw function running, frame:', frameCount, 'gameState:', gameState);
-    }
     
     // Handle different game states
     switch (gameState) {
@@ -374,10 +350,7 @@ function touchStarted() {
 
 // Handle general game input (transitions between states)
 function handleGameInput() {
-    console.log('handleGameInput called, current gameState:', gameState);
-    
     if (gameState === 'start') {
-        console.log('Starting new game...');
         resetGame();
     } else if (gameState === 'levelComplete') {
         if (level >= MAX_LEVELS) {

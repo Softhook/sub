@@ -36,14 +36,27 @@
     <input type="text" id="highscoreInput" maxlength="20" placeholder="Enter your name" 
            style="position: fixed; top: -1000px; left: -1000px; opacity: 0; pointer-events: none;">
     
-    <script src="mobileControls.js"></script>
-    <script src="sketch.js"></script>
+    <!-- Load configuration and utilities first -->
+    <script src="config.js"></script>
+    <script src="gameUtils.js"></script>
+    <script src="gameState.js"></script>
+    <script src="soundManager.js"></script>
+    
+    <!-- Load game classes -->
     <script src="bubbles.js"></script>
     <script src="cave.js"></script>
     <script src="enemy.js"></script>
     <script src="JSONBIN.js"></script>
     <script src="playerSub.js"></script>
     <script src="projectile.js"></script>
+    
+    <!-- Load game systems -->
+    <script src="gameLogic.js"></script>
+    <script src="uiRenderer.js"></script>
+    
+    <!-- Load mobile controls and main sketch -->
+    <script src="mobileControls.js"></script>
+    <script src="sketch.js"></script>
     
     <script>
       if ('serviceWorker' in navigator) {
