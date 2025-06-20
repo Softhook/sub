@@ -2601,43 +2601,85 @@ function drawStartScreen() {
 
 
   textAlign(CENTER, CENTER);
-  fill(START_SCREEN_TITLE_COLOR_H, START_SCREEN_TITLE_COLOR_S, START_SCREEN_TITLE_COLOR_B); textSize(START_SCREEN_TITLE_TEXT_SIZE);
-  text(`Reactor Dive`, width / 2, height / 2 + START_SCREEN_TITLE_Y_OFFSET);
   
-  // Responsive info text: split long lines on narrow screens
+  // Detect landscape mobile (short height) for compact layout
+  const isLandscapeMobile = height < 500;
   const isNarrow = width < 650;
-  const lineSep = START_SCREEN_INFO_TEXT_SIZE + 4;
-  textSize(isNarrow ? START_SCREEN_INFO_TEXT_SIZE - 2 : START_SCREEN_INFO_TEXT_SIZE);
-  // Credit
-  text("Christian Nold 2025", width / 2, height / 2 + START_SCREEN_INFO_Y_OFFSET_3);
-  // Objective
-  let killsForLevel1 = getKillsRequiredForLevel(1);
-  if (isNarrow) {
-    text(`Destroy ${killsForLevel1} mutated creatures`, width / 2, height / 2 + START_SCREEN_INFO_Y_OFFSET_1 - lineSep/2);
-    text(`and reach the flooded reactor`,     width / 2, height / 2 + START_SCREEN_INFO_Y_OFFSET_1 + lineSep/2);
-  } else {
-    text(`Destroy ${killsForLevel1} mutated creatures and reach the flooded reactor`, width / 2, height / 2 + START_SCREEN_INFO_Y_OFFSET_1);
-  }
-  // Controls
-  let ctrlY = height / 2 + START_SCREEN_INFO_Y_OFFSET_2 + (isNarrow ? lineSep/1.2 : 0);
-  if (typeof isMobileControlsEnabled === 'function' && isMobileControlsEnabled()) {
-    if (isNarrow) {
-      text("Touch controls: Joystick (left)",      width / 2, ctrlY - lineSep/2);
-      text("and Fire button (right)",             width / 2, ctrlY + lineSep/2);
+  
+  // Adjust layout for landscape mobile
+  const titleSize = isLandscapeMobile ? 45 : START_SCREEN_TITLE_TEXT_SIZE;
+  const titleY = isLandscapeMobile ? height / 2 - 120 : height / 2 + START_SCREEN_TITLE_Y_OFFSET;
+  const infoSize = isLandscapeMobile ? 16 : (isNarrow ? START_SCREEN_INFO_TEXT_SIZE - 2 : START_SCREEN_INFO_TEXT_SIZE);
+  const lineSep = infoSize + 4;
+  const promptSize = isLandscapeMobile ? 24 : START_SCREEN_PROMPT_TEXT_SIZE;
+  
+  // Title
+  fill(START_SCREEN_TITLE_COLOR_H, START_SCREEN_TITLE_COLOR_S, START_SCREEN_TITLE_COLOR_B);
+  textSize(titleSize);
+  text(`Reactor Dive`, width / 2, titleY);
+  
+  // Text layout
+  textSize(infoSize);
+  
+  if (isLandscapeMobile) {
+    // Compact landscape layout - everything closer together
+    text("Christian Nold 2025", width / 2, height / 2 - 70);
+    
+    // Objective - always split in landscape
+    let killsForLevel1 = getKillsRequiredForLevel(1);
+    text(`Destroy ${killsForLevel1} mutated creatures`, width / 2, height / 2 - 40);
+    text(`and reach the flooded reactor`, width / 2, height / 2 - 20);
+    
+    // Controls - always split in landscape
+    if (typeof isMobileControlsEnabled === 'function' && isMobileControlsEnabled()) {
+      text("Touch controls: Joystick (left)", width / 2, height / 2 + 10);
+      text("and Fire button (right)", width / 2, height / 2 + 30);
     } else {
-      text("Touch controls: Joystick (left) and Fire button (right)", width / 2, ctrlY);
+      text("WASD/Arrows: Move. SPACE: Shoot.", width / 2, height / 2 + 20);
+    }
+    
+    // Prompt - closer to bottom
+    textSize(promptSize);
+    fill(START_SCREEN_PROMPT_COLOR_H, START_SCREEN_PROMPT_COLOR_S, START_SCREEN_PROMPT_COLOR_B);
+    if (typeof isMobileControlsEnabled === 'function' && isMobileControlsEnabled()) {
+      text("Tap anywhere to Dive", width / 2, height / 2 + 65);
+    } else {
+      text("Press ENTER to Dive", width / 2, height / 2 + 65);
     }
   } else {
-    text("WASD/Arrows: Move. SPACE: Shoot.", width / 2, ctrlY);
-  }
-  
-  textSize(START_SCREEN_PROMPT_TEXT_SIZE); fill(START_SCREEN_PROMPT_COLOR_H, START_SCREEN_PROMPT_COLOR_S, START_SCREEN_PROMPT_COLOR_B);
-  
-  // Show different instructions based on whether mobile controls are active
-  if (typeof isMobileControlsEnabled === 'function' && isMobileControlsEnabled()) {
-    text("Tap anywhere to Dive", width / 2, height / 2 + START_SCREEN_PROMPT_Y_OFFSET);
-  } else {
-    text("Press ENTER to Dive", width / 2, height / 2 + START_SCREEN_PROMPT_Y_OFFSET);
+    // Standard layout for portrait and desktop
+    text("Christian Nold 2025", width / 2, height / 2 + START_SCREEN_INFO_Y_OFFSET_3);
+    
+    // Objective
+    let killsForLevel1 = getKillsRequiredForLevel(1);
+    if (isNarrow) {
+      text(`Destroy ${killsForLevel1} mutated creatures`, width / 2, height / 2 + START_SCREEN_INFO_Y_OFFSET_1 - lineSep/2);
+      text(`and reach the flooded reactor`, width / 2, height / 2 + START_SCREEN_INFO_Y_OFFSET_1 + lineSep/2);
+    } else {
+      text(`Destroy ${killsForLevel1} mutated creatures and reach the flooded reactor`, width / 2, height / 2 + START_SCREEN_INFO_Y_OFFSET_1);
+    }
+    
+    // Controls
+    let ctrlY = height / 2 + START_SCREEN_INFO_Y_OFFSET_2 + (isNarrow ? lineSep/1.2 : 0);
+    if (typeof isMobileControlsEnabled === 'function' && isMobileControlsEnabled()) {
+      if (isNarrow) {
+        text("Touch controls: Joystick (left)", width / 2, ctrlY - lineSep/2);
+        text("and Fire button (right)", width / 2, ctrlY + lineSep/2);
+      } else {
+        text("Touch controls: Joystick (left) and Fire button (right)", width / 2, ctrlY);
+      }
+    } else {
+      text("WASD/Arrows: Move. SPACE: Shoot.", width / 2, ctrlY);
+    }
+    
+    // Prompt
+    textSize(promptSize);
+    fill(START_SCREEN_PROMPT_COLOR_H, START_SCREEN_PROMPT_COLOR_S, START_SCREEN_PROMPT_COLOR_B);
+    if (typeof isMobileControlsEnabled === 'function' && isMobileControlsEnabled()) {
+      text("Tap anywhere to Dive", width / 2, height / 2 + START_SCREEN_PROMPT_Y_OFFSET);
+    } else {
+      text("Press ENTER to Dive", width / 2, height / 2 + START_SCREEN_PROMPT_Y_OFFSET);
+    }
   }
   if (!audioInitialized) {
       textSize(START_SCREEN_AUDIO_NOTE_TEXT_SIZE); fill(START_SCREEN_AUDIO_NOTE_COLOR_H, START_SCREEN_AUDIO_NOTE_COLOR_S, START_SCREEN_AUDIO_NOTE_COLOR_B);
