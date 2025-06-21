@@ -4,7 +4,7 @@
 const PWR_RADIUS = 15;
 const PWR_LIFETIME_FRAMES = 60 * 60; // 15 seconds at 60 FPS
 const PWR_SPAWN_COOLDOWN_FRAMES = 60 * 8; // Check every 8 seconds
-const PWR_SPAWN_CHANCE_PER_CHECK = 0.3; // 30% chance when cooldown is up
+const PWR_SPAWN_CHANCE_PER_CHECK = 1; // 30% chance when cooldown is up
 const MAX_PWR_ON_SCREEN = 3;
 const PWR_MIN_DISTANCE_FROM_PLAYER = 400;
 const PWR_AIR_RESTORE_AMOUNT = 300; // frames worth of air
@@ -137,6 +137,10 @@ class Powerup {
     if (this.collected) return;
     
     this.collected = true;
+    
+    // Debug logging before applying effect
+    console.log(`Collecting ${this.type} powerup. Player air before: ${player?.airSupply}/${player?.maxAirSupply}`);
+    
     this.applyEffect();
     
     // Visual and audio feedback
@@ -168,7 +172,18 @@ class Powerup {
   
   applyAirBoost() {
     let airToAdd = this.config.airAmount || PWR_AIR_RESTORE_AMOUNT;
-    player.airSupply = min(player.maxAirSupply, player.airSupply + airToAdd);
+    
+    // Safety checks to prevent NaN
+    if (!player || typeof player.airSupply !== 'number' || typeof player.maxAirSupply !== 'number') {
+      console.warn("Player air values are invalid:", player?.airSupply, player?.maxAirSupply);
+      return;
+    }
+    
+    // Use Math.min instead of p5.js min() and ensure we don't exceed max
+    let newAirSupply = player.airSupply + airToAdd;
+    player.airSupply = Math.min(player.maxAirSupply, newAirSupply);
+    
+    console.log(`Air restored: +${airToAdd}, new air: ${player.airSupply}/${player.maxAirSupply}`);
     
     // Show HUD notification
     showPowerupNotification("Air Restored!", this.config.color);
