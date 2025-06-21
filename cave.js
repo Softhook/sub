@@ -1,10 +1,10 @@
 // --- Cave Class ---
 class Cave {
   constructor(worldWidth, worldHeight, cellSize) { // Accept cellSize as a parameter
-    // Validate constructor parameters
-    if (isNaN(worldWidth) || worldWidth <= 0) worldWidth = 4000;
-    if (isNaN(worldHeight) || worldHeight <= 0) worldHeight = 2000;
-    if (isNaN(cellSize) || cellSize <= 0) cellSize = 20;
+    // Validate constructor parameters - use larger default world size
+    if (isNaN(worldWidth) || worldWidth <= 0) worldWidth = 6000; // Increased from 4000
+    if (isNaN(worldHeight) || worldHeight <= 0) worldHeight = 3000; // Increased from 2000
+    if (isNaN(cellSize) || cellSize <= 0) cellSize = 20; // Slightly larger cells for better performance
     
     this.worldWidth = worldWidth; this.worldHeight = worldHeight; this.cellSize = cellSize; // Use passed cellSize
     this.gridWidth = Math.ceil(worldWidth / this.cellSize); // Use this.cellSize
@@ -31,7 +31,7 @@ class Cave {
   
   calculatePlayerStartPosition() {
     const minDistanceFromGoal = 800; // Minimum distance to maintain consistency
-    const maxDistanceFromGoal = 1200; // Maximum distance for variety
+    const maxDistanceFromGoal = 1000; // Maximum distance for variety
     const safeMargin = 100; // Margin from world edges
     
     // Use the actual final goal position (now that it's been set)
@@ -39,6 +39,8 @@ class Cave {
     let goalY = this.goalPos.y;
     
     console.log(`Goal position: (${goalX.toFixed(0)}, ${goalY.toFixed(0)}) - Direction: ${this.goalDirection}`);
+    console.log(`World dimensions: ${this.worldWidth} x ${this.worldHeight}`);
+    console.log(`Safe margin: ${safeMargin}`);
     
     let bestPlayerX = goalX;
     let bestPlayerY = goalY;
@@ -81,6 +83,9 @@ class Cave {
           bestPlayerY = candidateY;
           bestDistance = actualDistance;
         }
+        console.log(`Attempt ${attempts}: candidate (${candidateX.toFixed(0)}, ${candidateY.toFixed(0)}) distance: ${actualDistance.toFixed(0)}`);
+      } else {
+        console.log(`Attempt ${attempts}: candidate (${candidateX.toFixed(0)}, ${candidateY.toFixed(0)}) OUT OF BOUNDS`);
       }
       
       attempts++;
