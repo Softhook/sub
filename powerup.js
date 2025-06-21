@@ -23,17 +23,17 @@ const PWR_CONFIGS = {
   },
   speed: {
     color: {h: 60, s: 100, b: 95}, // Bright yellow
-    duration: 60 * 15, // 15 seconds
-    speedMultiplier: 1.5
+    duration: 60 * 30, // 30 seconds
+    speedMultiplier: 2
   },
   shield: {
     color: {h: 280, s: 70, b: 80}, // Purple
-    duration: 60 * 12, // 12 seconds
+    duration: 60 * 30, // 30 seconds
     shieldHits: 3
   },
   sonar: {
     color: {h: 120, s: 80, b: 85}, // Green
-    duration: 60 * 18, // 18 seconds
+    duration: 60 * 30, // 30 seconds
     sonarRangeMultiplier: 1.5,
     sonarCooldownReduction: 0.5
   }
