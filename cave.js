@@ -13,18 +13,76 @@ class Cave {
     this.goalPos = createVector(0,0);
     this.goalSize = GOAL_SQUARE_SIZE_CELLS * this.cellSize; // Use this.cellSize
     
+    // Randomize goal direction (0=right, 1=bottom, 2=left, 3=top)
+    this.goalDirection = floor(random(4));
+    
+    // Calculate player start position based on goal direction to maintain consistent distance
+    this.calculatePlayerStartPosition();
+    
     // Initialize exitX before cave generation (needed for validation)
     this.exitX = worldWidth - this.cellSize * CAVE_EXIT_X_OFFSET_CELLS; // Use this.cellSize
     
     this.generateCave();
-    this.goalPos.x = this.exitX + this.goalSize / 2;
+    this.setRandomGoalPosition();
+  }
+  
+  calculatePlayerStartPosition() {
+    const minDistanceFromGoal = 800; // Minimum distance to maintain consistency
+    const maxDistanceFromGoal = 1200; // Maximum distance for variety
+    const distance = random(minDistanceFromGoal, maxDistanceFromGoal);
+    const safeMargin = 100; // Margin from world edges
     
+    switch(this.goalDirection) {
+      case 0: // Goal on right side - player starts on left side
+        this.playerStartX = safeMargin + random(0, 300);
+        this.playerStartY = this.worldHeight / 2 + random(-200, 200);
+        break;
+      case 1: // Goal on bottom side - player starts on top side  
+        this.playerStartX = this.worldWidth / 2 + random(-200, 200);
+        this.playerStartY = safeMargin + random(0, 300);
+        break;
+      case 2: // Goal on left side - player starts on right side
+        this.playerStartX = this.worldWidth - safeMargin - random(0, 300);
+        this.playerStartY = this.worldHeight / 2 + random(-200, 200);
+        break;
+      case 3: // Goal on top side - player starts on bottom side
+        this.playerStartX = this.worldWidth / 2 + random(-200, 200);
+        this.playerStartY = this.worldHeight - safeMargin - random(0, 300);
+        break;
+    }
+    
+    // Ensure player start position is within world bounds
+    this.playerStartX = constrain(this.playerStartX, safeMargin, this.worldWidth - safeMargin);
+    this.playerStartY = constrain(this.playerStartY, safeMargin, this.worldHeight - safeMargin);
+  }
+  
+  setRandomGoalPosition() {
     // Ensure exitPathY is valid before setting goal position
     if (isNaN(this.exitPathY) || this.exitPathY === undefined || this.exitPathY === null) {
       this.exitPathY = this.gridHeight / 2;
       console.warn("exitPathY was invalid after cave generation, using grid center");
     }
-    this.goalPos.y = this.exitPathY * this.cellSize; // Use this.cellSize
+    
+    const offset = CAVE_EXIT_X_OFFSET_CELLS * this.cellSize;
+    
+    switch(this.goalDirection) {
+      case 0: // Right side (original behavior)
+        this.goalPos.x = this.exitX + this.goalSize / 2;
+        this.goalPos.y = this.exitPathY * this.cellSize;
+        break;
+      case 1: // Bottom side
+        this.goalPos.x = (this.gridWidth / 2) * this.cellSize; // Center horizontally
+        this.goalPos.y = this.worldHeight - offset - this.goalSize / 2;
+        break;
+      case 2: // Left side
+        this.goalPos.x = offset + this.goalSize / 2;
+        this.goalPos.y = this.exitPathY * this.cellSize;
+        break;
+      case 3: // Top side
+        this.goalPos.x = (this.gridWidth / 2) * this.cellSize; // Center horizontally
+        this.goalPos.y = offset + this.goalSize / 2;
+        break;
+    }
   }
   generateCave() {
     for (let i = 0; i < this.gridWidth; i++) {

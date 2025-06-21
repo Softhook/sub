@@ -497,6 +497,9 @@ function prepareNextLevel() {
   enemiesKilledThisLevel = 0;
   levelScore = 0;
 
+  // Reset radiation pulse discovery flag for new level
+  goalDiscoveredBySonar = false;
+
   gameState = gameStates.LOADING;
   showLoadingOverlay(`LEVEL ${currentLevel}`);
 
@@ -553,6 +556,40 @@ function calculateLevelSettings() {
 }
 
 function findPlayerStartPosition(caveContext, cellSize) {
+    // Use the cave's randomized start position if available
+    if (caveContext.playerStartX !== undefined && caveContext.playerStartY !== undefined) {
+        let playerStartX = caveContext.playerStartX;
+        let playerStartY = caveContext.playerStartY;
+        const playerSpawnRadiusBuffer = cellSize * PLAYER_SPAWN_RADIUS_BUFFER_CELL_FACTOR;
+        
+        // Check if the randomized position is clear, if not, find a nearby clear spot
+        let attempts = 0;
+        let originalX = playerStartX;
+        let originalY = playerStartY;
+        
+        while (caveContext.isWall(playerStartX, playerStartY, playerSpawnRadiusBuffer) && attempts < MAX_PLAYER_SPAWN_ATTEMPTS) {
+            // Try positions in a spiral pattern around the original position
+            let angle = (attempts * 0.5) % (TWO_PI);
+            let radius = (attempts * 5) + 10;
+            playerStartX = originalX + cos(angle) * radius;
+            playerStartY = originalY + sin(angle) * radius;
+            
+            // Keep within world bounds
+            playerStartX = constrain(playerStartX, cellSize * 3, WORLD_WIDTH - cellSize * 3);
+            playerStartY = constrain(playerStartY, cellSize * 3, WORLD_HEIGHT - cellSize * 3);
+            
+            attempts++;
+        }
+        
+        if (attempts >= MAX_PLAYER_SPAWN_ATTEMPTS) {
+            console.warn("Could not find clear spot near randomized start position, using fallback");
+            // Fallback to original logic if randomized position doesn't work
+        } else {
+            return { x: playerStartX, y: playerStartY };
+        }
+    }
+    
+    // Fallback to original logic if no randomized position or it failed
     let playerStartX, playerStartY;
     let attempts = 0;
     const playerSpawnRadiusBuffer = cellSize * PLAYER_SPAWN_RADIUS_BUFFER_CELL_FACTOR;
