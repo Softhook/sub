@@ -73,15 +73,23 @@ class CurrentArea {
     this.forceDirection = forceDirection; // p5.Vector
     this.forceMagnitude = forceMagnitude;
     this.force = p5.Vector.mult(this.forceDirection, this.forceMagnitude);
+    
+    // Oval properties
+    this.centerX = this.x + this.width / 2;
+    this.centerY = this.y + this.height / 2;
+    this.radiusX = this.width / 2;
+    this.radiusY = this.height / 2;
   }
 
-  // Check if a point (px, py) is inside this current area
+  // Check if a point (px, py) is inside this oval current area
   contains(px, py) {
-    return px >= this.x && px <= this.x + this.width &&
-           py >= this.y && py <= this.y + this.height;
+    // Use ellipse equation: ((x-cx)/rx)^2 + ((y-cy)/ry)^2 <= 1
+    const dx = (px - this.centerX) / this.radiusX;
+    const dy = (py - this.centerY) / this.radiusY;
+    return (dx * dx + dy * dy) <= 1;
   }
 
-  // Spawn bubbles within the area to indicate the current
+  // Spawn bubbles within the oval area to indicate the current
   spawnBubbles(cave, cameraOffsetX, cameraOffsetY) {
     if (!cave) return; // Safety check
     
@@ -92,13 +100,13 @@ class CurrentArea {
     let screenTop = cameraOffsetY - margin;
     let screenBottom = cameraOffsetY + height + margin;
     
-    // Check if current area intersects with visible screen area
+    // Check if oval's bounding box intersects with visible screen area
     if (this.x + this.width < screenLeft || this.x > screenRight ||
         this.y + this.height < screenTop || this.y > screenBottom) {
       return; // Current area not visible, skip bubble spawning
     }
     
-    // Only calculate spawning for the visible portion of the current area
+    // Calculate visible portion of the oval's bounding box
     let visibleLeft = Math.max(this.x, screenLeft);
     let visibleRight = Math.min(this.x + this.width, screenRight);
     let visibleTop = Math.max(this.y, screenTop);
@@ -109,15 +117,30 @@ class CurrentArea {
     
     if (visibleWidth <= 0 || visibleHeight <= 0) return;
     
-    // Density determines how many bubbles to try to spawn per frame (based on visible area)
-    let bubblesToSpawn = floor(visibleWidth * visibleHeight * CURRENT_BUBBLE_SPAWN_DENSITY);
-    if (random() < (visibleWidth * visibleHeight * CURRENT_BUBBLE_SPAWN_DENSITY) % 1) {
+    // Estimate oval area (π * rx * ry) and adjust bubble spawn rate
+    let ovalArea = Math.PI * this.radiusX * this.radiusY;
+    let boundingBoxArea = this.width * this.height;
+    let areaRatio = ovalArea / boundingBoxArea; // Approximately 0.785 for circles
+    
+    // Density determines how many bubbles to try to spawn per frame
+    let bubblesToSpawn = floor(visibleWidth * visibleHeight * CURRENT_BUBBLE_SPAWN_DENSITY * areaRatio);
+    if (random() < (visibleWidth * visibleHeight * CURRENT_BUBBLE_SPAWN_DENSITY * areaRatio) % 1) {
         bubblesToSpawn++; // Probabilistically add one more bubble for fractional parts
     }
 
     for (let i = 0; i < bubblesToSpawn; i++) {
-      let bubbleX = random(visibleLeft, visibleRight);
-      let bubbleY = random(visibleTop, visibleBottom);
+      // Generate random point within the bounding box, then check if it's in the oval
+      let attempts = 0;
+      let bubbleX, bubbleY;
+      
+      do {
+        bubbleX = random(visibleLeft, visibleRight);
+        bubbleY = random(visibleTop, visibleBottom);
+        attempts++;
+      } while (!this.contains(bubbleX, bubbleY) && attempts < 10); // Max 10 attempts to find valid position
+      
+      // If we couldn't find a valid position in the oval after 10 attempts, skip this bubble
+      if (attempts >= 10) continue;
       
       // Only spawn bubbles in open water (not in walls)
       if (cave.isWall(bubbleX, bubbleY)) {
@@ -142,7 +165,7 @@ class CurrentArea {
     }
   }
 
-  // Render the current area (with debug visuals if enabled)
+  // Render the oval current area (with debug visuals if enabled)
   render(offsetX, offsetY) {
     if (!debugShowWalls) return; // Early exit if debug mode is off
     
@@ -152,23 +175,25 @@ class CurrentArea {
     let screenTop = offsetY;
     let screenBottom = offsetY + height;
     
-    // Check if current area intersects with visible screen area
+    // Check if oval's bounding box intersects with visible screen area
     if (this.x + this.width < screenLeft || this.x > screenRight ||
         this.y + this.height < screenTop || this.y > screenBottom) {
       return; // Current area not visible, skip rendering
     }
     
-    // Debug visualization of current area
+    // Debug visualization of oval current area
     push();
     stroke(255, 0, 0, 100); // Red border with transparency
     strokeWeight(2);
     noFill();
-    rect(this.x - offsetX, this.y - offsetY, this.width, this.height);
     
-    // Draw force direction arrow
-    let centerX = this.x + this.width / 2 - offsetX;
-    let centerY = this.y + this.height / 2 - offsetY;
-    let arrowLength = 30;
+    // Draw the oval
+    ellipse(this.centerX - offsetX, this.centerY - offsetY, this.width, this.height);
+    
+    // Draw force direction arrow at center
+    let centerX = this.centerX - offsetX;
+    let centerY = this.centerY - offsetY;
+    let arrowLength = min(this.radiusX, this.radiusY) * 0.6; // Scale arrow to oval size
     let arrowEndX = centerX + this.forceDirection.x * arrowLength;
     let arrowEndY = centerY + this.forceDirection.y * arrowLength;
     
