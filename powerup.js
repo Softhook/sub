@@ -139,7 +139,7 @@ class Powerup {
     this.collected = true;
     
     // Debug logging before applying effect
-    console.log(`Collecting ${this.type} powerup. Player air before: ${player?.airSupply}/${player?.maxAirSupply}`);
+    console.log(`Collecting ${this.type} powerup. Player air before: ${player?.airSupply}/${player?.initialAirSupply}`);
     
     this.applyEffect();
     
@@ -173,17 +173,17 @@ class Powerup {
   applyAirBoost() {
     let airToAdd = this.config.airAmount || PWR_AIR_RESTORE_AMOUNT;
     
-    // Safety checks to prevent NaN
-    if (!player || typeof player.airSupply !== 'number' || typeof player.maxAirSupply !== 'number') {
-      console.warn("Player air values are invalid:", player?.airSupply, player?.maxAirSupply);
+    // Safety checks to prevent NaN - use initialAirSupply as max, not maxAirSupply
+    if (!player || typeof player.airSupply !== 'number' || typeof player.initialAirSupply !== 'number') {
+      console.warn("Player air values are invalid:", player?.airSupply, player?.initialAirSupply);
       return;
     }
     
     // Use Math.min instead of p5.js min() and ensure we don't exceed max
     let newAirSupply = player.airSupply + airToAdd;
-    player.airSupply = Math.min(player.maxAirSupply, newAirSupply);
+    player.airSupply = Math.min(player.initialAirSupply, newAirSupply);
     
-    console.log(`Air restored: +${airToAdd}, new air: ${player.airSupply}/${player.maxAirSupply}`);
+    console.log(`Air restored: +${airToAdd}, new air: ${player.airSupply}/${player.initialAirSupply}`);
     
     // Show HUD notification
     showPowerupNotification("Air Restored!", this.config.color);
@@ -374,7 +374,7 @@ class PowerupManager {
     let weights = {...PWR_SPAWN_WEIGHTS};
     
     // Increase air spawn chance if player is low on air
-    if (player && player.airSupply < player.maxAirSupply * 0.3) {
+    if (player && player.airSupply < player.initialAirSupply * 0.3) {
       weights.air *= 3;
     }
     
