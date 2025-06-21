@@ -279,6 +279,16 @@ const REACTOR_HUM_ENV_LEVELS = { aL: 0.15, rL: 0 };
 const REACTOR_HUM_FREQ = 35; // Lower frequency hum (was 60)
 const REACTOR_HUM_MAX_DISTANCE = 2500; // Max distance where hum is audible
 
+// Radiation Pulse Effect Constants
+const RADIATION_PULSE_MAX_DISTANCE = 10000; // Increased max distance where radiation pulse is visible
+const RADIATION_PULSE_MIN_INTENSITY = 0.3; // Increased minimum pulse intensity
+const RADIATION_PULSE_MAX_INTENSITY = 0.5; // Reduced maximum pulse intensity for transparency
+const RADIATION_PULSE_SPEED = 0.02; // Slower, smoother pulse
+const RADIATION_PULSE_EDGE_WIDTH = 30; // Smaller pulse effect for subtlety
+const RADIATION_PULSE_COLOR_H = 60; // Yellow hue (same as goal/reactor)
+const RADIATION_PULSE_COLOR_S = 100; // Full saturation (same as goal)
+const RADIATION_PULSE_COLOR_B = 100; // Full brightness (same as goal)
+
 const LOW_AIR_ENV_ADSR = { aT: 0.05, dT: 0.1, sR: 0.6, rT: 0.2 };
 const LOW_AIR_ENV_LEVELS = { aL: 0.2, rL: 0 };
 const LOW_AIR_FREQ = 1200;
@@ -387,6 +397,10 @@ var currentFlowNoise, currentFlowNoiseEnv, currentFlowBassOsc, currentFlowBassEn
 let reactorHumOsc, reactorHumEnv;
 let reactorHumAmplitude = 0;
 
+// Radiation Pulse Effect
+let radiationPulsePhase = 0; // Phase for the pulsing animation
+let goalDiscoveredBySonar = false; // Track if goal has been discovered by sonar
+
 // Creature Growl Audio
 let creatureGrowlOsc, creatureGrowlEnv;
 
@@ -462,6 +476,9 @@ function resetGame() {
 
   sonarBubbles = [];
   particles = [];
+  
+  // Reset radiation pulse discovery flag
+  goalDiscoveredBySonar = false;
 
   if (audioInitialized) {
     if (lowAirOsc && lowAirOsc.started) lowAirEnv.triggerRelease(lowAirOsc);
@@ -999,6 +1016,110 @@ function updateReactorHum(distanceToGoal) {
   }
   
   reactorHumAmplitude = volume;
+}
+
+function renderRadiationPulse(cameraOffsetX, cameraOffsetY) {
+  if (!cave || !cave.goalPos) return;
+  
+  // Don't show indicator if goal has been discovered by sonar
+  if (goalDiscoveredBySonar) {
+    return; // Goal has been discovered, don't show radiation pulse
+  }
+  
+  // Calculate distance to reactor (goal)
+  let distanceToReactor = dist(player.pos.x, player.pos.y, cave.goalPos.x, cave.goalPos.y);
+  
+  // Calculate direction vector from player to reactor
+  let directionToReactor = createVector(
+    cave.goalPos.x - player.pos.x,
+    cave.goalPos.y - player.pos.y
+  );
+  directionToReactor.normalize();
+  
+  // Calculate angle to reactor
+  let angleToReactor = atan2(directionToReactor.y, directionToReactor.x);
+  
+  // Update pulse phase with smoother animation
+  radiationPulsePhase += RADIATION_PULSE_SPEED;
+  
+  // Calculate pulse intensity based on distance (closer = stronger pulse)
+  let normalizedDistance = min(distanceToReactor / RADIATION_PULSE_MAX_DISTANCE, 1.0);
+  let distanceIntensity = 1 - normalizedDistance * 0.6; // Closer = higher intensity
+  
+  // Create smoother pulsing effect using sine wave
+  let pulseWave = (sin(radiationPulsePhase) + 1) / 2; // Normalize to 0-1
+  // Apply easing for smoother animation
+  pulseWave = pulseWave * pulseWave * (3.0 - 2.0 * pulseWave); // Smoothstep
+  
+  let currentIntensity = RADIATION_PULSE_MIN_INTENSITY + 
+    (RADIATION_PULSE_MAX_INTENSITY - RADIATION_PULSE_MIN_INTENSITY) * pulseWave * distanceIntensity;
+  
+  // Calculate position at screen edge - center of indicator ON the edge
+  let screenCenterX = width / 2;
+  let screenCenterY = height / 2;
+  
+  // Find intersection with screen edge
+  let edgeX, edgeY;
+  
+  // Calculate which edge the direction intersects with
+  let dx = cos(angleToReactor);
+  let dy = sin(angleToReactor);
+  
+  // Calculate distances to each edge
+  let distToRight = dx > 0 ? (width - screenCenterX) / dx : Infinity;
+  let distToLeft = dx < 0 ? -screenCenterX / dx : Infinity;
+  let distToBottom = dy > 0 ? (height - screenCenterY) / dy : Infinity;
+  let distToTop = dy < 0 ? -screenCenterY / dy : Infinity;
+  
+  // Find the closest edge intersection
+  let minDist = min(distToRight, distToLeft, distToBottom, distToTop);
+  
+  if (minDist === distToRight) {
+    // Right edge
+    edgeX = width;
+    edgeY = screenCenterY + dy * distToRight;
+  } else if (minDist === distToLeft) {
+    // Left edge
+    edgeX = 0;
+    edgeY = screenCenterY + dy * distToLeft;
+  } else if (minDist === distToBottom) {
+    // Bottom edge
+    edgeX = screenCenterX + dx * distToBottom;
+    edgeY = height;
+  } else {
+    // Top edge
+    edgeX = screenCenterX + dx * distToTop;
+    edgeY = 0;
+  }
+  
+  // Ensure the position is within screen bounds
+  edgeX = constrain(edgeX, 0, width);
+  edgeY = constrain(edgeY, 0, height);
+  
+  // Render the radiation pulse effect with transparency and smoothing
+  push();
+  
+  // Use ADD blend mode for glow effect, but more subtle
+  blendMode(ADD);
+  
+  // Create gradient effect using multiple ellipses with transparency
+  let alpha = currentIntensity * 180; // Reduced alpha for transparency
+  let pulseSize = RADIATION_PULSE_EDGE_WIDTH * (0.8 + pulseWave * 0.2);
+  
+  // Outer glow - very transparent and soft
+  fill(RADIATION_PULSE_COLOR_H, RADIATION_PULSE_COLOR_S, RADIATION_PULSE_COLOR_B, alpha * 0.2);
+  ellipse(edgeX, edgeY, pulseSize * 2.5);
+  
+  // Middle glow - slightly more visible
+  fill(RADIATION_PULSE_COLOR_H, RADIATION_PULSE_COLOR_S, RADIATION_PULSE_COLOR_B, alpha * 0.4);
+  ellipse(edgeX, edgeY, pulseSize * 1.5);
+  
+  // Inner glow - core effect
+  fill(RADIATION_PULSE_COLOR_H, RADIATION_PULSE_COLOR_S, RADIATION_PULSE_COLOR_B, alpha * 0.7);
+  ellipse(edgeX, edgeY, pulseSize);
+  
+  blendMode(BLEND); // Reset blend mode
+  pop();
 }
 
 function startAudioRoutine() {
@@ -1860,6 +1981,9 @@ function drawPlayingState() {
   }
 
   player.render(cameraOffsetX, cameraOffsetY);
+
+  // Render radiation pulse effect (subtle directional indicator to reactor)
+  renderRadiationPulse(cameraOffsetX, cameraOffsetY);
 
   // Debug: Show cave walls
   if (debugShowWalls) {
