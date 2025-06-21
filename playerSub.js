@@ -115,11 +115,6 @@ class PlayerSub {
       receivedAt: frameCount,
       intensity
     });
-    
-    // Set global flag if this is the first goal discovery
-    if (type === 'goal' && !goalDiscoveredBySonar) {
-      goalDiscoveredBySonar = true;
-    }
   }
   
   cleanupOldSonarHits() {

@@ -16,44 +16,108 @@ class Cave {
     // Randomize goal direction (0=right, 1=bottom, 2=left, 3=top)
     this.goalDirection = floor(random(4));
     
-    // Calculate player start position based on goal direction to maintain consistent distance
-    this.calculatePlayerStartPosition();
-    
     // Initialize exitX before cave generation (needed for validation)
     this.exitX = worldWidth - this.cellSize * CAVE_EXIT_X_OFFSET_CELLS; // Use this.cellSize
     
     this.generateCave();
     this.setRandomGoalPosition();
+    
+    // Calculate player start position AFTER goal position is finalized
+    this.calculatePlayerStartPosition();
+    
+    // Validate and ensure connectivity between player start and goal
+    this.ensurePlayerToGoalConnectivity();
   }
   
   calculatePlayerStartPosition() {
     const minDistanceFromGoal = 800; // Minimum distance to maintain consistency
     const maxDistanceFromGoal = 1200; // Maximum distance for variety
-    const distance = random(minDistanceFromGoal, maxDistanceFromGoal);
     const safeMargin = 100; // Margin from world edges
     
-    switch(this.goalDirection) {
-      case 0: // Goal on right side - player starts on left side
-        this.playerStartX = safeMargin + random(0, 300);
-        this.playerStartY = this.worldHeight / 2 + random(-200, 200);
-        break;
-      case 1: // Goal on bottom side - player starts on top side  
-        this.playerStartX = this.worldWidth / 2 + random(-200, 200);
-        this.playerStartY = safeMargin + random(0, 300);
-        break;
-      case 2: // Goal on left side - player starts on right side
-        this.playerStartX = this.worldWidth - safeMargin - random(0, 300);
-        this.playerStartY = this.worldHeight / 2 + random(-200, 200);
-        break;
-      case 3: // Goal on top side - player starts on bottom side
-        this.playerStartX = this.worldWidth / 2 + random(-200, 200);
-        this.playerStartY = this.worldHeight - safeMargin - random(0, 300);
-        break;
+    // Use the actual final goal position (now that it's been set)
+    let goalX = this.goalPos.x;
+    let goalY = this.goalPos.y;
+    
+    console.log(`Goal position: (${goalX.toFixed(0)}, ${goalY.toFixed(0)}) - Direction: ${this.goalDirection}`);
+    
+    let bestPlayerX = goalX;
+    let bestPlayerY = goalY;
+    let bestDistance = 0;
+    let attempts = 0;
+    const maxAttempts = 50;
+    
+    // Try multiple positions to find one that maintains good distance
+    while (bestDistance < minDistanceFromGoal && attempts < maxAttempts) {
+      let targetDistance = random(minDistanceFromGoal, maxDistanceFromGoal);
+      let angle = random(TWO_PI);
+      
+      // Adjust angle based on goal direction to ensure player starts on opposite side
+      switch(this.goalDirection) {
+        case 0: // Goal on right - player should be towards left
+          angle = random(PI/2, 3*PI/2); // 90° to 270° (left semicircle)
+          break;
+        case 1: // Goal on bottom - player should be towards top
+          angle = random(PI, TWO_PI); // 180° to 360° (top semicircle)
+          break;
+        case 2: // Goal on left - player should be towards right
+          angle = random(-PI/2, PI/2); // -90° to 90° (right semicircle)
+          break;
+        case 3: // Goal on top - player should be towards bottom
+          angle = random(0, PI); // 0° to 180° (bottom semicircle)
+          break;
+      }
+      
+      // Calculate position at target distance and angle from goal
+      let candidateX = goalX + cos(angle) * targetDistance;
+      let candidateY = goalY + sin(angle) * targetDistance;
+      
+      // Check if this position is within bounds
+      if (candidateX >= safeMargin && candidateX <= this.worldWidth - safeMargin &&
+          candidateY >= safeMargin && candidateY <= this.worldHeight - safeMargin) {
+        
+        let actualDistance = dist(candidateX, candidateY, goalX, goalY);
+        if (actualDistance > bestDistance) {
+          bestPlayerX = candidateX;
+          bestPlayerY = candidateY;
+          bestDistance = actualDistance;
+        }
+      }
+      
+      attempts++;
     }
     
-    // Ensure player start position is within world bounds
-    this.playerStartX = constrain(this.playerStartX, safeMargin, this.worldWidth - safeMargin);
-    this.playerStartY = constrain(this.playerStartY, safeMargin, this.worldHeight - safeMargin);
+    // If we couldn't find a good position, try a different approach
+    if (bestDistance < minDistanceFromGoal) {
+      console.warn(`Could not maintain minimum distance after ${maxAttempts} attempts, using fallback positioning`);
+      
+      // Fallback: place player at maximum possible distance in the opposite direction
+      switch(this.goalDirection) {
+        case 0: // Goal on right - place player on far left
+          bestPlayerX = safeMargin;
+          bestPlayerY = constrain(goalY, safeMargin, this.worldHeight - safeMargin);
+          break;
+        case 1: // Goal on bottom - place player at top
+          bestPlayerX = constrain(goalX, safeMargin, this.worldWidth - safeMargin);
+          bestPlayerY = safeMargin;
+          break;
+        case 2: // Goal on left - place player on far right
+          bestPlayerX = this.worldWidth - safeMargin;
+          bestPlayerY = constrain(goalY, safeMargin, this.worldHeight - safeMargin);
+          break;
+        case 3: // Goal on top - place player at bottom
+          bestPlayerX = constrain(goalX, safeMargin, this.worldWidth - safeMargin);
+          bestPlayerY = this.worldHeight - safeMargin;
+          break;
+      }
+      bestDistance = dist(bestPlayerX, bestPlayerY, goalX, goalY);
+    }
+    
+    this.playerStartX = bestPlayerX;
+    this.playerStartY = bestPlayerY;
+    
+    // Debug log to verify distance
+    console.log(`Player start: (${this.playerStartX.toFixed(0)}, ${this.playerStartY.toFixed(0)})`);
+    console.log(`Final distance from reactor: ${bestDistance.toFixed(0)} units (target: ${minDistanceFromGoal}-${maxDistanceFromGoal})`);
   }
   
   setRandomGoalPosition() {
@@ -151,26 +215,6 @@ class Cave {
       else this.grid[this.gridWidth - 1][j] = false;
     }
     
-    // Validate path connectivity and regenerate if needed (max 3 attempts)
-    let attempts = 0;
-    while (!this.validatePathConnectivity() && attempts < 3) {
-      console.log("Path validation failed, regenerating cave...");
-      attempts++;
-      // Clear and regenerate with slightly different parameters
-      this.ensureMainPathClearance(mainPath);
-      // Reduce obstacle threshold to make more open space
-      for (let i = 1; i < this.gridWidth - 1; i++) {
-        for (let j = 1; j < this.gridHeight - 1; j++) {
-          if (this.grid[i][j] && !this.grid[0][j] && !this.grid[this.gridWidth-1][j] && j !== 0 && j !== this.gridHeight-1) {
-            // Clear some walls to improve connectivity
-            if (noise(i * 0.2, j * 0.2, attempts * 100) > 0.6) {
-              this.grid[i][j] = false;
-            }
-          }
-        }
-      }
-      this.ensureMainPathClearance(mainPath);
-    }
     // Ensure the goal area itself is not a wall in the grid, if it falls within the last column
     // This is more for logical consistency as direct drawing handles its appearance.
     let goalGridMinX = floor((this.goalPos.x - this.goalSize / 2) / this.cellSize);
@@ -392,99 +436,6 @@ class Cave {
     }
   }
 
-  // Validate that there's a connected path from start to goal that the submarine can traverse
-  validatePathConnectivity() {
-    let submarineRadiusInCells = Math.ceil(PLAYER_RADIUS / this.cellSize);
-    let startX = Math.floor(this.cellSize * 5 / this.cellSize); // Approximate player start
-    let startY = Math.floor(this.gridHeight / 2);
-    
-    // Ensure exitX is valid
-    if (isNaN(this.exitX) || this.exitX === undefined || this.exitX === null) {
-      this.exitX = this.worldWidth - this.cellSize * CAVE_EXIT_X_OFFSET_CELLS;
-      console.warn("exitX was invalid, recalculating");
-    }
-    let goalX = Math.floor(this.exitX / this.cellSize);
-    
-    // Ensure exitPathY is valid, use center if not
-    if (isNaN(this.exitPathY) || this.exitPathY === undefined || this.exitPathY === null) {
-      this.exitPathY = this.gridHeight / 2;
-      console.warn("exitPathY was invalid, using grid center");
-    }
-    let goalY = Math.floor(this.exitPathY);
-    
-    // Validate all calculated values are numbers
-    if (isNaN(startX)) startX = 5;
-    if (isNaN(startY)) startY = Math.floor(this.gridHeight / 2);
-    if (isNaN(goalX)) goalX = this.gridWidth - 10;
-    if (isNaN(goalY)) goalY = Math.floor(this.gridHeight / 2);
-    
-    // Validate goalX and goalY are within bounds
-    goalX = constrain(goalX, 0, this.gridWidth - 1);
-    goalY = constrain(goalY, 0, this.gridHeight - 1);
-    
-    // Use a simple flood fill to check connectivity
-    let visited = [];
-    for (let i = 0; i < this.gridWidth; i++) {
-      visited[i] = [];
-      for (let j = 0; j < this.gridHeight; j++) {
-        visited[i][j] = false;
-      }
-    }
-    
-    // BFS to check if goal is reachable from start
-    let queue = [{x: startX, y: startY}];
-    visited[startX][startY] = true;
-    
-    while (queue.length > 0) {
-      let current = queue.shift();
-      
-      // Check if we reached the goal area
-      if (dist(current.x, current.y, goalX, goalY) < 3) {
-        return true; // Path found
-      }
-      
-      // Check 8 directions for movement
-      for (let dx = -1; dx <= 1; dx++) {
-        for (let dy = -1; dy <= 1; dy++) {
-          if (dx === 0 && dy === 0) continue;
-          
-          let newX = current.x + dx;
-          let newY = current.y + dy;
-          
-          if (newX >= 0 && newX < this.gridWidth && 
-              newY >= 0 && newY < this.gridHeight && 
-              !visited[newX][newY] && 
-              this.canSubmarinePassThrough(newX, newY, submarineRadiusInCells)) {
-            visited[newX][newY] = true;
-            queue.push({x: newX, y: newY});
-          }
-        }
-      }
-    }
-    
-    return false; // No path found
-  }
-  
-  // Check if submarine can pass through a given grid cell
-  canSubmarinePassThrough(gridX, gridY, submarineRadiusInCells) {
-    // Check if submarine can fit at this position
-    for (let dx = -submarineRadiusInCells; dx <= submarineRadiusInCells; dx++) {
-      for (let dy = -submarineRadiusInCells; dy <= submarineRadiusInCells; dy++) {
-        if (dist(0, 0, dx, dy) <= submarineRadiusInCells) {
-          let checkX = gridX + dx;
-          let checkY = gridY + dy;
-          
-          if (checkX < 0 || checkX >= this.gridWidth || 
-              checkY < 0 || checkY >= this.gridHeight ||
-              (this.grid[checkX] && this.grid[checkX][checkY])) {
-            return false; // Blocked
-          }
-        }
-      }
-    }
-    return true; // Can pass through
-  }
-
   isWall(worldX, worldY, objectRadius = 0) {
     // Check for goal square collision first for sonar detection (not for player passage)
     // This is a simplified check; sonar will treat it as a distinct object.
@@ -600,5 +551,153 @@ class Cave {
         }
       }
     }
+  }
+  
+  ensurePlayerToGoalConnectivity() {
+    if (!this.playerStartX || !this.playerStartY || !this.goalPos) {
+      console.warn('Cannot validate connectivity: missing player start or goal positions');
+      return;
+    }
+    
+    // Use goalPos for the goal coordinates
+    const goalX = this.goalPos.x;
+    const goalY = this.goalPos.y;
+    
+    // Convert pixel positions to grid coordinates
+    const startCellX = Math.floor(this.playerStartX / this.cellSize);
+    const startCellY = Math.floor(this.playerStartY / this.cellSize);
+    const goalCellX = Math.floor(goalX / this.cellSize);
+    const goalCellY = Math.floor(goalY / this.cellSize);
+    
+    console.log(`Validating path from player (${startCellX}, ${startCellY}) to goal (${goalCellX}, ${goalCellY})`);
+    console.log(`Player start area: ${this.grid[startCellX][startCellY] ? 'BLOCKED' : 'CLEAR'}`);
+    console.log(`Goal area: ${this.grid[goalCellX][goalCellY] ? 'BLOCKED' : 'CLEAR'}`);
+    
+    // Ensure player start area is clear with a larger radius
+    this.carveArea(startCellX, startCellY, 4);
+    
+    // Ensure goal area is clear
+    this.carveArea(goalCellX, goalCellY, 3);
+    
+    console.log(`After carving - Player start area: ${this.grid[startCellX][startCellY] ? 'BLOCKED' : 'CLEAR'}`);
+    console.log(`After carving - Goal area: ${this.grid[goalCellX][goalCellY] ? 'BLOCKED' : 'CLEAR'}`);
+    
+    // Perform pathfinding to check connectivity
+    if (!this.isPathConnected(startCellX, startCellY, goalCellX, goalCellY)) {
+      console.log('No path found between player and goal - carving direct path');
+      this.carveDirectPath(startCellX, startCellY, goalCellX, goalCellY);
+      
+      // Double-check connectivity after carving
+      if (!this.isPathConnected(startCellX, startCellY, goalCellX, goalCellY)) {
+        console.warn('Still no path after carving - trying wider path');
+        this.carveDirectPath(startCellX, startCellY, goalCellX, goalCellY, 4); // Wider path
+        
+        // Final check
+        if (!this.isPathConnected(startCellX, startCellY, goalCellX, goalCellY)) {
+          console.error('CRITICAL: Cannot establish path even after multiple attempts!');
+        } else {
+          console.log('Path established with wider carving');
+        }
+      } else {
+        console.log('Path established after initial carving');
+      }
+    } else {
+      console.log('Path connectivity validated successfully');
+    }
+  }
+
+  isPathConnected(startX, startY, goalX, goalY) {
+    const visited = new Set();
+    const queue = [{x: startX, y: startY}];
+    
+    while (queue.length > 0) {
+      const {x, y} = queue.shift();
+      const key = `${x},${y}`;
+      
+      if (visited.has(key)) continue;
+      visited.add(key);
+      
+      // Check if we reached the goal
+      if (x === goalX && y === goalY) {
+        return true;
+      }
+      
+      // Add valid neighbors
+      const directions = [{x: 0, y: 1}, {x: 0, y: -1}, {x: 1, y: 0}, {x: -1, y: 0}];
+      for (const dir of directions) {
+        const newX = x + dir.x;
+        const newY = y + dir.y;
+        
+        if (newX >= 0 && newX < this.gridWidth && 
+            newY >= 0 && newY < this.gridHeight && 
+            this.grid[newX][newY] === false) { // false = open space
+          queue.push({x: newX, y: newY});
+        }
+      }
+    }
+    
+    return false;
+  }
+
+  carveDirectPath(startX, startY, goalX, goalY, radius = 2) {
+    // Simple direct line carving using Bresenham-like algorithm
+    let x0 = startX, y0 = startY;
+    const x1 = goalX, y1 = goalY;
+    
+    const dx = Math.abs(x1 - x0);
+    const dy = Math.abs(y1 - y0);
+    const sx = x0 < x1 ? 1 : -1;
+    const sy = y0 < y1 ? 1 : -1;
+    let err = dx - dy;
+    
+    while (true) {
+      // Carve out the current position and surrounding area
+      this.carveArea(x0, y0, radius);
+      
+      if (x0 === x1 && y0 === y1) break;
+      
+      const e2 = 2 * err;
+      if (e2 > -dy) {
+        err -= dy;
+        x0 += sx;
+      }
+      if (e2 < dx) {
+        err += dx;
+        y0 += sy;
+      }
+    }
+    
+    console.log(`Direct path carved between player start and goal with radius ${radius}`);
+  }
+
+  carveArea(centerX, centerY, radius) {
+    for (let dy = -radius; dy <= radius; dy++) {
+      for (let dx = -radius; dx <= radius; dx++) {
+        const x = centerX + dx;
+        const y = centerY + dy;
+        
+        if (x >= 0 && x < this.gridWidth && y >= 0 && y < this.gridHeight) {
+          const distance = Math.sqrt(dx * dx + dy * dy);
+          if (distance <= radius) {
+            this.grid[x][y] = false; // Make it open space
+          }
+        }
+      }
+    }
+  }
+
+  // Getter methods for external access to positions
+  getPlayerStartPosition() {
+    return {
+      x: this.playerStartX,
+      y: this.playerStartY
+    };
+  }
+
+  getGoalPosition() {
+    return {
+      x: this.goalPos.x,
+      y: this.goalPos.y
+    };
   }
 }

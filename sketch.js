@@ -399,7 +399,7 @@ let reactorHumAmplitude = 0;
 
 // Radiation Pulse Effect
 let radiationPulsePhase = 0; // Phase for the pulsing animation
-let goalDiscoveredBySonar = false; // Track if goal has been discovered by sonar
+let goalCurrentlyDetectedBySonar = false; // Track if goal is currently being detected by sonar
 
 // Creature Growl Audio
 let creatureGrowlOsc, creatureGrowlEnv;
@@ -478,7 +478,7 @@ function resetGame() {
   particles = [];
   
   // Reset radiation pulse discovery flag
-  goalDiscoveredBySonar = false;
+  goalCurrentlyDetectedBySonar = false;
 
   if (audioInitialized) {
     if (lowAirOsc && lowAirOsc.started) lowAirEnv.triggerRelease(lowAirOsc);
@@ -498,7 +498,7 @@ function prepareNextLevel() {
   levelScore = 0;
 
   // Reset radiation pulse discovery flag for new level
-  goalDiscoveredBySonar = false;
+  goalCurrentlyDetectedBySonar = false;
 
   gameState = gameStates.LOADING;
   showLoadingOverlay(`LEVEL ${currentLevel}`);
@@ -1058,9 +1058,20 @@ function updateReactorHum(distanceToGoal) {
 function renderRadiationPulse(cameraOffsetX, cameraOffsetY) {
   if (!cave || !cave.goalPos) return;
   
-  // Don't show indicator if goal has been discovered by sonar
-  if (goalDiscoveredBySonar) {
-    return; // Goal has been discovered, don't show radiation pulse
+  // Check if player has any active goal sonar hits (goal is currently visible)
+  let goalCurrentlyVisible = false;
+  if (player && player.sonarHits) {
+    for (let hit of player.sonarHits) {
+      if (hit.type === 'goal') {
+        goalCurrentlyVisible = true;
+        break;
+      }
+    }
+  }
+  
+  // Don't show indicator if goal is currently visible through sonar
+  if (goalCurrentlyVisible) {
+    return; // Goal is currently visible, don't show radiation pulse
   }
   
   // Calculate distance to reactor (goal)
@@ -1953,6 +1964,10 @@ function drawPlayingState() {
   // Apply mobile controls movement if enabled
   applyMobileMovement();
   
+  // Render radiation pulse effect (subtle directional indicator to reactor)
+  // This needs to be after player.update() so sonar detection flag is current
+  renderRadiationPulse(cameraOffsetX, cameraOffsetY);
+  
   // Update and render enemies - only process those near the screen
   let margin = 100; // Extra margin for off-screen enemies
   for (let enemy of enemies) {
@@ -2018,9 +2033,6 @@ function drawPlayingState() {
   }
 
   player.render(cameraOffsetX, cameraOffsetY);
-
-  // Render radiation pulse effect (subtle directional indicator to reactor)
-  renderRadiationPulse(cameraOffsetX, cameraOffsetY);
 
   // Debug: Show cave walls
   if (debugShowWalls) {
