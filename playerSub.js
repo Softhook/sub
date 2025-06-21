@@ -139,16 +139,23 @@ class PlayerSub {
     this.updatePropeller();
     this.updateMovement(cave);
     this.updateAirSupply();
+    this.updatePowerupEffects(); // Update powerup effects and expiration
     this.autoFireSonar(cave, currentEnemies);
   }
   
   handleInput() {
+    // Calculate effective thrust power (with speed boost if active)
+    let effectiveThrust = this.thrustPower;
+    if (this.speedBoost && frameCount < this.speedBoost.expiresAt) {
+      effectiveThrust *= this.speedBoost.multiplier;
+    }
+    
     // Thrust controls
     if (keyIsDown(UP_ARROW) || keyIsDown(KEY_CODE_W)) {
-      this.vel.add(p5.Vector.fromAngle(this.angle).mult(this.thrustPower));
+      this.vel.add(p5.Vector.fromAngle(this.angle).mult(effectiveThrust));
     }
     if (keyIsDown(DOWN_ARROW) || keyIsDown(KEY_CODE_S)) {
-      this.vel.add(p5.Vector.fromAngle(this.angle).mult(-this.thrustPower * PLAYER_REVERSE_THRUST_FACTOR));
+      this.vel.add(p5.Vector.fromAngle(this.angle).mult(-effectiveThrust * PLAYER_REVERSE_THRUST_FACTOR));
     }
     
     // Rotation controls
@@ -238,8 +245,7 @@ class PlayerSub {
   handleWallCollision() {
     this.pos.sub(this.vel.copy().mult(PLAYER_BUMP_RECOIL_FACTOR));
     this.vel.mult(PLAYER_BUMP_VELOCITY_REVERSE_FACTOR);
-    this.health -= PLAYER_BUMP_DAMAGE;
-    if (this.health < 0) this.health = 0;
+    this.takeDamage(PLAYER_BUMP_DAMAGE, 'wall collision');
     playSound('bump');
   }
   
@@ -416,8 +422,7 @@ class PlayerSub {
   
   applyCreatureCollisionDamage(creatureType) {
     const damage = creatureType === 'jellyfish' ? JELLYFISH_DAMAGE : PLAYER_ENEMY_COLLISION_DAMAGE;
-    this.health -= damage;
-    if (this.health < 0) this.health = 0;
+    this.takeDamage(damage, `${creatureType} collision`);
   }
   
   applyCreatureKnockback(creature, creatureType) {
@@ -427,4 +432,78 @@ class PlayerSub {
       .mult(PLAYER_ENEMY_COLLISION_KNOCKBACK * knockbackMultiplier);
     this.vel.add(knockback);
   }
+  
+  updatePowerupEffects() {
+    // Update weapon upgrade
+    if (this.weaponUpgrade && frameCount >= this.weaponUpgrade.expiresAt) {
+      this.weaponUpgrade = null;
+    }
+    
+    // Update speed boost
+    if (this.speedBoost && frameCount >= this.speedBoost.expiresAt) {
+      this.speedBoost = null;
+    }
+    
+    // Update shield
+    if (this.shield && frameCount >= this.shield.expiresAt) {
+      this.shield = null;
+    }
+    
+    // Update sonar boost
+    if (this.sonarBoost && frameCount >= this.sonarBoost.expiresAt) {
+      this.sonarBoost = null;
+    }
+  }
+  
+  // Check if shield is active and can absorb damage
+  hasActiveShield() {
+    return this.shield && this.shield.active && this.shield.hits > 0;
+  }
+  
+  // Apply damage with shield protection
+  takeDamage(amount, damageSource = 'unknown') {
+    if (this.hasActiveShield()) {
+      // Shield absorbs the damage
+      this.shield.hits--;
+      console.log(`Shield absorbed ${amount} damage! Shield hits remaining: ${this.shield.hits}`);
+      
+      // Deactivate shield if no hits remaining
+      if (this.shield.hits <= 0) {
+        this.shield.active = false;
+        console.log("Shield depleted!");
+      }
+      
+      // Create shield impact effect
+      this.createShieldEffect();
+      return; // No damage taken
+    }
+    
+    // No shield - take damage normally
+    this.health -= amount;
+    if (this.health < 0) this.health = 0;
+    console.log(`Took ${amount} damage from ${damageSource}. Health: ${this.health}`);
+  }
+  
+  createShieldEffect() {
+    // Create sparkle particles around the submarine when shield absorbs damage
+    for (let i = 0; i < 6; i++) {
+      let angle = (TWO_PI / 6) * i;
+      let distance = this.radius + 10;
+      particles.push(new Particle(
+        this.pos.x + cos(angle) * distance,
+        this.pos.y + sin(angle) * distance,
+        cos(angle) * 2,
+        sin(angle) * 2,
+        20, // lifetime
+        2,  // minSize
+        6,  // maxSize
+        280, // purple hue (shield color)
+        70,  // saturation
+        80,  // brightness
+        255  // alphaMax
+      ));
+    }
+  }
+
+  // ...existing code...
 }

@@ -7,7 +7,7 @@ class Cave {
     if (isNaN(cellSize) || cellSize <= 0) cellSize = 20; // Slightly larger cells for better performance
     
     // Safety buffer for path carving - configurable for consistent tunnel widths
-    this.pathSafetyBuffer = 2;
+    this.pathSafetyBuffer = 4;
     
     this.worldWidth = worldWidth; this.worldHeight = worldHeight; this.cellSize = cellSize; // Use passed cellSize
     this.gridWidth = Math.ceil(worldWidth / this.cellSize); // Use this.cellSize

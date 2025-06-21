@@ -7,7 +7,7 @@ const PWR_SPAWN_COOLDOWN_FRAMES = 60 * 8; // Check every 8 seconds
 const PWR_SPAWN_CHANCE_PER_CHECK = 1; // 30% chance when cooldown is up
 const MAX_PWR_ON_SCREEN = 3;
 const PWR_MIN_DISTANCE_FROM_PLAYER = 400;
-const PWR_AIR_RESTORE_AMOUNT = 300; // frames worth of air
+const PWR_AIR_RESTORE_AMOUNT = 1200; // frames worth of air (20 seconds instead of 5)
 
 // Powerup configurations
 const PWR_CONFIGS = {
