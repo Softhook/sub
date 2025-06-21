@@ -186,7 +186,7 @@ class Powerup {
     console.log(`Air restored: +${airToAdd}, new air: ${player.airSupply}/${player.initialAirSupply}`);
     
     // Show HUD notification
-    showPowerupNotification("Air Restored!", this.config.color);
+    showPowerupNotification("Air Collected", this.config.color);
   }
   
   applyWeaponUpgrade() {
@@ -207,7 +207,7 @@ class Powerup {
       expiresAt: frameCount + this.config.duration
     };
     
-    showPowerupNotification("Speed Boost!", this.config.color);
+    showPowerupNotification("Speed Boost", this.config.color);
   }
   
   applyShield() {
@@ -217,7 +217,7 @@ class Powerup {
       hits: this.config.shieldHits || 3
     };
     
-    showPowerupNotification("Shield Active!", this.config.color);
+    showPowerupNotification("Shield Active", this.config.color);
   }
   
   applySonarBoost() {
@@ -227,7 +227,7 @@ class Powerup {
       expiresAt: frameCount + this.config.duration
     };
     
-    showPowerupNotification("Sonar Enhanced!", this.config.color);
+    showPowerupNotification("Sonar Enhanced", this.config.color);
   }
   
   createCollectionEffect() {
