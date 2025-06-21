@@ -417,6 +417,7 @@ const CREATURE_EXPLOSION_BASS_MIN_FREQ = 25;
 const CREATURE_EXPLOSION_BASS_MAX_FREQ = 45;
 
 // Game Variables
+let customFont; // Custom font loaded from Berpatroli.otf
 let player;
 let cave;
 let enemies = [];
@@ -425,6 +426,7 @@ let projectiles = [];
 let sonarBubbles = [];
 let particles = []; // New global array for torpedo trail particles
 let currentAreas = []; // Array for underwater current areas
+let powerupManager; // Powerup system manager
 let cameraOffsetX, cameraOffsetY;
 let gameState = 'start';
 let currentLevel = 1;
@@ -538,6 +540,13 @@ function initGameObjects() {
   projectiles = [];
   sonarBubbles = [];
   particles = [];
+
+  // Initialize powerup manager
+  if (!powerupManager) {
+    powerupManager = new PowerupManager();
+  } else {
+    powerupManager.reset();
+  }
 
   enemies = spawnEnemies(cave);
   jellyfish = spawnJellyfish(cave, playerStartPos.x, playerStartPos.y);
@@ -956,6 +965,10 @@ function initializeSounds() {
   let lowAirSound = setupSound('osc', 'square', LOW_AIR_ENV_ADSR, LOW_AIR_ENV_LEVELS);
   lowAirOsc = lowAirSound.sound; lowAirEnv = lowAirSound.envelope;
 
+  // Initialize powerup collection sound
+  let powerupSound = setupSound('osc', 'sine', {aT: 0.01, dT: 0.2, sR: 0, rT: 0.3}, {aL: 0.8, rL: 0});
+  powerupOsc = powerupSound.sound; powerupEnv = powerupSound.envelope;
+
   // Initialize reactor hum
   let reactorHumSound = setupSound('osc', 'sawtooth', REACTOR_HUM_ENV_ADSR, REACTOR_HUM_ENV_LEVELS);
   reactorHumOsc = reactorHumSound.sound; reactorHumEnv = reactorHumSound.envelope;
@@ -1009,6 +1022,11 @@ function playSound(soundName) {
       currentFlowBassEnv.play(currentFlowBassOsc);
     } else if (soundName === 'lowAir') {
       ensureStarted(lowAirOsc); lowAirOsc.freq(LOW_AIR_FREQ); lowAirEnv.play(lowAirOsc);
+    } else if (soundName === 'powerupCollect') {
+      // Bright, pleasant powerup collection sound
+      ensureStarted(powerupOsc); 
+      powerupOsc.freq(800); // High frequency for bright sound
+      powerupEnv.play(powerupOsc);
     } else if (soundName === 'creatureGrowl') {
       ensureStarted(creatureGrowlOsc); 
       creatureGrowlOsc.freq(random(CREATURE_GROWL_MIN_FREQ, CREATURE_GROWL_MAX_FREQ)); 
@@ -1211,7 +1229,11 @@ function setup() {
   createCanvas(windowWidth, windowHeight);
   colorMode(HSB, 360, 100, 100, 255);
   textAlign(CENTER, CENTER);
-  textFont('monospace');
+  
+  // Set custom font if loaded
+  if (customFont) {
+    textFont(customFont);
+  }
   
   initializeSounds(); 
   highScoreManager = new JSONBaseHighScores(); // Use the new high score service
@@ -1567,7 +1589,7 @@ function drawDebugCaveWalls(offsetX, offsetY) {
   noStroke();
   textAlign(RIGHT, TOP);
   textSize(16);
-  text("DEBUG: Cave Walls & Enemies (Press ] to toggle)", width - 10, 10);
+  text("DEBUG: Cave Walls & Enemies (Press ] to toggle)", width -  10, 10);
   text(`Grid: ${cave.gridWidth}x${cave.gridHeight}, Cell: ${cave.cellSize}px`, width - 10, 30);
   text(`Enemies: ${enemies.length}, Jellyfish: ${jellyfish.length}`, width - 10, 50);
 
@@ -1964,6 +1986,14 @@ function drawPlayingState() {
   // Apply mobile controls movement if enabled
   applyMobileMovement();
   
+  // Update powerup system
+  if (powerupManager) {
+    powerupManager.update(cave);
+  }
+  
+  // Update powerup notifications
+  updatePowerupNotifications();
+  
   // Render radiation pulse effect (subtle directional indicator to reactor)
   // This needs to be after player.update() so sonar detection flag is current
   renderRadiationPulse(cameraOffsetX, cameraOffsetY);
@@ -2034,6 +2064,11 @@ function drawPlayingState() {
 
   player.render(cameraOffsetX, cameraOffsetY);
 
+  // Render powerups
+  if (powerupManager) {
+    powerupManager.render(cameraOffsetX, cameraOffsetY);
+  }
+
   // Debug: Show cave walls
   if (debugShowWalls) {
     drawDebugCaveWalls(cameraOffsetX, cameraOffsetY);
@@ -2051,6 +2086,9 @@ function drawPlayingState() {
 
   // Render mobile controls after HUD
   renderMobileControls();
+
+  // Render powerup notifications over everything
+  renderPowerupNotifications();
 
   // Update reactor hum volume based on distance to goal (reactor)
   updateReactorHum(distanceToGoal);
