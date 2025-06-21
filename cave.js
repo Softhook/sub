@@ -6,6 +6,9 @@ class Cave {
     if (isNaN(worldHeight) || worldHeight <= 0) worldHeight = 3000; // Increased from 2000
     if (isNaN(cellSize) || cellSize <= 0) cellSize = 20; // Slightly larger cells for better performance
     
+    // Safety buffer for path carving - configurable for consistent tunnel widths
+    this.pathSafetyBuffer = 2;
+    
     this.worldWidth = worldWidth; this.worldHeight = worldHeight; this.cellSize = cellSize; // Use passed cellSize
     this.gridWidth = Math.ceil(worldWidth / this.cellSize); // Use this.cellSize
     this.gridHeight = Math.ceil(worldHeight / this.cellSize); // Use this.cellSize
@@ -185,7 +188,7 @@ class Cave {
         if (!this.grid[i][j]) { // If it's currently open path
           // Only add obstacles if they don't block the guaranteed main path
           let pathPoint = mainPath[i];
-          let minClearanceFromPath = (PLAYER_RADIUS / this.cellSize) + 1; // Ensure submarine can pass
+          let minClearanceFromPath = (PLAYER_RADIUS / this.cellSize) + this.pathSafetyBuffer; // Ensure submarine can pass
           
           if (noise(i * CAVE_OBSTACLE_NOISE_FACTOR_1, j * CAVE_OBSTACLE_NOISE_FACTOR_1, CAVE_OBSTACLE_NOISE_OFFSET_1 + currentLevel) > CAVE_OBSTACLE_THRESHOLD_1 && 
               abs(j - pathPoint.y) > pathPoint.radius + CAVE_OBSTACLE_DIST_BUFFER_1 &&
@@ -248,7 +251,7 @@ class Cave {
   // Ensure the main path has guaranteed clearance for submarine passage
   ensureMainPathClearance(mainPath) {
     let submarineRadiusInCells = PLAYER_RADIUS / this.cellSize;
-    let requiredClearance = Math.ceil(submarineRadiusInCells) + 1; // Extra buffer for safety
+    let requiredClearance = Math.ceil(submarineRadiusInCells) + this.pathSafetyBuffer; // Extra buffer for safety
     
     for (let pathPoint of mainPath) {
       let centerX = Math.round(pathPoint.x);
@@ -406,7 +409,7 @@ class Cave {
   // Carve a noisy, organic-looking path between two points
   carveNoisyPath(x1, y1, x2, y2) {
     let steps = Math.floor(dist(x1, y1, x2, y2)) + 5;
-    let tunnelWidth = Math.ceil(PLAYER_RADIUS / this.cellSize) + 1;
+    let tunnelWidth = Math.ceil(PLAYER_RADIUS / this.cellSize) + this.pathSafetyBuffer;
     
     for (let i = 0; i <= steps; i++) {
       let t = i / steps;
