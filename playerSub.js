@@ -1,4 +1,7 @@
 // --- PlayerSub Class ---
+// Debug mode flag - set to false to disable console logs
+const DEBUG_MODE = false;
+
 class PlayerSub {
   constructor(x, y, initialAir, airDepletionRatePerFrame) {
     // Position and movement
@@ -34,6 +37,12 @@ class PlayerSub {
     // Animation and state
     this.propellerAngle = 0;
     this.wasInCurrent = false;
+    
+    // Powerup halo animation
+    this.haloSize = 1.0;
+    this.haloPhase = 0;
+    this.haloAlphaBase = 120; // Base alpha for the halo
+    this.haloPulseSpeed = 0.05; // How fast the halo pulses
   }
   fireSonar(cave, enemies, jellyfish) {
     this.lastSonarTime = frameCount;
@@ -241,8 +250,12 @@ class PlayerSub {
     this.vel.limit(this.maxSpeed);
     const nextPos = p5.Vector.add(this.pos, this.vel);
     
-    if (cave.isWall(nextPos.x, nextPos.y, this.radius * PLAYER_COLLISION_RADIUS_FACTOR)) {
-      this.handleWallCollision();
+    // Check if we're about to hit a wall
+    const willHitWall = cave.isWall(nextPos.x, nextPos.y, this.radius * PLAYER_COLLISION_RADIUS_FACTOR);
+    
+    // Wall collision handling
+    if (willHitWall) {
+      this.handleWallCollision(cave);
     } else {
       this.pos.add(this.vel);
     }
@@ -250,11 +263,31 @@ class PlayerSub {
     this.vel.mult(this.damping);
   }
   
-  handleWallCollision() {
-    this.pos.sub(this.vel.copy().mult(PLAYER_BUMP_RECOIL_FACTOR));
-    this.vel.mult(PLAYER_BUMP_VELOCITY_REVERSE_FACTOR);
-    this.takeDamage(PLAYER_BUMP_DAMAGE, 'wall collision');
-    playSound('bump');
+  handleWallCollision(cave) {
+    // Check if shield is active before handling collision physics
+    const shieldActive = this.hasActiveShield();
+    
+    if (shieldActive) {
+      // With shield active, we still need to stop movement but with less recoil
+      this.pos.sub(this.vel.copy().mult(PLAYER_BUMP_RECOIL_FACTOR * 0.5));
+      this.vel.mult(0.1); // Minimal velocity reduction with shield
+      
+      // Apply damage silently (shield absorbs it)
+      this.takeDamage(PLAYER_BUMP_DAMAGE, 'wall collision');
+      
+      // No sound or visual effects when shielded
+      
+      // Debug log only if needed
+      if (DEBUG_MODE) {
+        console.log("Shield protected from wall collision");
+      }
+    } else {
+      // Normal collision handling without shield
+      this.pos.sub(this.vel.copy().mult(PLAYER_BUMP_RECOIL_FACTOR));
+      this.vel.mult(PLAYER_BUMP_VELOCITY_REVERSE_FACTOR);
+      this.takeDamage(PLAYER_BUMP_DAMAGE, 'wall collision');
+      playSound('bump');
+    }
   }
   
   updateAirSupply() {
@@ -364,6 +397,47 @@ class PlayerSub {
     endShape(CLOSE);
   }
 
+  _renderPowerupHalo() {
+    // Update halo animation
+    this.haloPhase += this.haloPulseSpeed;
+    this.haloSize = 1.0 + sin(this.haloPhase) * 0.1; // Subtle pulsing effect
+  
+    // Check if any powerup is active
+    const hasPowerup = this.speedBoost || this.shield || this.sonarBoost || this.weaponUpgrade;
+    if (!hasPowerup) return;
+    
+    noStroke();
+    
+    // Create a layered halo effect for each active powerup
+    let haloRadius = this.radius * 1.8 * this.haloSize;
+    let haloAlpha = this.haloAlphaBase + sin(this.haloPhase) * 30;
+    
+    // Draw multiple halos for multiple active powerups
+    // Each powerup adds a colored ring to the halo
+    if (this.shield && this.shield.active) {
+      fill(280, 70, 80, haloAlpha); // Shield: Purple
+      ellipse(0, 0, haloRadius, haloRadius);
+      haloRadius -= 6; // Shrink for next layer
+    }
+    
+    if (this.speedBoost && frameCount < this.speedBoost.expiresAt) {
+      fill(60, 100, 95, haloAlpha); // Speed: Bright yellow
+      ellipse(0, 0, haloRadius, haloRadius);
+      haloRadius -= 6; // Shrink for next layer
+    }
+    
+    if (this.sonarBoost && frameCount < this.sonarBoost.expiresAt) {
+      fill(120, 80, 85, haloAlpha); // Sonar: Green
+      ellipse(0, 0, haloRadius, haloRadius);
+      haloRadius -= 6; // Shrink for next layer
+    }
+    
+    if (this.weaponUpgrade && frameCount < this.weaponUpgrade.expiresAt) {
+      fill(15, 90, 85, haloAlpha); // Weapon: Orange/red
+      ellipse(0, 0, haloRadius, haloRadius);
+    }
+  }
+
   _renderPropeller() {
     push();
     translate(this.radius * PLAYER_PROPELLER_X_OFFSET_FACTOR, 0); // Position propeller at the back
@@ -389,6 +463,9 @@ class PlayerSub {
     translate(width / 2, height / 2); // Player is always centered
     rotate(this.angle); // And rotated
 
+    // Render powerup halo behind the submarine
+    this._renderPowerupHalo();
+    
     this._renderBody();
     this._renderSail();
     this._renderFin();
@@ -424,9 +501,35 @@ class PlayerSub {
       const collisionRadius = this.radius * PLAYER_COLLISION_RADIUS_FACTOR + creature.radius;
       
       if (distance < collisionRadius) {
-        this.applyCreatureCollisionDamage(creatureType);
-        this.applyCreatureKnockback(creature, creatureType);
-        playSound('explosion');
+        // Check if shield is active before applying any effects
+        const shieldActive = this.hasActiveShield();
+        
+        if (shieldActive) {
+          // With shield active - creature collision is completely blocked
+          // Only do the minimum required to prevent overlap
+          
+          // Apply damage silently (will be absorbed by shield with no effects)
+          this.takeDamage(creatureType === 'jellyfish' ? JELLYFISH_DAMAGE : PLAYER_ENEMY_COLLISION_DAMAGE, 
+                          `${creatureType} collision`);
+          
+          // Very minimal knockback with shield (just enough to prevent overlap)
+          const minimalKnockback = p5.Vector.sub(this.pos, creature.pos)
+            .normalize()
+            .mult(PLAYER_ENEMY_COLLISION_KNOCKBACK * 0.15); // Very slight knockback
+          this.vel.add(minimalKnockback);
+          
+          // No sound effects with shield
+          
+          // Debug log only if needed
+          if (DEBUG_MODE) {
+            console.log(`Shield protected from ${creatureType} collision`);
+          }
+        } else {
+          // No shield - normal damage and knockback
+          this.applyCreatureCollisionDamage(creatureType);
+          this.applyCreatureKnockback(creature, creatureType);
+          playSound('explosion');
+        }
       }
     }
   }
@@ -445,6 +548,10 @@ class PlayerSub {
   }
   
   updatePowerupEffects() {
+    // Check old powerup state before updates
+    const hadPowerups = this.weaponUpgrade || this.speedBoost || this.shield || this.sonarBoost;
+    const hadShield = this.shield && this.shield.active;
+    
     // Update weapon upgrade
     if (this.weaponUpgrade && frameCount >= this.weaponUpgrade.expiresAt) {
       this.weaponUpgrade = null;
@@ -453,40 +560,59 @@ class PlayerSub {
     // Update speed boost
     if (this.speedBoost && frameCount >= this.speedBoost.expiresAt) {
       this.speedBoost = null;
+      showPowerupNotification("Speed boost expired", {h: 60, s: 100, b: 95});
     }
     
     // Update shield
     if (this.shield && frameCount >= this.shield.expiresAt) {
       this.shield = null;
+      // No notification for shield expiration
+      if (DEBUG_MODE) {
+        console.log("Shield expired due to time limit");
+      }
     }
     
     // Update sonar boost
     if (this.sonarBoost && frameCount >= this.sonarBoost.expiresAt) {
       this.sonarBoost = null;
+      showPowerupNotification("Sonar boost expired", {h: 120, s: 80, b: 85});
+    }
+    
+    // Check new powerup state after updates
+    const hasPowerups = this.weaponUpgrade || this.speedBoost || this.shield || this.sonarBoost;
+    
+    // Reset the halo phase when powerups are newly activated
+    if (!hadPowerups && hasPowerups) {
+      this.haloPhase = 0;
+      this.haloPulseSpeed = 0.05 + random(0.01, 0.03); // Slightly randomize pulse speed
     }
   }
   
   // Check if shield is active and can absorb damage
   hasActiveShield() {
-    return this.shield && this.shield.active && this.shield.hits > 0;
+    // Simpler validation: shield object exists, is marked active, and hasn't expired
+    const isActive = this.shield && 
+                     this.shield.active && 
+                     frameCount < this.shield.expiresAt;
+    
+    // Debug logging only if enabled
+    if (DEBUG_MODE && this.shield && frameCount % 60 === 0) {
+      console.log(`Shield status: active=${isActive}, expires in ${this.shield.expiresAt - frameCount} frames`);
+    }
+    
+    return isActive;
   }
   
   // Apply damage with shield protection
   takeDamage(amount, damageSource = 'unknown') {
     if (this.hasActiveShield()) {
-      // Shield absorbs the damage
-      this.shield.hits--;
-      console.log(`Shield absorbed ${amount} damage! Shield hits remaining: ${this.shield.hits}`);
-      
-      // Deactivate shield if no hits remaining
-      if (this.shield.hits <= 0) {
-        this.shield.active = false;
-        console.log("Shield depleted!");
+      // Shield silently absorbs the damage - no hit counter, no effects
+      // Only log for debugging if needed
+      if (DEBUG_MODE) {
+        console.log(`Shield absorbed ${amount} damage from ${damageSource}`);
       }
       
-      // Create shield impact effect
-      this.createShieldEffect();
-      return; // No damage taken
+      return; // No damage taken and shield remains active
     }
     
     // No shield - take damage normally
@@ -495,24 +621,70 @@ class PlayerSub {
     console.log(`Took ${amount} damage from ${damageSource}. Health: ${this.health}`);
   }
   
-  createShieldEffect() {
+  createShieldEffect(damageSource = 'unknown') {
     // Create sparkle particles around the submarine when shield absorbs damage
-    for (let i = 0; i < 6; i++) {
-      let angle = (TWO_PI / 6) * i;
-      let distance = this.radius + 10;
+    let particleCount = 16;
+    let flashIntensity = 1.0;
+    
+    // More intense effect for certain damage types
+    if (damageSource.includes('enemy') || damageSource.includes('jellyfish')) {
+      particleCount = 24; // More particles
+      flashIntensity = 1.5; // Larger flash
+    }
+    
+    // Create sparkle particles in a ring around the submarine
+    for (let i = 0; i < particleCount; i++) {
+      let angle = (TWO_PI / particleCount) * i;
+      let distance = this.radius + 5 + random(10, 20); // More varied distance
       particles.push(new Particle(
         this.pos.x + cos(angle) * distance,
         this.pos.y + sin(angle) * distance,
-        cos(angle) * 2,
-        sin(angle) * 2,
-        20, // lifetime
-        2,  // minSize
-        6,  // maxSize
+        cos(angle) * random(1.5, 4.0),
+        sin(angle) * random(1.5, 4.0),
+        25 + random(-5, 15), // longer, varied lifetime
+        3,  // minSize (larger)
+        12,  // maxSize (larger)
         280, // purple hue (shield color)
         70,  // saturation
-        80,  // brightness
+        90,  // brightness (brighter)
         255  // alphaMax
       ));
+    }
+    
+    // Create a shield "flash" effect with a quick larger circle
+    particles.push(new Particle(
+      this.pos.x, 
+      this.pos.y,
+      0, // no movement
+      0,
+      15, // lifetime
+      this.radius * 2 * flashIntensity, // start larger
+      this.radius * 3 * flashIntensity, // grow more
+      280, // purple hue (shield color)
+      70,  
+      95, // brighter 
+      180 // semi-transparent
+    ));
+    
+    // Add a second shield flash that persists longer
+    particles.push(new Particle(
+      this.pos.x, 
+      this.pos.y,
+      0, // no movement
+      0,
+      30, // longer lifetime
+      this.radius * 1.7 * flashIntensity, // different size
+      this.radius * 1.9 * flashIntensity, // minimal growth
+      290, // slightly different color
+      60,  
+      85,  
+      150 // more transparent
+    ));
+    
+    // Show shield impact notification with time remaining
+    if (this.shield && this.shield.expiresAt) {
+      const secondsRemaining = Math.ceil((this.shield.expiresAt - frameCount) / 60);
+      showPowerupNotification(`Shield blocked damage! (${secondsRemaining}s left)`, {h: 280, s: 70, b: 80});
     }
   }
 

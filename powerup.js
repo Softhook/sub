@@ -213,11 +213,17 @@ class Powerup {
   applyShield() {
     player.shield = {
       active: true,
-      expiresAt: frameCount + this.config.duration,
-      hits: this.config.shieldHits || 3
+      expiresAt: frameCount + this.config.duration
+      // No hit counter - shield will last for the full duration
     };
     
+    // We'll still show initial notification when shield is collected
     showPowerupNotification("Shield Active", this.config.color);
+    
+    if (DEBUG_MODE) {
+      const durationInSeconds = Math.round(this.config.duration / 60);
+      console.log(`Shield activated - will last for ${durationInSeconds} seconds`);
+    }
   }
   
   applySonarBoost() {
