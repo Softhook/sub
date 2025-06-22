@@ -17,9 +17,10 @@ const PWR_CONFIGS = {
   },
   weapon: {
     color: {h: 15, s: 90, b: 85}, // Orange/red
-    duration: 60 * 20, // 20 seconds
+    duration: 60 * 30, // 30 seconds (increased from 20)
     maxLevel: 3,
-    weaponType: 'damage'
+    weaponType: 'damage',
+    description: 'Enhanced torpedoes with increased damage, speed, and area effect'
   },
   speed: {
     color: {h: 60, s: 100, b: 95}, // Bright yellow

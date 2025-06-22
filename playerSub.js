@@ -141,14 +141,100 @@ class PlayerSub {
     );
   }
   shoot() {
-    if (frameCount - this.lastShotTime < this.shotCooldown) return;
+    // Check for normal cooldown if no weapon upgrade is active
+    if (!this.weaponUpgrade) {
+      if (frameCount - this.lastShotTime < this.shotCooldown) return;
+    } else {
+      // With weapon upgrade, reduce cooldown based on level
+      const cooldownReduction = this.weaponUpgrade.level * 0.25; // 25% reduction per level
+      const effectiveCooldown = Math.max(10, this.shotCooldown * (1 - cooldownReduction));
+      if (frameCount - this.lastShotTime < effectiveCooldown) return;
+      
+      if (DEBUG_MODE) {
+        console.log(`Firing enhanced torpedo with cooldown: ${Math.round(effectiveCooldown)} (${Math.round(cooldownReduction * 100)}% reduction)`);
+      }
+    }
     
     const projectileStartX = this.pos.x + cos(this.angle) * this.radius * PLAYER_PROJECTILE_OFFSET_FACTOR;
     const projectileStartY = this.pos.y + sin(this.angle) * this.radius * PLAYER_PROJECTILE_OFFSET_FACTOR;
     
-    projectiles.push(new Projectile(projectileStartX, projectileStartY, this.angle));
+    // Create base projectile
+    const projectile = new Projectile(projectileStartX, projectileStartY, this.angle);
+    
+    // Apply weapon upgrade effects if active
+    if (this.weaponUpgrade) {
+      projectile.enhanced = true;
+      projectile.level = this.weaponUpgrade.level;
+      projectile.damageMultiplier = 1 + (this.weaponUpgrade.level * 0.5); // 50% more damage per level
+      projectile.speedMultiplier = 1 + (this.weaponUpgrade.level * 0.3); // 30% faster per level
+      projectile.destructionMultiplier = 1 + (this.weaponUpgrade.level * 0.75); // 75% larger destruction per level
+      
+      // Apply speed boost immediately
+      projectile.vel.mult(projectile.speedMultiplier);
+      
+      // Fire additional torpedoes at higher levels (spread pattern)
+      if (this.weaponUpgrade.level >= 2) {
+        this.fireAdditionalTorpedoes(projectileStartX, projectileStartY);
+      }
+    }
+    
+    projectiles.push(projectile);
     this.lastShotTime = frameCount;
-    playSound('torpedo');
+    
+    // Create launch visual effect for enhanced torpedoes
+    if (this.weaponUpgrade) {
+      this.createTorpedoLaunchEffect(
+        projectileStartX, 
+        projectileStartY, 
+        this.angle,
+        this.weaponUpgrade.level
+      );
+    }
+    
+    // Play appropriate sound
+    if (this.weaponUpgrade && this.weaponUpgrade.level >= 3) {
+      // Play an enhanced sound for highest level torpedoes
+      playSound('explosion');
+      playSound('torpedo');
+    } else {
+      playSound('torpedo');
+    }
+    
+    // Create launch effects for enhanced torpedoes
+    this.createTorpedoLaunchEffect(projectileStartX, projectileStartY, this.angle, this.weaponUpgrade ? this.weaponUpgrade.level : 0);
+  }
+  
+  fireAdditionalTorpedoes(x, y) {
+    // Level 2: fire 1 additional torpedo (total 2)
+    // Level 3: fire 2 additional torpedoes (total 3)
+    const additionalCount = this.weaponUpgrade.level - 1;
+    const spreadAngle = PI / 12; // 15 degrees
+    
+    for (let i = 1; i <= additionalCount; i++) {
+      // Alternate left/right for multiple torpedoes
+      const sideMultiplier = i % 2 === 0 ? 1 : -1;
+      const angleOffset = spreadAngle * Math.ceil(i/2) * sideMultiplier;
+      
+      const projectile = new Projectile(x, y, this.angle + angleOffset);
+      projectile.enhanced = true;
+      projectile.level = this.weaponUpgrade.level;
+      projectile.damageMultiplier = 1 + (this.weaponUpgrade.level * 0.5);
+      projectile.speedMultiplier = 1 + (this.weaponUpgrade.level * 0.3);
+      projectile.destructionMultiplier = 1 + (this.weaponUpgrade.level * 0.75);
+      
+      // Apply speed boost immediately
+      projectile.vel.mult(projectile.speedMultiplier);
+      
+      projectiles.push(projectile);
+      
+      // Create launch effect for each additional torpedo
+      this.createTorpedoLaunchEffect(
+        x, 
+        y,
+        this.angle + angleOffset,
+        this.weaponUpgrade.level
+      );
+    }
   }
   update(cave, currentEnemies) {
     this.handleInput();
@@ -554,19 +640,38 @@ class PlayerSub {
     
     // Update weapon upgrade
     if (this.weaponUpgrade && frameCount >= this.weaponUpgrade.expiresAt) {
+      const level = this.weaponUpgrade.level;
       this.weaponUpgrade = null;
+      
+      // Create a more obvious notification for weapon expiration
+      showPowerupNotification(`Weapon Upgrade Lv.${level} expired!`, {h: 15, s: 90, b: 85});
+      
+      // Play a sound to indicate expiration
+      playSound('bump');
+      
+      // Create visual effect for powerup expiration
+      this.createPowerupExpirationEffect('weapon');
     }
     
     // Update speed boost
     if (this.speedBoost && frameCount >= this.speedBoost.expiresAt) {
+      // Create visual effect before removing the powerup
+      this.createPowerupExpirationEffect('speed');
+      
       this.speedBoost = null;
-      showPowerupNotification("Speed boost expired", {h: 60, s: 100, b: 95});
+      showPowerupNotification("Speed Boost expired!", {h: 60, s: 100, b: 95});
+      playSound('bump');
     }
     
     // Update shield
     if (this.shield && frameCount >= this.shield.expiresAt) {
+      // Create visual effect before removing the powerup
+      this.createPowerupExpirationEffect('shield');
+      
       this.shield = null;
-      // No notification for shield expiration
+      showPowerupNotification("Shield expired!", {h: 280, s: 70, b: 80});
+      playSound('bump');
+      
       if (DEBUG_MODE) {
         console.log("Shield expired due to time limit");
       }
@@ -574,8 +679,12 @@ class PlayerSub {
     
     // Update sonar boost
     if (this.sonarBoost && frameCount >= this.sonarBoost.expiresAt) {
+      // Create visual effect before removing the powerup
+      this.createPowerupExpirationEffect('sonar');
+      
       this.sonarBoost = null;
-      showPowerupNotification("Sonar boost expired", {h: 120, s: 80, b: 85});
+      showPowerupNotification("Sonar Boost expired!", {h: 160, s: 80, b: 90});
+      playSound('bump');
     }
     
     // Check new powerup state after updates
@@ -702,5 +811,95 @@ class PlayerSub {
       return this.sonarCooldown * this.sonarBoost.cooldownReduction;
     }
     return this.sonarCooldown;
+  }
+  
+  createTorpedoLaunchEffect(x, y, angle, level = 0) {
+    // Only create special effects for enhanced torpedoes
+    if (level === 0) return;
+    
+    // Number of particles scales with torpedo level
+    const particleCount = 5 + (level * 5);
+    const spreadAngle = PI / 6; // 30 degrees cone behind torpedo
+    
+    for (let i = 0; i < particleCount; i++) {
+      // Create particles in a cone behind the firing direction
+      const particleAngle = angle + PI + random(-spreadAngle/2, spreadAngle/2);
+      const particleSpeed = random(0.5, 2) * (1 + level * 0.3);
+      const particleVel = p5.Vector.fromAngle(particleAngle, particleSpeed);
+      
+      // Particle size and lifespan increase with torpedo level
+      const lifespan = random(10, 30) * (1 + level * 0.2);
+      const minSize = 1 + (level * 0.5);
+      const maxSize = 2 + (level * 1);
+      
+      // Color based on level - brighter, more saturated for higher levels
+      let hue = 30 + random(-10, 10); // Base orange with slight variation
+      let saturation = 80 + (level * 5);
+      let brightness = 90 + (level * 3);
+      
+      // Level 3 gets special colors
+      if (level >= 3) {
+        // Random variation between orange and yellow for a more energetic effect
+        hue = random([30, 40, 50]); 
+      }
+      
+      particles.push(new Particle(
+        x, y,
+        particleVel.x, particleVel.y,
+        lifespan,
+        minSize, maxSize,
+        hue, saturation, brightness,
+        200 // Alpha
+      ));
+    }
+    
+    // For level 3, add a special muzzle flash effect
+    if (level >= 3) {
+      // Create a bright flash at the launch point
+      const flashSize = 8 + random(4);
+      const flashLifespan = 8 + random(4);
+      
+      particles.push(new Particle(
+        x, y,
+        0, 0, // Stationary
+        flashLifespan,
+        flashSize, flashSize,
+        40, 70, 100, // Bright yellow
+        200 // Alpha
+      ));
+    }
+  }
+  
+  createPowerupExpirationEffect(type) {
+    // Create a burst of particles around the sub to indicate a powerup expiring
+    const particleCount = 20;
+    const color = {
+      weapon: {h: 15, s: 90, b: 85}, // Orange/red
+      speed: {h: 60, s: 100, b: 95}, // Bright yellow
+      shield: {h: 280, s: 70, b: 80}, // Purple
+      sonar: {h: 160, s: 80, b: 90}, // Teal
+    };
+    
+    const particleColor = color[type] || {h: 0, s: 0, b: 80}; // Default to gray
+    
+    for (let i = 0; i < particleCount; i++) {
+      const angle = random(TWO_PI);
+      const distance = this.radius * 1.5;
+      const x = this.pos.x + cos(angle) * distance;
+      const y = this.pos.y + sin(angle) * distance;
+      
+      // Particles move outward from sub
+      const speed = random(1, 3);
+      const vel = p5.Vector.fromAngle(angle, speed);
+      
+      particles.push(new Particle(
+        x, y,
+        vel.x, vel.y,
+        random(20, 40), // lifespan
+        2, 4, // size range
+        particleColor.h, particleColor.s, particleColor.b,
+        200 // alpha
+      ));
+    }
   }
 }

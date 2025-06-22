@@ -872,15 +872,34 @@ function processGameObjectArray(arr, offsetX, offsetY, caveContext = null) {
   }
 }
 
-function createExplosion(x, y, type) {
+function createExplosion(x, y, type, enhancementLevel = 0) {
   let particleCount = 0;
   let colorH, colorS, colorB;
+  let speedMultiplier = 1.0;
+  let sizeMultiplier = 1.0;
+  let lifespanMultiplier = 1.0;
 
   if (type === 'wall') {
     particleCount = EXPLOSION_PARTICLE_COUNT_TORPEDO_WALL;
     colorH = EXPLOSION_PARTICLE_COLOR_H_WALL;
     colorS = EXPLOSION_PARTICLE_COLOR_S_WALL;
     colorB = EXPLOSION_PARTICLE_COLOR_B_WALL;
+    
+    // Apply enhancements for upgraded weapons
+    if (enhancementLevel > 0) {
+      particleCount = Math.round(particleCount * (1 + enhancementLevel * 0.5));
+      speedMultiplier = 1 + (enhancementLevel * 0.2);
+      sizeMultiplier = 1 + (enhancementLevel * 0.3);
+      lifespanMultiplier = 1 + (enhancementLevel * 0.4);
+      
+      // Make colors more intense for upgraded torpedoes
+      colorS = Math.min(100, colorS + (enhancementLevel * 5));
+      colorB = Math.min(100, colorB + (enhancementLevel * 5));
+      
+      if (DEBUG_MODE) {
+        console.log(`Enhanced explosion: Level ${enhancementLevel}, ${particleCount} particles`);
+      }
+    }
   } else if (type === 'enemy') {
     particleCount = EXPLOSION_PARTICLE_COUNT_TORPEDO_ENEMY;
     colorH = EXPLOSION_PARTICLE_COLOR_H_ENEMY;
@@ -895,15 +914,27 @@ function createExplosion(x, y, type) {
 
   for (let i = 0; i < particleCount; i++) {
     let angle = random(TWO_PI);
-    let speed = random(EXPLOSION_PARTICLE_SPEED_MIN, EXPLOSION_PARTICLE_SPEED_MAX);
+    let speed = random(EXPLOSION_PARTICLE_SPEED_MIN, EXPLOSION_PARTICLE_SPEED_MAX) * speedMultiplier;
     let vel = p5.Vector.fromAngle(angle, speed);
+    
+    // Enhanced explosions have increased lifespan, size, and possibly different color variations
+    const lifespan = EXPLOSION_PARTICLE_MAX_LIFESPAN * lifespanMultiplier;
+    const minSize = EXPLOSION_PARTICLE_MIN_SIZE * sizeMultiplier;
+    const maxSize = EXPLOSION_PARTICLE_MAX_SIZE * sizeMultiplier;
+    
+    // Add slight hue variation for enhanced explosions
+    let particleColorH = colorH;
+    if (enhancementLevel > 0) {
+      particleColorH += random(-10, 10); // Color variation for more interesting effects
+    }
+    
     particles.push(new Particle(
       x, y, 
       vel.x, vel.y, 
-      EXPLOSION_PARTICLE_MAX_LIFESPAN, 
-      EXPLOSION_PARTICLE_MIN_SIZE, 
-      EXPLOSION_PARTICLE_MAX_SIZE, 
-      colorH, colorS, colorB, 
+      lifespan, 
+      minSize, 
+      maxSize, 
+      particleColorH, colorS, colorB, 
       EXPLOSION_PARTICLE_ALPHA_MAX
     ));
   }
@@ -2026,12 +2057,53 @@ function drawPlayingState() {
       if (projectiles[i] && enemies[j]) {
         let d = dist(projectiles[i].pos.x, projectiles[i].pos.y, enemies[j].pos.x, enemies[j].pos.y);
         if (d < projectiles[i].radius + enemies[j].radius) {
-          createExplosion(projectiles[i].pos.x, projectiles[i].pos.y, 'enemy'); // Create enemy explosion before splicing
-          enemies.splice(j, 1); 
+          const projectile = projectiles[i];
+          
+          // Check for enhanced torpedoes
+          if (projectile.enhanced) {
+            // Enhanced explosions for upgraded weapons
+            createExplosion(projectile.pos.x, projectile.pos.y, 'enemy', projectile.level);
+            
+            if (DEBUG_MODE) {
+              console.log(`Enhanced torpedo hit enemy with level ${projectile.level} (${Math.round(projectile.damageMultiplier * 100)}% damage)`);
+            }
+            
+            // For level 3 weapons, create an area of effect that can damage nearby enemies
+            if (projectile.level >= 3) {
+              // AOE damage to nearby enemies
+              const blastRadius = 100 + (projectile.level * 20); // Base radius + per level bonus
+              damageEnemiesInRadius(projectile.pos.x, projectile.pos.y, blastRadius, j);
+            }
+          } else {
+            createExplosion(projectile.pos.x, projectile.pos.y, 'enemy'); // Standard explosion
+          }
+          
+          // Remove the enemy that was directly hit
+          enemies.splice(j, 1);
           projectiles.splice(i, 1); 
           enemiesKilledThisLevel++;
           playSound('creatureExplosion'); // Use creature explosion sound
           break; 
+        }
+      }
+    }
+  }
+  
+  // Helper function for AOE damage from high-level torpedoes
+  function damageEnemiesInRadius(x, y, radius, skipIndex) {
+    // Only count enemies that weren't already destroyed by direct hit
+    for (let j = enemies.length - 1; j >= 0; j--) {
+      if (j !== skipIndex && enemies[j]) { // Skip the directly hit enemy
+        const distance = dist(x, y, enemies[j].pos.x, enemies[j].pos.y);
+        if (distance < radius) {
+          // Create smaller explosion effect at enemy position
+          createExplosion(enemies[j].pos.x, enemies[j].pos.y, 'enemy', 0);
+          enemies.splice(j, 1);
+          enemiesKilledThisLevel++;
+          
+          if (DEBUG_MODE) {
+            console.log(`AOE damage killed enemy at distance ${Math.round(distance)}`);
+          }
         }
       }
     }
@@ -2043,9 +2115,30 @@ function drawPlayingState() {
       if (projectiles[i] && jellyfish[j]) {
         let d = dist(projectiles[i].pos.x, projectiles[i].pos.y, jellyfish[j].pos.x, jellyfish[j].pos.y);
         if (d < projectiles[i].radius + jellyfish[j].radius) {
-          // Jellyfish takes damage instead of being destroyed immediately
-          let destroyed = jellyfish[j].takeDamage();
-          createExplosion(projectiles[i].pos.x, projectiles[i].pos.y, 'creature');
+          const projectile = projectiles[i];
+          let baseDamage = 1; // Default damage amount
+          
+          // Enhanced torpedoes do more damage to jellyfish
+          if (projectile.enhanced) {
+            baseDamage = Math.ceil(projectile.damageMultiplier);
+            
+            if (DEBUG_MODE) {
+              console.log(`Enhanced torpedo hit jellyfish with ${baseDamage} damage (level ${projectile.level})`);
+            }
+            
+            // Create an enhanced explosion
+            createExplosion(projectile.pos.x, projectile.pos.y, 'creature', projectile.level);
+          } else {
+            createExplosion(projectile.pos.x, projectile.pos.y, 'creature');
+          }
+          
+          // Apply damage (possibly enhanced)
+          let destroyed = false;
+          for (let hit = 0; hit < baseDamage; hit++) {
+            destroyed = jellyfish[j] ? jellyfish[j].takeDamage() : true;
+            if (destroyed) break;
+          }
+          
           projectiles.splice(i, 1);
           
           if (destroyed) {
@@ -2057,7 +2150,6 @@ function drawPlayingState() {
           }
           break;
         }
-
       }
     }
   }
@@ -2076,13 +2168,28 @@ function drawPlayingState() {
 
   // HUD
   fill(HUD_TEXT_COLOR_H, HUD_TEXT_COLOR_S, HUD_TEXT_COLOR_B); textSize(HUD_TEXT_SIZE); textAlign(LEFT, TOP);
-  text(`Hull: ${player.health}%`, HUD_MARGIN_X, HUD_MARGIN_Y+ HUD_LINE_SPACING);
+  text(`Hull: ${player.health}%`, HUD_MARGIN_X, HUD_MARGIN_Y + HUD_LINE_SPACING);
   text(`Air: ${floor(player.airSupply / AIR_SUPPLY_FRAMES_TO_SECONDS_DIVISOR)} seconds `, HUD_MARGIN_X, HUD_MARGIN_Y + HUD_LINE_SPACING*2);
   const killsRequired = getKillsRequiredForLevel(currentLevel);
   let killsStillNeeded = Math.max(0, killsRequired - enemiesKilledThisLevel);
   text(`Kills Needed: ${killsStillNeeded}`, HUD_MARGIN_X, HUD_MARGIN_Y + HUD_LINE_SPACING * 3);
   let distanceToGoal = dist(player.pos.x, player.pos.y, cave.goalPos.x, cave.goalPos.y);
   text(`Distance to Reactor: ${floor(distanceToGoal)} meters`, HUD_MARGIN_X, HUD_MARGIN_Y + HUD_LINE_SPACING * 4);
+  
+  // Show weapon upgrade status if active
+  if (player.weaponUpgrade) {
+    const timeLeft = Math.ceil((player.weaponUpgrade.expiresAt - frameCount) / 60); // Convert to seconds
+    
+    // Change color based on how much time is left
+    let weaponUpgradeH = 30; // Base orange color
+    if (timeLeft < 5) {
+      // Flash when about to expire
+      weaponUpgradeH = frameCount % 10 < 5 ? 0 : 30; 
+    }
+    
+    fill(weaponUpgradeH, 100, 100);
+    text(`Weapon Upgrade Lv.${player.weaponUpgrade.level} (${timeLeft}s)`, HUD_MARGIN_X, HUD_MARGIN_Y + HUD_LINE_SPACING * 5);
+  }
 
   // Render mobile controls after HUD
   renderMobileControls();

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'reactor-dive-cache-v15'; // Updated for JSONBase.js integration
+const CACHE_NAME = 'reactor-dive-cache-v17'; // Updated to fix playerSub.js sonar range bug
 
 // Core application files
 const CORE_FILES = [
