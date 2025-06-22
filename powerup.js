@@ -222,8 +222,8 @@ class Powerup {
   
   applySonarBoost() {
     player.sonarBoost = {
-      rangeMultiplier: this.config.sonarRangeMultiplier || 1.5,
-      cooldownReduction: this.config.sonarCooldownReduction || 0.5,
+      rangeMultiplier: this.config.sonarRangeMultiplier || 2,
+      cooldownReduction: this.config.sonarCooldownReduction || 0.2,
       expiresAt: frameCount + this.config.duration
     };
     

@@ -39,6 +39,11 @@ class PlayerSub {
     this.lastSonarTime = frameCount;
     playSound('sonar');
     
+    // Log sonar boost if active
+    if (this.sonarBoost) {
+      console.log(`Sonar enhanced! Range: ${Math.round(this.getEffectiveSonarRange())} (${Math.round(this.sonarBoost.rangeMultiplier * 100)}% boost), Cooldown: ${Math.round(this.getEffectiveSonarCooldown())} frames (${Math.round(this.sonarBoost.cooldownReduction * 100)}% of normal)`);
+    }
+    
     const playerInGoal = cave.isGoal(this.pos.x, this.pos.y);
     
     for (let i = 0; i < this.sonarPulses; i++) {
@@ -52,7 +57,10 @@ class PlayerSub {
     const rayAngle = this.angle - PI + (TWO_PI / this.sonarPulses) * rayIndex;
     let hitDetected = false;
     
-    for (let dist = 0; dist < this.sonarRange && !hitDetected; dist += PLAYER_SONAR_RAY_STEP) {
+    // Use effective sonar range with boost
+    const effectiveRange = this.getEffectiveSonarRange();
+    
+    for (let dist = 0; dist < effectiveRange && !hitDetected; dist += PLAYER_SONAR_RAY_STEP) {
       const checkX = this.pos.x + cos(rayAngle) * dist;
       const checkY = this.pos.y + sin(rayAngle) * dist;
       
@@ -271,7 +279,10 @@ class PlayerSub {
   }
   
   autoFireSonar(cave, currentEnemies) {
-    if (frameCount - this.lastSonarTime >= this.sonarCooldown) {
+    // Use effective cooldown with boost
+    const effectiveCooldown = this.getEffectiveSonarCooldown();
+    
+    if (frameCount - this.lastSonarTime >= effectiveCooldown) {
       this.fireSonar(cave, currentEnemies, jellyfish);
     }
   }
@@ -505,5 +516,19 @@ class PlayerSub {
     }
   }
 
-  // ...existing code...
+  // Get actual sonar range accounting for any active sonar boost
+  getEffectiveSonarRange() {
+    if (this.sonarBoost) {
+      return this.sonarRange * this.sonarBoost.rangeMultiplier;
+    }
+    return this.sonarRange;
+  }
+  
+  // Get actual sonar cooldown accounting for any active sonar boost
+  getEffectiveSonarCooldown() {
+    if (this.sonarBoost) {
+      return this.sonarCooldown * this.sonarBoost.cooldownReduction;
+    }
+    return this.sonarCooldown;
+  }
 }
