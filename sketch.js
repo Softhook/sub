@@ -2176,19 +2176,71 @@ function drawPlayingState() {
   let distanceToGoal = dist(player.pos.x, player.pos.y, cave.goalPos.x, cave.goalPos.y);
   text(`Distance to Reactor: ${floor(distanceToGoal)} meters`, HUD_MARGIN_X, HUD_MARGIN_Y + HUD_LINE_SPACING * 4);
   
+  // Initialize HUD line counter
+  let hudLineCounter = 5;
+  
   // Show weapon upgrade status if active
   if (player.weaponUpgrade) {
     const timeLeft = Math.ceil((player.weaponUpgrade.expiresAt - frameCount) / 60); // Convert to seconds
     
     // Change color based on how much time is left
-    let weaponUpgradeH = 30; // Base orange color
+    let weaponUpgradeH = 15; // Orange/red color from PWR_CONFIGS
     if (timeLeft < 5) {
       // Flash when about to expire
-      weaponUpgradeH = frameCount % 10 < 5 ? 0 : 30; 
+      weaponUpgradeH = frameCount % 10 < 5 ? 0 : 15; 
     }
     
-    fill(weaponUpgradeH, 100, 100);
-    text(`Weapon Upgrade Lv.${player.weaponUpgrade.level} (${timeLeft}s)`, HUD_MARGIN_X, HUD_MARGIN_Y + HUD_LINE_SPACING * 5);
+    fill(weaponUpgradeH, 90, 85);
+    text(`Weapon Upgrade Lv.${player.weaponUpgrade.level} (${timeLeft}s)`, HUD_MARGIN_X, HUD_MARGIN_Y + HUD_LINE_SPACING * hudLineCounter);
+    hudLineCounter++;
+  }
+  
+  // Show speed boost status if active
+  if (player.speedBoost) {
+    const timeLeft = Math.ceil((player.speedBoost.expiresAt - frameCount) / 60); // Convert to seconds
+    
+    // Change color based on how much time is left
+    let speedBoostH = 60; // Bright yellow color from PWR_CONFIGS
+    if (timeLeft < 5) {
+      // Flash when about to expire
+      speedBoostH = frameCount % 10 < 5 ? 0 : 60; 
+    }
+    
+    fill(speedBoostH, 100, 95);
+    text(`Speed Boost (${timeLeft}s)`, HUD_MARGIN_X, HUD_MARGIN_Y + HUD_LINE_SPACING * hudLineCounter);
+    hudLineCounter++;
+  }
+  
+  // Show shield status if active
+  if (player.shield) {
+    const timeLeft = Math.ceil((player.shield.expiresAt - frameCount) / 60); // Convert to seconds
+    
+    // Change color based on how much time is left
+    let shieldH = 280; // Purple color from PWR_CONFIGS
+    if (timeLeft < 5) {
+      // Flash when about to expire
+      shieldH = frameCount % 10 < 5 ? 0 : 280; 
+    }
+    
+    fill(shieldH, 70, 80);
+    text(`Shield Active (${timeLeft}s)`, HUD_MARGIN_X, HUD_MARGIN_Y + HUD_LINE_SPACING * hudLineCounter);
+    hudLineCounter++;
+  }
+  
+  // Show sonar boost status if active
+  if (player.sonarBoost) {
+    const timeLeft = Math.ceil((player.sonarBoost.expiresAt - frameCount) / 60); // Convert to seconds
+    
+    // Change color based on how much time is left
+    let sonarBoostH = 120; // Green color from PWR_CONFIGS
+    if (timeLeft < 5) {
+      // Flash when about to expire
+      sonarBoostH = frameCount % 10 < 5 ? 0 : 120; 
+    }
+    
+    fill(sonarBoostH, 80, 85);
+    text(`Sonar Enhanced (${timeLeft}s)`, HUD_MARGIN_X, HUD_MARGIN_Y + HUD_LINE_SPACING * hudLineCounter);
+    hudLineCounter++;
   }
 
   // Render mobile controls after HUD

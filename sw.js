@@ -1,4 +1,4 @@
-const CACHE_NAME = 'reactor-dive-cache-v17'; // Updated to fix playerSub.js sonar range bug
+const CACHE_NAME = 'reactor-dive-cache-v18'; // Updated to add HUD countdown for all powerups
 
 // Core application files
 const CORE_FILES = [

@@ -198,7 +198,12 @@ class Powerup {
         type: this.config.weaponType || 'damage'
       };
       
-      showPowerupNotification(`Weapon Upgrade Lv.${player.weaponUpgrade.level}!`, this.config.color);
+      const durationInSeconds = Math.round(this.config.duration / 60);
+      showPowerupNotification(`Weapon Upgrade Lv.${player.weaponUpgrade.level}! (${durationInSeconds}s)`, this.config.color);
+      
+      if (DEBUG_MODE) {
+        console.log(`Weapon upgraded to level ${player.weaponUpgrade.level} - will last for ${durationInSeconds} seconds`);
+      }
     }
   }
   
@@ -208,7 +213,12 @@ class Powerup {
       expiresAt: frameCount + this.config.duration
     };
     
-    showPowerupNotification("Speed Boost", this.config.color);
+    const durationInSeconds = Math.round(this.config.duration / 60);
+    showPowerupNotification(`Speed Boost (${durationInSeconds}s)`, this.config.color);
+    
+    if (DEBUG_MODE) {
+      console.log(`Speed boost activated - will last for ${durationInSeconds} seconds`);
+    }
   }
   
   applyShield() {
@@ -218,11 +228,10 @@ class Powerup {
       // No hit counter - shield will last for the full duration
     };
     
-    // We'll still show initial notification when shield is collected
-    showPowerupNotification("Shield Active", this.config.color);
+    const durationInSeconds = Math.round(this.config.duration / 60);
+    showPowerupNotification(`Shield Active (${durationInSeconds}s)`, this.config.color);
     
     if (DEBUG_MODE) {
-      const durationInSeconds = Math.round(this.config.duration / 60);
       console.log(`Shield activated - will last for ${durationInSeconds} seconds`);
     }
   }
@@ -234,7 +243,12 @@ class Powerup {
       expiresAt: frameCount + this.config.duration
     };
     
-    showPowerupNotification("Sonar Enhanced", this.config.color);
+    const durationInSeconds = Math.round(this.config.duration / 60);
+    showPowerupNotification(`Sonar Enhanced (${durationInSeconds}s)`, this.config.color);
+    
+    if (DEBUG_MODE) {
+      console.log(`Sonar boost activated - will last for ${durationInSeconds} seconds with ${this.config.sonarRangeMultiplier}x range`);
+    }
   }
   
   createCollectionEffect() {
