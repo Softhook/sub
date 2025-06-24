@@ -50,30 +50,9 @@
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
           // Register the service worker with its default scope (the current directory)
-          navigator.serviceWorker.register('sw.js?v=25')
+          navigator.serviceWorker.register('sw.js')
             .then(registration => {
               console.log('ServiceWorker registration successful with scope:', registration.scope);
-              
-              // Check for updates right away
-              if (registration.waiting) {
-                console.log('New service worker waiting');
-                document.dispatchEvent(new CustomEvent('serviceWorkerWaiting'));
-              }
-              
-              // Add an update check function to the registration
-              registration.onupdatefound = () => {
-                const installingWorker = registration.installing;
-                if (installingWorker) {
-                  installingWorker.onstatechange = () => {
-                    if (installingWorker.state === 'installed') {
-                      if (navigator.serviceWorker.controller) {
-                        console.log('New service worker installed and waiting');
-                        document.dispatchEvent(new CustomEvent('serviceWorkerWaiting'));
-                      }
-                    }
-                  };
-                }
-              };
             })
             .catch(error => {
               console.error('ServiceWorker registration failed:', error);
@@ -81,8 +60,5 @@
         });
       }
     </script>
-    
-    <!-- PWA Update Manager -->
-    <script src="update-manager.js?v=1"></script>
   </body>
 </html>
