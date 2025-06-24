@@ -1,4 +1,4 @@
-const CACHE_NAME = 'reactor-dive-cache-v21'; // Updated score calculation system
+const CACHE_NAME = 'reactor-dive-cache-v24'; // Completely fixed Cave class syntax errors
 
 // Core application files
 const CORE_FILES = [

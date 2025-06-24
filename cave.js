@@ -30,6 +30,11 @@ class Cave {
     
     // Validate and ensure connectivity between player start and goal
     this.ensurePlayerToGoalConnectivity();
+    
+    // Ensure player is connected to the main tunnel system
+    const startCellX = Math.floor(this.playerStartX / this.cellSize);
+    const startCellY = Math.floor(this.playerStartY / this.cellSize);
+    this.ensurePlayerToMainTunnelConnectivity(startCellX, startCellY);
   }
   
   calculatePlayerStartPosition() {
@@ -612,8 +617,11 @@ class Cave {
     } else {
       console.log('Path connectivity validated successfully');
     }
+    
+    // Now ensure player is connected to the main tunnel
+    this.ensurePlayerToMainTunnelConnectivity(startCellX, startCellY);
   }
-
+  
   isPathConnected(startX, startY, goalX, goalY) {
     const visited = new Set();
     const queue = [{x: startX, y: startY}];
@@ -645,13 +653,12 @@ class Cave {
     }
     
     return false;
-  }
-
+  } 
+  
+  // Simple direct line carving using Bresenham-like algorithm
   carveDirectPath(startX, startY, goalX, goalY, radius = 2) {
-    // Simple direct line carving using Bresenham-like algorithm
     let x0 = startX, y0 = startY;
     const x1 = goalX, y1 = goalY;
-    
     const dx = Math.abs(x1 - x0);
     const dy = Math.abs(y1 - y0);
     const sx = x0 < x1 ? 1 : -1;
@@ -669,6 +676,7 @@ class Cave {
         err -= dy;
         x0 += sx;
       }
+      
       if (e2 < dx) {
         err += dx;
         y0 += sy;
@@ -677,7 +685,7 @@ class Cave {
     
     console.log(`Direct path carved between player start and goal with radius ${radius}`);
   }
-
+  
   carveArea(centerX, centerY, radius) {
     for (let dy = -radius; dy <= radius; dy++) {
       for (let dx = -radius; dx <= radius; dx++) {
@@ -693,7 +701,7 @@ class Cave {
       }
     }
   }
-
+  
   // Getter methods for external access to positions
   getPlayerStartPosition() {
     return {
@@ -701,11 +709,80 @@ class Cave {
       y: this.playerStartY
     };
   }
-
+  
   getGoalPosition() {
     return {
       x: this.goalPos.x,
       y: this.goalPos.y
     };
+  }
+  ensurePlayerToMainTunnelConnectivity(playerCellX, playerCellY) {
+    console.log('Checking player connectivity to main tunnel...');
+    
+    // Find a point in the main tunnel (middle of the map, horizontally)
+    const tunnelX = Math.floor(this.gridWidth / 4); // Use 1/4 of the width as most cave generation focuses around here
+    const tunnelY = Math.floor(this.gridHeight / 2); // Middle height
+    
+    // Try to find an open space in the main tunnel area
+    let mainTunnelPoint = this.findOpenSpaceNear(tunnelX, tunnelY);
+    
+    if (!mainTunnelPoint) {
+      console.warn('Could not find open space in main tunnel area, using default coordinates');
+      mainTunnelPoint = {x: tunnelX, y: tunnelY};
+      // Force this point to be open
+      this.carveArea(mainTunnelPoint.x, mainTunnelPoint.y, 3);
+    }
+    
+    console.log(`Found main tunnel point at (${mainTunnelPoint.x}, ${mainTunnelPoint.y})`);
+    
+    // Check if player is already connected to the main tunnel
+    if (!this.isPathConnected(playerCellX, playerCellY, mainTunnelPoint.x, mainTunnelPoint.y)) {
+      console.log('Player not connected to main tunnel - carving path');
+      
+      // Carve a direct path between player start and main tunnel
+      this.carveDirectPath(playerCellX, playerCellY, mainTunnelPoint.x, mainTunnelPoint.y, 3);
+      
+      // Double check connectivity after carving
+      if (!this.isPathConnected(playerCellX, playerCellY, mainTunnelPoint.x, mainTunnelPoint.y)) {
+        console.warn('Still no path to main tunnel after first carving - trying wider path');
+        this.carveDirectPath(playerCellX, playerCellY, mainTunnelPoint.x, mainTunnelPoint.y, 5); // Even wider path
+        
+        if (!this.isPathConnected(playerCellX, playerCellY, mainTunnelPoint.x, mainTunnelPoint.y)) {
+          console.error('CRITICAL: Cannot connect player to main tunnel even after multiple attempts!');
+        } else {
+          console.log('Path to main tunnel established with wider carving');
+        }
+      } else {
+        console.log('Path to main tunnel established after initial carving');
+      }
+    } else {
+      console.log('Player is already connected to main tunnel');
+    }
+  }
+  
+  findOpenSpaceNear(x, y, searchRadius = 15) {
+    // Search in expanding squares around the given point
+    for (let r = 0; r <= searchRadius; r++) {
+      // Check points in a square with radius r around (x, y)
+      for (let dx = -r; dx <= r; dx++) {
+        for (let dy = -r; dy <= r; dy++) {
+          // Only check points on the perimeter of the square
+          if (Math.abs(dx) === r || Math.abs(dy) === r) {
+            const nx = x + dx;
+            const ny = y + dy;
+            
+            // Check if point is valid and is open space
+            if (nx >= 0 && nx < this.gridWidth && 
+                ny >= 0 && ny < this.gridHeight && 
+                this.grid[nx][ny] === false) {
+              return {x: nx, y: ny};
+            }
+          }
+        }
+      }
+    }
+    
+    // If no open space found
+    return null;
   }
 }
