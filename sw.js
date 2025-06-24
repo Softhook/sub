@@ -1,4 +1,4 @@
-const CACHE_NAME = 'reactor-dive-cache-v20'; // Fixed issue with blank screen after high score submission
+const CACHE_NAME = 'reactor-dive-cache-v21'; // Updated score calculation system
 
 // Core application files
 const CORE_FILES = [

@@ -434,6 +434,8 @@ let enemiesKilledThisLevel = 0; // New variable to track enemies killed this lev
 let startScreenPropellerAngle = 0; // Animation variable for start screen submarine propeller
 let totalScore = 0; // Total accumulated score across all completed levels
 let levelScore = 0; // Score for the current level
+let enemyKillScore = 0; // Score from killed enemies (100 per enemy)
+let jellyfishKillScore = 0; // Score from killed jellyfish (300 per jellyfish)
 let debugShowWalls = false; // Debug mode to show all cave walls
 
 // Highscore submission variables
@@ -468,6 +470,8 @@ function resetGame() {
   enemiesKilledThisLevel = 0;
   totalScore = 0;
   levelScore = 0;
+  enemyKillScore = 0;
+  jellyfishKillScore = 0;
 
   isHighScoreChecked = false;
   isSubmittingHighScore = false;
@@ -498,6 +502,8 @@ function prepareNextLevel() {
   currentLevel++;
   enemiesKilledThisLevel = 0;
   levelScore = 0;
+  enemyKillScore = 0;
+  jellyfishKillScore = 0;
 
   // Reset radiation pulse discovery flag for new level
   goalCurrentlyDetectedBySonar = false;
@@ -2086,6 +2092,7 @@ function drawPlayingState() {
           enemies.splice(j, 1);
           projectiles.splice(i, 1); 
           enemiesKilledThisLevel++;
+          enemyKillScore += 100; // Add 100 points for killing an enemy
           playSound('creatureExplosion'); // Use creature explosion sound
           break; 
         }
@@ -2104,6 +2111,7 @@ function drawPlayingState() {
           createExplosion(enemies[j].pos.x, enemies[j].pos.y, 'enemy', 0);
           enemies.splice(j, 1);
           enemiesKilledThisLevel++;
+          enemyKillScore += 100; // Add 100 points for killing an enemy with AOE damage
           
           if (DEBUG_MODE) {
             console.log(`AOE damage killed enemy at distance ${Math.round(distance)}`);
@@ -2148,6 +2156,7 @@ function drawPlayingState() {
           if (destroyed) {
             jellyfish.splice(j, 1);
             enemiesKilledThisLevel++;
+            jellyfishKillScore += 300; // Add 300 points for killing a jellyfish
             playSound('creatureExplosion'); // Use creature explosion sound when destroyed
           } else {
             playSound('bump'); // Different sound for non-fatal hit
@@ -2180,7 +2189,7 @@ function drawPlayingState() {
   let distanceToGoal = dist(player.pos.x, player.pos.y, cave.goalPos.x, cave.goalPos.y);
   text(`Distance to Reactor: ${floor(distanceToGoal)} meters`, HUD_MARGIN_X, HUD_MARGIN_Y + HUD_LINE_SPACING * 4);
   
-  // Initialize HUD line counter
+  // Initialize HUD line counter (increased by 1 since we added a score display line)
   let hudLineCounter = 5;
   
   // Show weapon upgrade status if active
@@ -2260,7 +2269,8 @@ function drawPlayingState() {
   if (player.health <= 0 || player.airSupply <= 0) {
       if(gameState === gameStates.PLAYING) {
         let timeLeftInSeconds = Math.max(0, Math.floor(player.airSupply / 60));
-        levelScore = timeLeftInSeconds * 10;
+        // Calculate level score: time bonus + enemy and jellyfish kills (no completion bonus)
+        levelScore = (timeLeftInSeconds * 10) + enemyKillScore + jellyfishKillScore;
         playSound('gameOver');
         
         isHighScoreChecked = false;
@@ -2271,7 +2281,8 @@ function drawPlayingState() {
       gameState = gameStates.GAME_OVER;
   } else if (cave.isGoal(player.pos.x, player.pos.y) && killsStillNeeded === 0) {
     let timeLeftInSeconds = Math.max(0, Math.floor(player.airSupply / 60));
-    levelScore = (timeLeftInSeconds * 10) + 500;
+    // Calculate level score: time bonus + enemy and jellyfish kills + completion bonus
+    levelScore = (timeLeftInSeconds * 10) + enemyKillScore + jellyfishKillScore + 500;
     totalScore += levelScore;
     gameState = (currentLevel >= MAX_LEVELS) ? gameStates.GAME_COMPLETE : gameStates.LEVEL_COMPLETE;
   }
