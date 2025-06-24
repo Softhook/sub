@@ -1,4 +1,4 @@
-const CACHE_NAME = 'reactor-dive-cache-v24'; // Completely fixed Cave class syntax errors
+const CACHE_NAME = 'reactor-dive-cache-v25'; // Added improved update handling
 
 // Core application files
 const CORE_FILES = [
@@ -17,7 +17,9 @@ const GAME_FILES = [
   'cave.js',
   'bubbles.js',
   'mobileControls.js',
-  'JSONBase.js' // Updated from JSONBIN.js to JSONBase.js
+  'JSONBase.js', // Updated from JSONBIN.js to JSONBase.js
+  'powerup.js',
+  'update-manager.js'
 ];
 
 // External libraries
@@ -49,6 +51,7 @@ self.addEventListener('install', event => {
     installCache()
       .then(() => {
         console.log('[SW] Installation complete');
+        // Skip waiting to activate the new service worker immediately
         return self.skipWaiting();
       })
       .catch(error => {
@@ -94,6 +97,105 @@ self.addEventListener('fetch', event => {
   );
 });
 
+// Check for app updates periodically
+self.addEventListener('message', event => {
+  if (event.data === 'CHECK_FOR_UPDATES') {
+    console.log('[SW] Checking for updates requested by client');
+    // This will compare the cached files with network versions
+    event.waitUntil(
+      checkForUpdates().then(hasUpdates => {
+        // Notify client about update status
+        if (hasUpdates) {
+          self.clients.matchAll().then(clients => {
+            clients.forEach(client => {
+              client.postMessage({
+                type: 'UPDATE_AVAILABLE',
+                message: 'A new version is available!'
+              });
+            });
+          });
+        }
+      })
+    );
+  } else if (event.data === 'SKIP_WAITING') {
+    console.log('[SW] Skip waiting requested by client');
+    self.skipWaiting();
+  }
+});
+
+// Function to check for updates by comparing cache to network
+async function checkForUpdates() {
+  console.log('[SW] Checking for application updates...');
+  
+  // First, check if we're online by attempting a network request
+  try {
+    // We'll try to fetch a known endpoint on the same origin
+    const onlineCheckUrl = self.location.origin + '/manifest.json';
+    const testRequest = await fetch(onlineCheckUrl, { 
+      method: 'HEAD',
+      cache: 'no-store'
+    });
+    
+    if (!testRequest.ok) {
+      console.log('[SW] Network appears to be offline or unreliable. Skipping update check.');
+      return false;
+    }
+  } catch (error) {
+    console.log('[SW] Network test failed. Likely offline. Skipping update check.');
+    return false;
+  }
+  
+  let hasUpdates = false;
+  const cache = await caches.open(CACHE_NAME);
+  const cachedRequests = await cache.keys();
+  const updateCheckFiles = cachedRequests.filter(request => {
+    const url = new URL(request.url);
+    return url.pathname.endsWith('.js') || url.pathname.endsWith('.html') || url.pathname === '/';
+  });
+
+  try {
+    for (const request of updateCheckFiles) {
+      try {
+        // Get the cached version
+        const cachedResponse = await cache.match(request);
+        if (!cachedResponse) continue;
+
+        // Fetch the current version from network
+        const fetchResponse = await fetch(request, { cache: 'no-cache' });
+        if (!fetchResponse || fetchResponse.status !== 200) continue;
+
+        // Compare the responses (at minimum by checking their dates)
+        const cachedLastModified = cachedResponse.headers.get('last-modified');
+        const fetchedLastModified = fetchResponse.headers.get('last-modified');
+
+        if (fetchedLastModified && cachedLastModified && 
+            new Date(fetchedLastModified) > new Date(cachedLastModified)) {
+          console.log(`[SW] Update detected for ${request.url}`);
+          hasUpdates = true;
+          break;
+        }
+        
+        // If we can't compare by date, compare by etag or content
+        const cachedEtag = cachedResponse.headers.get('etag');
+        const fetchedEtag = fetchResponse.headers.get('etag');
+        
+        if (fetchedEtag && cachedEtag && fetchedEtag !== cachedEtag) {
+          console.log(`[SW] Update detected for ${request.url} (ETag changed)`);
+          hasUpdates = true;
+          break;
+        }
+      } catch (error) {
+        console.error(`[SW] Error checking updates for ${request.url}:`, error);
+      }
+    }
+  } catch (error) {
+    console.error('[SW] Error during update check:', error);
+  }
+  
+  console.log('[SW] Update check complete. Updates available:', hasUpdates);
+  return hasUpdates;
+}
+
 // Helper function to install and cache resources
 async function installCache() {
   const cache = await caches.open(CACHE_NAME);
@@ -133,11 +235,44 @@ async function handleFetchRequest(request) {
   const requestUrl = new URL(request.url);
   const scopeUrl = new URL(self.registration.scope);
   const isStartUrlRequest = requestUrl.pathname === scopeUrl.pathname;
+  const path = requestUrl.pathname;
   
-  // Try cache first
-  const cachedResponse = await caches.match(request);
-  if (cachedResponse) {
-    return cachedResponse;
+  // Check if this is a file that might be updated frequently
+  const isUpdateableFile = path.endsWith('.html') || path.endsWith('.js') || path.endsWith('.css') || 
+                           path === '/' || path === '' || isStartUrlRequest;
+                           
+  // For HTML, JS, and CSS files - use network first with cache fallback
+  if (isUpdateableFile) {
+    console.log('[SW] Network-first strategy for:', request.url);
+    try {
+      // Try network first
+      const networkResponse = await fetch(request);
+      
+      // If successful, clone the response, cache it and return it
+      if (networkResponse && networkResponse.status === 200) {
+        const clone = networkResponse.clone();
+        const cache = await caches.open(CACHE_NAME);
+        cache.put(request, clone);
+        console.log('[SW] Updated cache from network for:', request.url);
+        return networkResponse;
+      }
+    } catch (error) {
+      console.log('[SW] Network request failed, falling back to cache for:', request.url);
+    }
+    
+    // If network fails, try cache
+    const cachedResponse = await caches.match(request);
+    if (cachedResponse) {
+      return cachedResponse;
+    }
+  } 
+  // For other assets - use cache first with network fallback
+  else {
+    // Try cache first
+    const cachedResponse = await caches.match(request);
+    if (cachedResponse) {
+      return cachedResponse;
+    }
   }
   
   // For navigation requests or start URL, serve the app shell
@@ -149,7 +284,7 @@ async function handleFetchRequest(request) {
     }
   }
   
-  // Try network as fallback
+  // Try network as last resort
   console.log('[SW] Fetching from network:', request.url);
   return fetch(request);
 }
