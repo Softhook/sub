@@ -819,6 +819,10 @@ function submitHighScore() {
       playerNameInput = '';
       setHighScoreInputState(false);
       
+      // Transition to START screen after successful high score submission
+      gameState = gameStates.START;
+      console.log('Returning to start screen after high score submission');
+      
     })
     .catch(error => {
       console.error('Error submitting high score:', error);

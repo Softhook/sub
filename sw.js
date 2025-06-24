@@ -1,4 +1,4 @@
-const CACHE_NAME = 'reactor-dive-cache-v18'; // Updated to add HUD countdown for all powerups
+const CACHE_NAME = 'reactor-dive-cache-v20'; // Fixed issue with blank screen after high score submission
 
 // Core application files
 const CORE_FILES = [
