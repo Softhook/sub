@@ -276,11 +276,6 @@ class PlayerSub {
     // Play sound when entering current area
     if (inCurrentArea && !this.wasInCurrent) {
       playSound('current_flow');
-      
-      // Trigger gamepad vibration feedback for current area if available
-      if (typeof gamepadControls !== 'undefined' && gamepadControls?.enabled) {
-        gamepadControls.notifyCurrentAreaEntered();
-      }
     }
     this.wasInCurrent = inCurrentArea;
     
@@ -733,11 +728,6 @@ class PlayerSub {
     this.health -= amount;
     if (this.health < 0) this.health = 0;
     console.log(`Took ${amount} damage from ${damageSource}. Health: ${this.health}`);
-    
-    // Trigger gamepad vibration feedback if available
-    if (typeof gamepadControls !== 'undefined' && gamepadControls?.enabled) {
-      gamepadControls.notifyDamage();
-    }
   }
   
   createShieldEffect(damageSource = 'unknown') {

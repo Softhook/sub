@@ -1279,7 +1279,6 @@ function setup() {
   initializeSounds(); 
   highScoreManager = new JSONBaseHighScores(); // Use the new high score service
   initMobileControls();
-  initGamepadControls(); // Initialize gamepad controls
   
   highscoreInputElement = document.getElementById('highscoreInput');
   if (highscoreInputElement) {
@@ -1799,8 +1798,6 @@ function drawStartScreen() {
     
     // Controls
     let ctrlY = height / 2 + START_SCREEN_INFO_Y_OFFSET_2 + (isNarrow ? lineSep/1.2 : 0);
-    
-    // Show appropriate control information based on detected input method
     if (typeof isMobileControlsEnabled === 'function' && isMobileControlsEnabled()) {
       if (isNarrow) {
         text("Touch controls: Joystick (left)", width / 2, ctrlY - lineSep/2);
@@ -1808,16 +1805,7 @@ function drawStartScreen() {
       } else {
         text("Touch controls: Joystick (left) and Fire button (right)", width / 2, ctrlY);
       }
-    } else if (typeof isGamepadControlsEnabled === 'function' && isGamepadControlsEnabled()) {
-      // Show gamepad control info if a gamepad is connected
-      if (isNarrow) {
-        text("Gamepad: Left Stick/D-Pad to move", width / 2, ctrlY - lineSep/2);
-        text("A: Shoot, B: Sonar", width / 2, ctrlY + lineSep/2);
-      } else {
-        text("Gamepad: Left Stick/D-Pad to move, A: Shoot, B: Sonar", width / 2, ctrlY);
-      }
     } else {
-      // Default to keyboard controls
       text("WASD/Arrows: Move. SPACE: Shoot.", width / 2, ctrlY);
     }
     
@@ -1826,8 +1814,6 @@ function drawStartScreen() {
     fill(START_SCREEN_PROMPT_COLOR_H, START_SCREEN_PROMPT_COLOR_S, START_SCREEN_PROMPT_COLOR_B);
     if (typeof isMobileControlsEnabled === 'function' && isMobileControlsEnabled()) {
       text("Tap anywhere to Dive", width / 2, height / 2 + START_SCREEN_PROMPT_Y_OFFSET);
-    } else if (typeof isGamepadControlsEnabled === 'function' && isGamepadControlsEnabled()) {
-      text("Press START button to Dive", width / 2, height / 2 + START_SCREEN_PROMPT_Y_OFFSET);
     } else {
       text("Press ENTER to Dive", width / 2, height / 2 + START_SCREEN_PROMPT_Y_OFFSET);
     }
@@ -2040,9 +2026,6 @@ function drawPlayingState() {
   
   // Apply mobile controls movement if enabled
   applyMobileMovement();
-  
-  // Update gamepad controls if enabled
-  updateGamepadControls();
   
   // Update powerup system
   if (powerupManager) {
@@ -2275,9 +2258,6 @@ function drawPlayingState() {
 
   // Render mobile controls after HUD
   renderMobileControls();
-  
-  // Render gamepad feedback if enabled
-  renderGamepadControls();
 
   // Render powerup notifications over everything
   renderPowerupNotifications();
