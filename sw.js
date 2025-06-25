@@ -1,4 +1,4 @@
-const CACHE_NAME = 'reactor-dive-cache-v24'; // Completely fixed Cave class syntax errors
+const CACHE_NAME = 'reactor-dive-cache-v27'; // Improved gamepad controller support with better D-pad handling
 
 // Core application files
 const CORE_FILES = [
@@ -17,6 +17,7 @@ const GAME_FILES = [
   'cave.js',
   'bubbles.js',
   'mobileControls.js',
+  'gamepadControls.js',
   'JSONBase.js' // Updated from JSONBIN.js to JSONBase.js
 ];
 
