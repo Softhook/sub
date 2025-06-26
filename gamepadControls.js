@@ -93,217 +93,16 @@ function handleMenuNavigation(gamepad) {
   if (gamepad.buttons[9] && gamepad.buttons[9].pressed && !buttonStates[9]) {
     console.log("Start button pressed in menu");
     
-    // Special handling for start screen
-    if (gameState === gameStates.START) {
-      console.log("Navigating from start screen to high scores");
-      gameState = gameStates.HIGH_SCORES;
-      if (typeof highScoreManager !== 'undefined' && highScoreManager.getHighScores) {
-        highScores = null;
-        highScoreManager.getHighScores().then(scores => {
-          highScores = scores;
-        }).catch(error => {
-          console.error('Failed to load high scores:', error);
-          highScores = [];
-        });
-      } else {
-        // Fallback to key simulation if the direct call isn't available
-        simulateKeyPress(13); // 13 is Enter key code
-      }
-    }
-    // Special handling for high scores screen
-    else if (gameState === gameStates.HIGH_SCORES) {
-      console.log("Starting game from high scores screen");
-      // Start loading sequence
-      gameState = gameStates.LOADING;
-      if (typeof showLoadingOverlay === 'function') {
-        showLoadingOverlay("GENERATING LEVEL");
-      }
-      
-      // Use setTimeout to match the original code's behavior
-      setTimeout(() => {
-        // Initialize game objects
-        if (typeof initGameObjects === 'function') {
-          initGameObjects();
-        }
-        
-        // Set up player if available
-        if (typeof player !== 'undefined') {
-          player.health = PLAYER_INITIAL_HEALTH;
-          player.airSupply = player.initialAirSupply;
-          player.lastSonarTime = frameCount - player.sonarCooldown;
-          player.lastShotTime = frameCount - player.shotCooldown;
-        }
-        
-        // Change game state to playing
-        gameState = gameStates.PLAYING;
-        
-        // Turn off reactor hum if needed
-        if (typeof audioInitialized !== 'undefined' && audioInitialized && 
-            typeof reactorHumOsc !== 'undefined' && reactorHumOsc && reactorHumOsc.started) {
-          reactorHumOsc.amp(0, 0);
-        }
-      }, 100);
-    }
-    // Special handling for level complete to ensure progression
-    else if (gameState === gameStates.LEVEL_COMPLETE) {
-      console.log("Progressing to next level");
-      if (typeof prepareNextLevel === 'function') {
-        prepareNextLevel();
-      } else {
-        // Fallback to key simulation
-        simulateKeyPress(13); // 13 is Enter key code
-      }
-    } 
-    // Special handling for game complete
-    else if (gameState === gameStates.GAME_COMPLETE) {
-      console.log("Resetting game");
-      if (typeof resetGame === 'function') {
-        resetGame();
-      } else {
-        // Fallback to key simulation
-        simulateKeyPress(13); // 13 is Enter key code
-      }
-    }
-    // Special handling for game over
-    else if (gameState === gameStates.GAME_OVER) {
-      console.log("Game over screen action");
-      
-      // Check if submitting high score
-      if (typeof isSubmittingHighScore !== 'undefined' && isSubmittingHighScore) {
-        // If submission is not in progress
-        if (typeof isSubmissionInProgress !== 'undefined' && !isSubmissionInProgress) {
-          if (typeof playerNameInput !== 'undefined' && playerNameInput.trim().length > 0) {
-            console.log("Submitting high score");
-            if (typeof submitHighScore === 'function') {
-              submitHighScore();
-            } else {
-              simulateKeyPress(13); // Enter key fallback
-            }
-          }
-          // Do nothing if name is empty - following original behavior
-        }
-      } 
-      // Not submitting a high score, just reset the game
-      else if (typeof isSubmittingHighScore !== 'undefined' && !isSubmittingHighScore) {
-        console.log("Resetting game after game over");
-        if (typeof resetGame === 'function') {
-          resetGame();
-        } else {
-          simulateKeyPress(13); // Enter key fallback
-        }
-      }
-      else {
-        // Fallback if variables are undefined
-        simulateKeyPress(13);
-      }
-    }
-    else {
-      // For other menu states
-      simulateKeyPress(13); // 13 is Enter key code
-    }
+    console.log("Start button pressed in menu - using direct action handling");
+    // Use our new direct action handler which works on mobile
+    handleAction(13); // Handle as if Enter key was pressed
   }
   
   // Button 0 (A button) - also acts like Enter key for selection
   if (gamepad.buttons[0] && gamepad.buttons[0].pressed && !buttonStates[0]) {
-    console.log("Button 0 pressed in menu");
-    
-    // Special handling for start screen
-    if (gameState === gameStates.START) {
-      console.log("Navigating from start screen to high scores");
-      gameState = gameStates.HIGH_SCORES;
-      if (typeof highScoreManager !== 'undefined' && highScoreManager.getHighScores) {
-        highScores = null;
-        highScoreManager.getHighScores().then(scores => {
-          highScores = scores;
-        }).catch(error => {
-          console.error('Failed to load high scores:', error);
-          highScores = [];
-        });
-      } else {
-        // Fallback to key simulation if the direct call isn't available
-        simulateKeyPress(13);
-      }
-    }
-    // Special handling for high scores screen (same as button 9)
-    else if (gameState === gameStates.HIGH_SCORES) {
-      console.log("Starting game from high scores screen");
-      // Start loading sequence
-      gameState = gameStates.LOADING;
-      if (typeof showLoadingOverlay === 'function') {
-        showLoadingOverlay("GENERATING LEVEL");
-      }
-      
-      // Use setTimeout to match the original code's behavior
-      setTimeout(() => {
-        if (typeof initGameObjects === 'function') {
-          initGameObjects();
-        }
-        
-        if (typeof player !== 'undefined') {
-          player.health = PLAYER_INITIAL_HEALTH;
-          player.airSupply = player.initialAirSupply;
-          player.lastSonarTime = frameCount - player.sonarCooldown;
-          player.lastShotTime = frameCount - player.shotCooldown;
-        }
-        
-        gameState = gameStates.PLAYING;
-        
-        if (typeof audioInitialized !== 'undefined' && audioInitialized && 
-            typeof reactorHumOsc !== 'undefined' && reactorHumOsc && reactorHumOsc.started) {
-          reactorHumOsc.amp(0, 0);
-        }
-      }, 100);
-    }
-    // Same special handling for level complete
-    else if (gameState === gameStates.LEVEL_COMPLETE) {
-      if (typeof prepareNextLevel === 'function') {
-        prepareNextLevel();
-      } else {
-        simulateKeyPress(13);
-      }
-    }
-    // Same special handling for game complete
-    else if (gameState === gameStates.GAME_COMPLETE) {
-      if (typeof resetGame === 'function') {
-        resetGame();
-      } else {
-        simulateKeyPress(13);
-      }
-    }
-    // Special handling for game over screen
-    else if (gameState === gameStates.GAME_OVER) {
-      // Check if submitting high score
-      if (typeof isSubmittingHighScore !== 'undefined' && isSubmittingHighScore) {
-        // If submission is not in progress
-        if (typeof isSubmissionInProgress !== 'undefined' && !isSubmissionInProgress) {
-          if (typeof playerNameInput !== 'undefined' && playerNameInput.trim().length > 0) {
-            console.log("Submitting high score");
-            if (typeof submitHighScore === 'function') {
-              submitHighScore();
-            } else {
-              simulateKeyPress(13); // Enter key fallback
-            }
-          }
-          // Do nothing if name is empty - following original behavior
-        }
-      } 
-      // Not submitting a high score, just reset the game
-      else if (typeof isSubmittingHighScore !== 'undefined' && !isSubmittingHighScore) {
-        console.log("Resetting game after game over");
-        if (typeof resetGame === 'function') {
-          resetGame();
-        } else {
-          simulateKeyPress(13); // Enter key fallback
-        }
-      }
-      else {
-        // Fallback if variables are undefined
-        simulateKeyPress(13);
-      }
-    }
-    else {
-      simulateKeyPress(13);
-    }
+    console.log("Button 0 pressed in menu - using direct action handling");
+    // Use our new direct action handler which works on mobile
+    handleAction(13); // Handle as if Enter key was pressed
   }
   
   // D-pad or analog stick for menu navigation
@@ -313,21 +112,21 @@ function handleMenuNavigation(gamepad) {
   if (Math.abs(axes[1]) > axesThreshold) {
     if (axes[1] < -axesThreshold && !isAxesMoving(gamepad, 1, true)) {
       // Up direction
-      simulateKeyPress(38); // 38 is Up arrow key code
+      handleAction(38); // 38 is Up arrow key code
     } else if (axes[1] > axesThreshold && !isAxesMoving(gamepad, 1, false)) {
       // Down direction
-      simulateKeyPress(40); // 40 is Down arrow key code
+      handleAction(40); // 40 is Down arrow key code
     }
   }
   
   // D-pad support
   if (gamepad.buttons[12] && gamepad.buttons[12].pressed && !buttonStates[12]) {
     // D-pad up
-    simulateKeyPress(38);
+    handleAction(38);
   }
   if (gamepad.buttons[13] && gamepad.buttons[13].pressed && !buttonStates[13]) {
     // D-pad down
-    simulateKeyPress(40);
+    handleAction(40);
   }
 }
 
@@ -348,8 +147,8 @@ function handleGameplay(gamepad) {
   // Button 9 (Start button) - Pause/menu
   if (gamepad.buttons[9] && gamepad.buttons[9].pressed && !buttonStates[9]) {
     console.log("Start button pressed (pause)");
-    // Simulate Escape key to pause if needed
-    simulateKeyPress(27); // 27 is Escape key code
+    // Use direct action handler for pause
+    handleAction(27); // 27 is Escape key code
   }
   
   // Analog stick for movement
@@ -450,27 +249,104 @@ function isAxesMoving(gamepad, axisIndex, isNegative) {
 }
 
 /**
- * Simulate a keyboard key press
+ * Handle action based on key code
+ * This function directly calls the appropriate handler functions
+ * rather than simulating keyboard events which don't work reliably on mobile
  */
-function simulateKeyPress(keyCode) {
-  if (typeof keyPressed === 'function') {
-    keyPressed({key: String.fromCharCode(keyCode), keyCode: keyCode});
-  } else {
-    // Fallback to dispatching events
-    window.dispatchEvent(new KeyboardEvent('keydown', {
-      key: String.fromCharCode(keyCode),
-      keyCode: keyCode,
-      which: keyCode,
-      bubbles: true
-    }));
-    
-    // Create and dispatch keyup event (immediately after)
-    window.dispatchEvent(new KeyboardEvent('keyup', {
-      key: String.fromCharCode(keyCode),
-      keyCode: keyCode,
-      which: keyCode,
-      bubbles: true
-    }));
+function handleAction(keyCode) {
+  // Use direct function calls instead of event simulation
+  switch(keyCode) {
+    case 13: // Enter key
+      switch(gameState) {
+        case gameStates.START:
+          // Navigate to high scores
+          gameState = gameStates.HIGH_SCORES;
+          if (typeof highScoreManager !== 'undefined' && highScoreManager.getHighScores) {
+            highScores = null;
+            highScoreManager.getHighScores().then(scores => {
+              highScores = scores;
+            }).catch(error => {
+              console.error('Failed to load high scores:', error);
+              highScores = [];
+            });
+          }
+          break;
+        case gameStates.HIGH_SCORES:
+          // Start the game
+          gameState = gameStates.LOADING;
+          if (typeof showLoadingOverlay === 'function') {
+            showLoadingOverlay("GENERATING LEVEL");
+          }
+          
+          setTimeout(() => {
+            if (typeof initGameObjects === 'function') {
+              initGameObjects();
+            }
+            
+            if (typeof player !== 'undefined') {
+              player.health = PLAYER_INITIAL_HEALTH;
+              player.airSupply = player.initialAirSupply;
+              player.lastSonarTime = frameCount - player.sonarCooldown;
+              player.lastShotTime = frameCount - player.shotCooldown;
+            }
+            
+            gameState = gameStates.PLAYING;
+            
+            if (typeof audioInitialized !== 'undefined' && audioInitialized && 
+                typeof reactorHumOsc !== 'undefined' && reactorHumOsc && reactorHumOsc.started) {
+              reactorHumOsc.amp(0, 0);
+            }
+          }, 100);
+          break;
+        case gameStates.LEVEL_COMPLETE:
+          // Progress to next level
+          if (typeof prepareNextLevel === 'function') {
+            prepareNextLevel();
+          }
+          break;
+        case gameStates.GAME_COMPLETE:
+          // Reset game
+          if (typeof resetGame === 'function') {
+            resetGame();
+          }
+          break;
+        case gameStates.GAME_OVER:
+          // Submit high score or reset
+          if (typeof isSubmittingHighScore !== 'undefined' && isSubmittingHighScore) {
+            if (typeof isSubmissionInProgress === 'undefined' || !isSubmissionInProgress) {
+              if (typeof playerNameInput !== 'undefined' && playerNameInput.trim().length > 0) {
+                if (typeof submitHighScore === 'function') {
+                  submitHighScore();
+                }
+              }
+            }
+          } else if (typeof resetGame === 'function') {
+            resetGame();
+          }
+          break;
+      }
+      break;
+      
+    case 27: // Escape key
+      // Handle pause functionality
+      if (typeof togglePause === 'function') {
+        togglePause();
+      }
+      break;
+      
+    case 38: // Up arrow
+      // Handle menu navigation up
+      if (typeof handleMenuNavUp === 'function') {
+        handleMenuNavUp();
+      }
+      break;
+      
+    case 40: // Down arrow
+      // Handle menu navigation down
+      if (typeof handleMenuNavDown === 'function') {
+        handleMenuNavDown();
+      }
+      break;
   }
 }
 
