@@ -1279,6 +1279,7 @@ function setup() {
   initializeSounds(); 
   highScoreManager = new JSONBaseHighScores(); // Use the new high score service
   initMobileControls();
+  initGamepadControls(); // Initialize gamepad controls
   
   highscoreInputElement = document.getElementById('highscoreInput');
   if (highscoreInputElement) {
@@ -1339,10 +1340,16 @@ const drawFunctions = {
 function draw() {
   background(BACKGROUND_COLOR_H, BACKGROUND_COLOR_S, BACKGROUND_COLOR_B);
 
+  // Update gamepad controls
+  updateGamepadControls();
+  
   const drawFunction = drawFunctions[gameState];
   if (drawFunction) {
     drawFunction();
   }
+  
+  // Render gamepad debug info if needed
+  renderGamepadControls();
 }
 
 function windowResized() { 
