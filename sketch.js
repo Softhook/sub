@@ -817,18 +817,14 @@ function submitHighScore() {
       isSubmittingHighScore = false;
       isMobileInputFocused = false;
       isSubmissionInProgress = false;
-      
+
+      // Explicitly hide and blur the input for mobile devices
       if (highscoreInputElement) {
-        highscoreInputElement.value = '';
         highscoreInputElement.blur();
+        highscoreInputElement.style.display = 'none';
       }
-      playerNameInput = '';
-      setHighScoreInputState(false);
-      
-      // Transition to START screen after successful high score submission
-      gameState = gameStates.START;
-      console.log('Returning to start screen after high score submission');
-      
+
+      resetGame();
     })
     .catch(error => {
       console.error('Error submitting high score:', error);

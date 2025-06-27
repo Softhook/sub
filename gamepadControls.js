@@ -93,6 +93,7 @@ function handleMenuNavigation(gamepad) {
   if (gamepad.buttons[9] && gamepad.buttons[9].pressed && !buttonStates[9]) {
     console.log("Start button pressed in menu");
     
+
     console.log("Start button pressed in menu - using direct action handling");
     // Use our new direct action handler which works on mobile
     handleAction(13); // Handle as if Enter key was pressed
