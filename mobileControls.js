@@ -51,25 +51,11 @@ const MOBILE_CONTROLS_CONFIG = {
 
 class MobileControls {
   constructor() {
-    this.enabled = this.isMobileDevice();
-    this.touches = new Map(); // Track multiple touches
-    this.joystickActive = false;
-    this.joystickOffset = { x: 0, y: 0 };
-    this.fireButtonPressed = false; // Initialize property
-    this.lastFireTime = 0;
-    this.lastSonarTime = 0;
-    
-    // Movement state
-    this.movementVector = { x: 0, y: 0 };
-    
-    // Smooth rotation properties
-    this.targetAngle = 0;
-    this.lastMovementAngle = 0;
-    this.angleLerpSpeed = MOBILE_CONTROLS_CONFIG.smoothRotation.lerpSpeed;
-    this.movementThreshold = MOBILE_CONTROLS_CONFIG.smoothRotation.movementThreshold;
-    this.angleStabilityFrames = 0;
-    this.requiredStabilityFrames = MOBILE_CONTROLS_CONFIG.smoothRotation.stabilityFrames;
-    this.angleTolerance = MOBILE_CONTROLS_CONFIG.smoothRotation.angleTolerance;
+    // Device and state initialization
+    this.enabled = this.detectMobileDevice();
+    this.initializeControlState();
+    this.initializeMovementState();
+    this.initializeSmoothRotation();
     
     if (this.enabled) {
       this.initializeControls();
@@ -77,42 +63,78 @@ class MobileControls {
     }
   }
   
-  isMobileDevice() {
-    // Detect mobile devices and tablets
-    const userAgent = navigator.userAgent.toLowerCase();
-    const patterns = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i;
-    const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+  initializeControlState() {
+    this.touches = new Map();
+    this.joystickActive = false;
+    this.joystickOffset = { x: 0, y: 0 };
+    this.fireButtonPressed = false;
+    this.lastFireTime = 0;
+    this.lastSonarTime = 0;
+  }
+  
+  initializeMovementState() {
+    this.movementVector = { x: 0, y: 0 };
+  }
+  
+  initializeSmoothRotation() {
+    const config = MOBILE_CONTROLS_CONFIG.smoothRotation;
+    this.targetAngle = 0;
+    this.lastMovementAngle = 0;
+    this.angleLerpSpeed = config.lerpSpeed;
+    this.movementThreshold = config.movementThreshold;
+    this.angleStabilityFrames = 0;
+    this.requiredStabilityFrames = config.stabilityFrames;
+    this.angleTolerance = config.angleTolerance;
+  }
+  
+  detectMobileDevice() {
+    const deviceInfo = this.getDeviceInfo();
+    const detectionResults = this.performDeviceDetection(deviceInfo);
     
-    // Check for specific mobile/tablet patterns
-    const isMobile = patterns.test(userAgent);
+    this.logDeviceDetection(deviceInfo, detectionResults);
     
-    // Enhanced iPad detection for modern iPadOS
-    const isIPad = /ipad/i.test(userAgent) || 
-                   (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-    
-    const screenSize = Math.max(window.screen.width, window.screen.height);
-    const isTabletSize = screenSize >= 768 && screenSize <= 1366;
-    
-    // Additional checks for modern iPadOS (Safari might report as Mac)
-    const isProbablyIPad = navigator.platform === 'MacIntel' && 
-                          navigator.maxTouchPoints > 1 && 
-                          !window.MSStream;
-    
-    // Debug logging
-    console.log('Device detection:', {
-      userAgent,
-      isMobile,
-      hasTouch,
-      isIPad,
-      isProbablyIPad,
-      screenSize,
-      isTabletSize,
+    return detectionResults.isMobile || detectionResults.isIPad || 
+           detectionResults.isProbablyIPad || detectionResults.isTouchTablet;
+  }
+  
+  getDeviceInfo() {
+    return {
+      userAgent: navigator.userAgent.toLowerCase(),
+      hasTouch: 'ontouchstart' in window || navigator.maxTouchPoints > 0,
+      screenSize: Math.max(window.screen.width, window.screen.height),
       platform: navigator.platform,
       maxTouchPoints: navigator.maxTouchPoints
-    });
+    };
+  }
+  
+  performDeviceDetection(deviceInfo) {
+    const patterns = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i;
     
-    // Return true if any mobile/tablet indicator is present
-    return isMobile || isIPad || isProbablyIPad || (hasTouch && isTabletSize);
+    return {
+      isMobile: patterns.test(deviceInfo.userAgent),
+      isIPad: /ipad/i.test(deviceInfo.userAgent) || 
+              (deviceInfo.platform === 'MacIntel' && deviceInfo.maxTouchPoints > 1),
+      isProbablyIPad: deviceInfo.platform === 'MacIntel' && 
+                      deviceInfo.maxTouchPoints > 1 && 
+                      !window.MSStream,
+      isTouchTablet: deviceInfo.hasTouch && 
+                     deviceInfo.screenSize >= 768 && 
+                     deviceInfo.screenSize <= 1366
+    };
+  }
+  
+  logDeviceDetection(deviceInfo, results) {
+    console.log('Device detection:', {
+      userAgent: deviceInfo.userAgent,
+      isMobile: results.isMobile,
+      hasTouch: deviceInfo.hasTouch,
+      isIPad: results.isIPad,
+      isProbablyIPad: results.isProbablyIPad,
+      screenSize: deviceInfo.screenSize,
+      isTabletSize: results.isTouchTablet,
+      platform: deviceInfo.platform,
+      maxTouchPoints: deviceInfo.maxTouchPoints
+    });
   }
   
   isDesktop() {
@@ -205,105 +227,143 @@ class MobileControls {
     
     for (let i = 0; i < touches.length; i++) {
       const touch = touches[i];
+      const coordinates = this.extractTouchCoordinates(touch);
       
-      // p5.js touch events have x and y properties directly
-      let touchX, touchY;
-      
-      if (touch.x !== undefined && touch.y !== undefined) {
-        // p5.js touch object - coordinates are already in canvas space
-        touchX = touch.x;
-        touchY = touch.y;
-      } else if (touch.clientX !== undefined && touch.clientY !== undefined) {
-        // Fallback to client coordinates
-        touchX = touch.clientX;
-        touchY = touch.clientY;
-      } else {
+      if (!coordinates) {
         console.log('Touch object missing coordinates:', touch);
         continue;
       }
       
-      console.log(`Touch ${i}: x=${touchX}, y=${touchY}, identifier=${touch.identifier}`);
-      console.log('Game state:', typeof gameState !== 'undefined' ? gameState : 'undefined');
+      console.log(`Touch ${i}: x=${coordinates.x}, y=${coordinates.y}, identifier=${touch.identifier}`);
       
-      // Update positions to ensure they're current
-      this.updatePositions();
-      
-      // Handle start screen and other non-gameplay screens - tap anywhere to continue
-      if (typeof gameState !== 'undefined' && 
-          (gameState === 'start' || gameState === 'highScores' || gameState === 'levelComplete' || 
-           gameState === 'gameOver' || gameState === 'gameComplete')) {
-        
-        console.log('Touch detected on non-gameplay screen, simulating ENTER key');
-        
-        // Simulate ENTER key press for non-gameplay screens
-        if (typeof keyPressed === 'function') {
-          // Set the global keyCode variable that p5.js uses
-          // Try both window.keyCode and global keyCode for compatibility
-          const originalKeyCode = typeof keyCode !== 'undefined' ? keyCode : null;
-          const originalWindowKeyCode = window.keyCode;
-          
-          keyCode = 13; // ENTER key code
-          window.keyCode = 13;
-          
-          try {
-            keyPressed(); // Call the keyPressed function
-            console.log('Successfully triggered keyPressed for mobile tap-to-restart');
-          } catch (e) {
-            console.log('Error calling keyPressed:', e);
-          }
-          
-          // Restore original values
-          if (originalKeyCode !== null) keyCode = originalKeyCode;
-          if (originalWindowKeyCode !== undefined) window.keyCode = originalWindowKeyCode;
-        }
+      // Handle non-gameplay screen touches
+      if (this.handleNonGameplayTouch()) {
         return;
       }
       
       // Only handle control touches during gameplay
-      if (typeof gameState === 'undefined' || gameState !== 'playing') {
+      if (!this.isInPlayingState()) {
         console.log('Not in playing state, ignoring touch');
         return;
       }
       
-      console.log('Checking control positions:');
-      console.log('Joystick at:', MOBILE_CONTROLS_CONFIG.joystick.x, MOBILE_CONTROLS_CONFIG.joystick.y);
-      console.log('Fire button at:', MOBILE_CONTROLS_CONFIG.fireButton.x, MOBILE_CONTROLS_CONFIG.fireButton.y);
-      
-      // Check joystick
-      if (this.isPointInJoystick(touchX, touchY)) {
-        console.log('Joystick touch detected! Touch at:', touchX, touchY, 'Joystick at:', MOBILE_CONTROLS_CONFIG.joystick.x, MOBILE_CONTROLS_CONFIG.joystick.y);
-        
-        // Initialize smooth rotation when joystick becomes active
-        if (!this.joystickActive && typeof player !== 'undefined' && player) {
-          this.targetAngle = player.angle; // Start with current submarine angle
-          this.lastMovementAngle = player.angle;
-          this.angleStabilityFrames = 0;
-        }
-        
-        this.joystickActive = true;
-        const touchId = touch.id; // Use p5.js touch id
-        this.touches.set(touchId, { type: 'joystick', x: touchX, y: touchY });
-        this.updateJoystick(touchX, touchY);
-      }
-      // Check fire button
-      else if (this.isPointInFireButton(touchX, touchY)) {
-        console.log('Fire button touch detected! Touch at:', touchX, touchY, 'Fire button at:', MOBILE_CONTROLS_CONFIG.fireButton.x, MOBILE_CONTROLS_CONFIG.fireButton.y);
-        this.fireButtonPressed = true;
-        const touchId = touch.id; // Use p5.js touch id
-        this.touches.set(touchId, { type: 'fire', x: touchX, y: touchY });
-        this.handleFire();
-      } else {
-        console.log('Touch not on any control - touch at:', touchX, touchY);
-        console.log('Joystick bounds check:', 
-          'Distance to joystick center:', 
-          Math.sqrt(Math.pow(touchX - MOBILE_CONTROLS_CONFIG.joystick.x, 2) + Math.pow(touchY - MOBILE_CONTROLS_CONFIG.joystick.y, 2)),
-          'vs joystick radius:', MOBILE_CONTROLS_CONFIG.joystick.outerRadius);
-        console.log('Fire button bounds check:', 
-          'Distance to fire button center:', 
-          Math.sqrt(Math.pow(touchX - MOBILE_CONTROLS_CONFIG.fireButton.x, 2) + Math.pow(touchY - MOBILE_CONTROLS_CONFIG.fireButton.y, 2)),
-          'vs fire button radius:', MOBILE_CONTROLS_CONFIG.fireButton.radius)
-      }
+      this.updatePositions();
+      this.processControlTouch(touch, coordinates);
     }
+  }
+  
+  extractTouchCoordinates(touch) {
+    // p5.js touch events have x and y properties directly
+    if (touch.x !== undefined && touch.y !== undefined) {
+      // p5.js touch object - coordinates are already in canvas space
+      return { x: touch.x, y: touch.y };
+    } else if (touch.clientX !== undefined && touch.clientY !== undefined) {
+      // Fallback to client coordinates
+      return { x: touch.clientX, y: touch.clientY };
+    }
+    return null;
+  }
+  
+  handleNonGameplayTouch() {
+    console.log('Game state:', typeof gameState !== 'undefined' ? gameState : 'undefined');
+    
+    // Handle start screen and other non-gameplay screens - tap anywhere to continue
+    if (typeof gameState !== 'undefined' && 
+        this.isNonGameplayState(gameState)) {
+      
+      console.log('Touch detected on non-gameplay screen, simulating ENTER key');
+      this.simulateEnterKey();
+      return true;
+    }
+    return false;
+  }
+  
+  isNonGameplayState(state) {
+    return state === 'start' || state === 'highScores' || 
+           state === 'levelComplete' || state === 'gameOver' || 
+           state === 'gameComplete';
+  }
+  
+  simulateEnterKey() {
+    if (typeof keyPressed === 'function') {
+      // Set the global keyCode variable that p5.js uses
+      const originalKeyCode = typeof keyCode !== 'undefined' ? keyCode : null;
+      const originalWindowKeyCode = window.keyCode;
+      
+      keyCode = 13; // ENTER key code
+      window.keyCode = 13;
+      
+      try {
+        keyPressed(); // Call the keyPressed function
+        console.log('Successfully triggered keyPressed for mobile tap-to-restart');
+      } catch (e) {
+        console.log('Error calling keyPressed:', e);
+      }
+      
+      // Restore original values
+      if (originalKeyCode !== null) keyCode = originalKeyCode;
+      if (originalWindowKeyCode !== undefined) window.keyCode = originalWindowKeyCode;
+    }
+  }
+  
+  isInPlayingState() {
+    return typeof gameState !== 'undefined' && gameState === 'playing';
+  }
+  
+  processControlTouch(touch, coordinates) {
+    console.log('Checking control positions:');
+    console.log('Joystick at:', MOBILE_CONTROLS_CONFIG.joystick.x, MOBILE_CONTROLS_CONFIG.joystick.y);
+    console.log('Fire button at:', MOBILE_CONTROLS_CONFIG.fireButton.x, MOBILE_CONTROLS_CONFIG.fireButton.y);
+    
+    const { x: touchX, y: touchY } = coordinates;
+    
+    if (this.isPointInJoystick(touchX, touchY)) {
+      this.handleJoystickTouch(touch, touchX, touchY);
+    } else if (this.isPointInFireButton(touchX, touchY)) {
+      this.handleFireButtonTouch(touch, touchX, touchY);
+    } else {
+      this.logMissedTouch(touchX, touchY);
+    }
+  }
+  
+  handleJoystickTouch(touch, touchX, touchY) {
+    console.log('Joystick touch detected! Touch at:', touchX, touchY, 
+                'Joystick at:', MOBILE_CONTROLS_CONFIG.joystick.x, MOBILE_CONTROLS_CONFIG.joystick.y);
+    
+    // Initialize smooth rotation when joystick becomes active
+    if (!this.joystickActive && typeof player !== 'undefined' && player) {
+      this.targetAngle = player.angle; // Start with current submarine angle
+      this.lastMovementAngle = player.angle;
+      this.angleStabilityFrames = 0;
+    }
+    
+    this.joystickActive = true;
+    const touchId = touch.id; // Use p5.js touch id
+    this.touches.set(touchId, { type: 'joystick', x: touchX, y: touchY });
+    this.updateJoystick(touchX, touchY);
+  }
+  
+  handleFireButtonTouch(touch, touchX, touchY) {
+    console.log('Fire button touch detected! Touch at:', touchX, touchY, 
+                'Fire button at:', MOBILE_CONTROLS_CONFIG.fireButton.x, MOBILE_CONTROLS_CONFIG.fireButton.y);
+    this.fireButtonPressed = true;
+    const touchId = touch.id; // Use p5.js touch id
+    this.touches.set(touchId, { type: 'fire', x: touchX, y: touchY });
+    this.handleFire();
+  }
+  
+  logMissedTouch(touchX, touchY) {
+    console.log('Touch not on any control - touch at:', touchX, touchY);
+    console.log('Joystick bounds check:', 
+      'Distance to joystick center:', 
+      Math.sqrt(Math.pow(touchX - MOBILE_CONTROLS_CONFIG.joystick.x, 2) + 
+                Math.pow(touchY - MOBILE_CONTROLS_CONFIG.joystick.y, 2)),
+      'vs joystick radius:', MOBILE_CONTROLS_CONFIG.joystick.outerRadius);
+    console.log('Fire button bounds check:', 
+      'Distance to fire button center:', 
+      Math.sqrt(Math.pow(touchX - MOBILE_CONTROLS_CONFIG.fireButton.x, 2) + 
+                Math.pow(touchY - MOBILE_CONTROLS_CONFIG.fireButton.y, 2)),
+      'vs fire button radius:', MOBILE_CONTROLS_CONFIG.fireButton.radius);
   }
 
   handleTouchMove(touches) {
@@ -315,20 +375,10 @@ class MobileControls {
       const storedTouch = this.touches.get(touchId);
       
       if (storedTouch && storedTouch.type === 'joystick') {
-        // Get touch coordinates
-        let touchX, touchY;
-        
-        if (touch.x !== undefined && touch.y !== undefined) {
-          touchX = touch.x;
-          touchY = touch.y;
-        } else if (touch.clientX !== undefined && touch.clientY !== undefined) {
-          touchX = touch.clientX;
-          touchY = touch.clientY;
-        } else {
-          continue;
+        const coordinates = this.extractTouchCoordinates(touch);
+        if (coordinates) {
+          this.updateJoystick(coordinates.x, coordinates.y);
         }
-        
-        this.updateJoystick(touchX, touchY);
       }
     }
   }
@@ -436,14 +486,25 @@ class MobileControls {
   
   // Apply movement to player
   applyMovement() {
-    if (!this.enabled || !this.joystickActive) return;
-    if (typeof player === 'undefined' || !player || gameState !== 'playing') return;
+    if (!this.canApplyMovement()) return;
 
     const joystick = MOBILE_CONTROLS_CONFIG.joystick;
     const sensitivity = joystick.sensitivity;
     const moveX = this.movementVector.x * sensitivity;
     const moveY = this.movementVector.y * sensitivity;
 
+    // Apply movement and rotation
+    this.applyPhysicalMovement(moveX, moveY, joystick);
+    this.applyRotation(moveX, moveY);
+  }
+  
+  canApplyMovement() {
+    return this.enabled && this.joystickActive && 
+           typeof player !== 'undefined' && player && 
+           gameState === 'playing';
+  }
+  
+  applyPhysicalMovement(moveX, moveY, joystick) {
     // --- MOVEMENT LOGIC ---
     const knobDistance = Math.sqrt(this.joystickOffset.x**2 + this.joystickOffset.y**2);
     if (knobDistance > joystick.deadZoneRadius) {
@@ -463,50 +524,60 @@ class MobileControls {
             player.vel.y += finalMoveY * PLAYER_THRUST_POWER;
         }
     }
-
+  }
+  
+  applyRotation(moveX, moveY) {
     // --- ROTATION LOGIC ---
     // This part will now run regardless of whether movement is applied.
     // It depends on moveX/moveY which are calculated from the raw joystick vector,
     // which is what we want for rotation.
     if (MOBILE_CONTROLS_CONFIG.smoothRotation.enabled) {
-      // Use smooth rotation with stability checking to reduce jitter
-      const movementMagnitude = Math.sqrt(moveX * moveX + moveY * moveY);
+      this.applySmoothRotation(moveX, moveY);
+    } else {
+      this.applyImmediateRotation(moveX, moveY);
+    }
+  }
+  
+  applySmoothRotation(moveX, moveY) {
+    // Use smooth rotation with stability checking to reduce jitter
+    const movementMagnitude = Math.sqrt(moveX * moveX + moveY * moveY);
+    
+    if (movementMagnitude > this.movementThreshold) {
+      const currentMovementAngle = Math.atan2(moveY, moveX);
       
-      if (movementMagnitude > this.movementThreshold) {
-        const currentMovementAngle = Math.atan2(moveY, moveX);
-        
-        // Check if the movement direction is stable (not changing rapidly)
-        const angleDifference = this.getAngleDifference(currentMovementAngle, this.lastMovementAngle);
-        
-        if (Math.abs(angleDifference) < this.angleTolerance) {
-          this.angleStabilityFrames++;
-        } else {
-          this.angleStabilityFrames = 0; // Reset if direction changed significantly
-        }
-        
-        // Only update target angle if movement has been stable for enough frames
-        if (this.angleStabilityFrames >= this.requiredStabilityFrames) {
-          this.targetAngle = currentMovementAngle;
-        }
-        
-        this.lastMovementAngle = currentMovementAngle;
-        
-        // Smoothly interpolate toward target angle
-        if (typeof player !== 'undefined' && player) {
-          player.angle = this.lerpAngle(player.angle, this.targetAngle, this.angleLerpSpeed);
-        }
+      // Check if the movement direction is stable (not changing rapidly)
+      const angleDifference = this.getAngleDifference(currentMovementAngle, this.lastMovementAngle);
+      
+      if (Math.abs(angleDifference) < this.angleTolerance) {
+        this.angleStabilityFrames++;
       } else {
-        // Reset stability when not moving
-        this.angleStabilityFrames = 0;
+        this.angleStabilityFrames = 0; // Reset if direction changed significantly
+      }
+      
+      // Only update target angle if movement has been stable for enough frames
+      if (this.angleStabilityFrames >= this.requiredStabilityFrames) {
+        this.targetAngle = currentMovementAngle;
+      }
+      
+      this.lastMovementAngle = currentMovementAngle;
+      
+      // Smoothly interpolate toward target angle
+      if (typeof player !== 'undefined' && player) {
+        player.angle = this.lerpAngle(player.angle, this.targetAngle, this.angleLerpSpeed);
       }
     } else {
-      // Original immediate rotation (for comparison/fallback)
-      const movementMagnitude = Math.sqrt(moveX * moveX + moveY * moveY);
-      if (movementMagnitude > 0.01) { // Use a small threshold to avoid issues with atan2(0,0)
-        const targetAngle = Math.atan2(moveY, moveX);
-        if (typeof player !== 'undefined' && player) {
-          player.angle = targetAngle;
-        }
+      // Reset stability when not moving
+      this.angleStabilityFrames = 0;
+    }
+  }
+  
+  applyImmediateRotation(moveX, moveY) {
+    // Original immediate rotation (for comparison/fallback)
+    const movementMagnitude = Math.sqrt(moveX * moveX + moveY * moveY);
+    if (movementMagnitude > 0.01) { // Use a small threshold to avoid issues with atan2(0,0)
+      const targetAngle = Math.atan2(moveY, moveX);
+      if (typeof player !== 'undefined' && player) {
+        player.angle = targetAngle;
       }
     }
   }
@@ -528,22 +599,21 @@ class MobileControls {
   
   // Render the mobile controls
   render() {
-    if (!this.enabled) return;
-    
-    // Only show controls during gameplay
-    if (typeof gameState === 'undefined' || gameState !== 'playing') {
-      return;
-    }
+    if (!this.shouldRenderControls()) return;
     
     // Update positions in case of screen size changes
     this.updatePositions();
     
-    // Draw joystick
+    // Draw controls
     this.renderJoystick();
-    
-    // Draw fire button
     this.renderFireButton();
-    
+  }
+  
+  shouldRenderControls() {
+    // Only show controls during gameplay on enabled devices
+    return this.enabled && 
+           typeof gameState !== 'undefined' && 
+           gameState === 'playing';
   }
   
   renderJoystick() {
@@ -552,18 +622,32 @@ class MobileControls {
     
     push();
     
+    // Draw joystick components
+    this.drawJoystickOuter(joystick, style);
+    this.drawJoystickDeadZone(joystick, style);
+    this.drawJoystickKnob(joystick, style);
+    this.drawJoystickDirection(joystick, style);
+    
+    pop();
+  }
+  
+  drawJoystickOuter(joystick, style) {
     // Outer circle - make it more visible
     strokeWeight(style.strokeWeight + 1);
     stroke(style.joystickColor.h, style.joystickColor.s, style.joystickColor.b, style.outerAlpha + 50);
     fill(style.joystickColor.h, style.joystickColor.s, style.joystickColor.b, style.outerAlpha * 0.5);
     ellipse(joystick.x, joystick.y, joystick.outerRadius * 2);
-    
+  }
+  
+  drawJoystickDeadZone(joystick, style) {
     // Dead zone inner circle
     stroke(style.joystickColor.h, style.joystickColor.s, style.joystickColor.b, style.outerAlpha);
     strokeWeight(style.strokeWeight - 1); // Thinner line
     noFill();
     ellipse(joystick.x, joystick.y, joystick.deadZoneRadius * 2);
-
+  }
+  
+  drawJoystickKnob(joystick, style) {
     // Inner knob - more prominent when active
     const knobX = joystick.x + this.joystickOffset.x;
     const knobY = joystick.y + this.joystickOffset.y;
@@ -574,34 +658,53 @@ class MobileControls {
     stroke(knobColor.h, knobColor.s, knobColor.b + 20, knobAlpha);
     strokeWeight(style.strokeWeight);
     ellipse(knobX, knobY, joystick.innerRadius * 2);
-    
+  }
+  
+  drawJoystickDirection(joystick, style) {
     // Direction indicator lines - more visible
     if (this.joystickActive) {
+      const knobX = joystick.x + this.joystickOffset.x;
+      const knobY = joystick.y + this.joystickOffset.y;
+      const knobColor = style.pressedColor;
+      const knobAlpha = style.pressedAlpha;
+      
       stroke(knobColor.h, knobColor.s, knobColor.b + 30, knobAlpha);
       strokeWeight(style.strokeWeight + 1);
       line(joystick.x, joystick.y, knobX, knobY);
     }
-    
-    pop();
   }
   
   renderFireButton() {
     const button = MOBILE_CONTROLS_CONFIG.fireButton;
     const style = MOBILE_CONTROLS_CONFIG.style;
-    const isPressed = this.fireButtonPressed;
     
     push();
     
-    // Use the color from the config. A brighter yellow is used for the 'pressed' state.
-    const baseColor = style.fireButtonColor;
+    // Draw fire button components
+    this.drawFireButtonBase(button, style);
+    this.drawFireButtonIcon(button, style);
+    this.renderFireCooldown(button, this.getFireButtonAlpha(style));
     
+    pop();
+  }
+  
+  drawFireButtonBase(button, style) {
+    const isPressed = this.fireButtonPressed;
+    const baseColor = style.fireButtonColor;
     const color = isPressed ? style.pressedColor : baseColor;
-    const alpha = isPressed ? style.pressedAlpha + 50 : style.innerAlpha + 30;
+    const alpha = this.getFireButtonAlpha(style);
     
     strokeWeight(style.strokeWeight + 1);
     stroke(color.h, color.s, color.b + 20, alpha);
     fill(color.h, color.s, color.b, alpha * 0.8);
     ellipse(button.x, button.y, button.radius * 2);
+  }
+  
+  drawFireButtonIcon(button, style) {
+    const isPressed = this.fireButtonPressed;
+    const baseColor = style.fireButtonColor;
+    const color = isPressed ? style.pressedColor : baseColor;
+    const alpha = this.getFireButtonAlpha(style);
     
     // Fire icon (triangle)
     fill(color.h, color.s, color.b + 30, alpha + 50);
@@ -612,11 +715,11 @@ class MobileControls {
       button.x - iconSize * 0.4, button.y - iconSize * 0.6,
       button.x - iconSize * 0.4, button.y + iconSize * 0.6
     );
-    
-    // Cooldown indicator
-    this.renderFireCooldown(button, alpha);
+  }
   
-    pop();
+  getFireButtonAlpha(style) {
+    const isPressed = this.fireButtonPressed;
+    return isPressed ? style.pressedAlpha + 50 : style.innerAlpha + 30;
   }
 
   renderFireCooldown(button, alpha) {
@@ -637,6 +740,52 @@ class MobileControls {
             -PI/2, -PI/2 + TWO_PI * cooldownRatio);
       }
     }
+  }
+  
+  // ==================== UTILITY METHODS ====================
+  
+  isValidPlayer() {
+    return typeof player !== 'undefined' && player;
+  }
+  
+  isValidGameState() {
+    return typeof gameState !== 'undefined';
+  }
+  
+  getCurrentTime() {
+    return typeof millis !== 'undefined' ? millis() : Date.now();
+  }
+  
+  getCurrentFrameCount() {
+    return typeof frameCount !== 'undefined' ? frameCount : 0;
+  }
+  
+  // Distance calculation helper
+  calculateDistance(x1, y1, x2, y2) {
+    return Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
+  }
+  
+  // Clamp value between min and max
+  clamp(value, min, max) {
+    return Math.min(Math.max(value, min), max);
+  }
+  
+  // ==================== CONFIGURATION HELPERS ====================
+  
+  getJoystickConfig() {
+    return MOBILE_CONTROLS_CONFIG.joystick;
+  }
+  
+  getFireButtonConfig() {
+    return MOBILE_CONTROLS_CONFIG.fireButton;
+  }
+  
+  getStyleConfig() {
+    return MOBILE_CONTROLS_CONFIG.style;
+  }
+  
+  getSmoothRotationConfig() {
+    return MOBILE_CONTROLS_CONFIG.smoothRotation;
   }
 }
 
