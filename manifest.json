@@ -1,4 +1,5 @@
 {
+  "id": "io.github.softhook.sub",
   "name": "Reactor Dive",
   "short_name": "ReactorDive",
   "description": "Destroy the mutated creatures and reach the reactor before your time runs out.",
@@ -9,6 +10,26 @@
   "orientation": "landscape",
   "background_color": "#000000",
   "theme_color": "#000000",
+  "dir": "ltr",
+  "lang": "en-GB",
+  "iarc_rating_id": "e84b072d-71b3-4d3e-86ae-31a8ce4e53b7",
+  "categories": ["games", "action", "arcade"],
+  "screenshots": [
+    {
+      "src": "screenshot1.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "platform": "wide",
+      "label": "Gameplay screenshot showing combat"
+    },
+    {
+      "src": "screenshot2.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "platform": "wide",
+      "label": "Reactor environment screenshot"
+    }
+  ],
   "icons": [
     {
       "src": "icon-192x192.png",
@@ -33,6 +54,22 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
+    }
+  ],
+  "launch_handler": {
+    "client_mode": ["navigate-existing", "auto"]
+  },
+  "prefer_related_applications": false,
+  "related_applications": [
+    {
+      "platform": "web",
+      "url": "https://softhook.github.io/sub/",
+      "id": "io.github.softhook.sub"
+    }
+  ],
+  "scope_extensions": [
+    {
+      "origin": "https://softhook.github.io"
     }
   ]
 }
