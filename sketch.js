@@ -378,6 +378,9 @@ var torpedoNoise, torpedoEnv; // Changed from Osc to Noise for woosh
 var lowAirOsc, lowAirEnv;
 var gameOverImpactNoise, gameOverImpactEnv, gameOverGroanOsc, gameOverGroanEnv, gameOverFinalBoomNoise, gameOverFinalBoomEnv; // Sub Destruction
 
+// MOD Player object
+let modPlayer = null;
+
 // Current Flow Audio
 var currentFlowNoise, currentFlowNoiseEnv, currentFlowBassOsc, currentFlowBassEnv;
 
@@ -2221,6 +2224,11 @@ function resetGame() {
   }
   lastLowAirBeepTime = 0; // Reset beep timer
   
+  // Restart MOD music if it was playing
+  if (modPlayer && !modPlayer.playing) {
+    modPlayer.play();
+  }
+  
   // Return to start screen (don't initialize game objects yet)
   gameState = 'start';
 }
@@ -2310,6 +2318,9 @@ function startAudioRoutine() {
         if (reactorHumOsc && reactorHumOsc.started) {
             // Reactor hum plays continuously, volume controlled by amp()
         }
+        
+        // Initialize MOD player
+        initializeModPlayer();
     }
 
     if (typeof userStartAudio === 'function') {
@@ -2321,6 +2332,173 @@ function startAudioRoutine() {
             ctx.resume().then(() => { audioInitialized = true; startAllSoundObjects(); })
                         .catch(e => { /* console.error("AudioContext.resume error", e); */ });
         } else if (ctx && ctx.state === 'running') { audioInitialized = true; startAllSoundObjects(); }
+    }
+    
+    // Initialize MOD player separately if audio is already running
+    if (audioInitialized && !modPlayer) {
+        initializeModPlayer();
+    }
+}
+
+// Initialize and set up the MOD player
+function initializeModPlayer() {
+    if (modPlayer) return; // Already initialized
+    
+    console.log('Initializing MOD player...');
+    
+    try {
+        // Make sure we have a valid audio context first
+        let ctx;
+        try {
+            if (typeof getAudioContext === 'function') {
+                ctx = getAudioContext();
+                console.log('Got p5 audio context:', ctx ? ctx.state : 'null');
+            }
+        } catch (e) {
+            console.error('Error accessing audio context:', e);
+        }
+        
+        if (!ctx) {
+            console.warn('No p5 audio context available, creating new one');
+            try {
+                // Create a new AudioContext as fallback
+                ctx = new (window.AudioContext || window.webkitAudioContext)();
+                console.log('Created new audio context:', ctx.state);
+            } catch (e) {
+                console.error('Failed to create audio context:', e);
+                return; // Can't continue without audio context
+            }
+        }
+        
+        // Create ModPlayer with the audio context
+        try {
+            modPlayer = new ModPlayer(ctx);
+            console.log('MOD player initialized with audio context');
+            
+            // If context is already running, load music immediately
+            if (ctx.state === 'running') {
+                loadModMusic();
+            } else {
+                // Try to resume the context first
+                console.log('Audio context not running, attempting to resume...');
+                ctx.resume().then(() => {
+                    console.log('Audio context resumed, loading music...');
+                    loadModMusic();
+                }).catch(err => {
+                    console.error('Could not resume audio context:', err);
+                    // We'll still try to load music, but it might not play until user interaction
+                    loadModMusic();
+                });
+            }
+        } catch (e) {
+            console.error('Failed to create ModPlayer:', e);
+        }
+    } catch (error) {
+        console.error('Error in initializeModPlayer:', error);
+    }
+}
+
+// Load and play the MOD file
+async function loadModMusic() {
+    if (!modPlayer) {
+        console.error('Cannot load MOD music: ModPlayer is not initialized');
+        return;
+    }
+    
+    try {
+        console.log('Loading MOD music...');
+        
+        // Directly interact with user gesture to unlock audio
+        // This can help in browsers that require user interaction
+        if (typeof getAudioContext === 'function') {
+            try {
+                const audioCtx = getAudioContext();
+                console.log('Audio context state before resume:', audioCtx?.state);
+                
+                if (audioCtx && audioCtx.state !== 'running') {
+                    console.log('p5 Audio context not running, attempting to resume...');
+                    // Wait for audio context to resume
+                    await audioCtx.resume();
+                    console.log('p5 Audio context resumed:', audioCtx.state);
+                    
+                    // Use a small delay after resume to ensure it took effect
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                }
+            } catch (e) {
+                console.warn('Issue with audio context:', e);
+            }
+        }
+        
+        // Try to use a fetch to load MOD as ArrayBuffer for more reliable loading
+        let modData;
+        try {
+            console.log('Fetching MOD file...');
+            const response = await fetch('start.mod');
+            modData = await response.arrayBuffer();
+            console.log('MOD file fetched successfully, size:', modData.byteLength);
+        } catch (fetchErr) {
+            console.warn('Failed to fetch MOD file, falling back to standard loading:', fetchErr);
+            modData = 'start.mod'; // Fall back to string path
+        }
+        
+        // Load the MOD file with the data we obtained
+        await modPlayer.load(modData);
+        
+        if (modPlayer.mod) {
+            console.log('MOD loaded:', modPlayer.mod.title);
+            
+            // Set initial volume before playing
+            modPlayer.setVolume(0.1); // Set moderate initial volume
+            
+            // Double-check audio context is resumed before playing
+            if (modPlayer[Symbol.for('audio')] && 
+                modPlayer[Symbol.for('audio')].state !== 'running') {
+                console.log('Final audio context resume before playing...');
+                await modPlayer[Symbol.for('audio')].resume();
+            }
+            
+            console.log('Starting MOD playback...');
+            
+            // Handle play result (may be a Promise or boolean)
+            const playResult = modPlayer.play();
+            
+            if (playResult instanceof Promise) {
+                // If play() returns a Promise
+                try {
+                    const success = await playResult;
+                    console.log('MOD play Promise resolved:', success ? 'success' : 'failed');
+                    
+                    // Force another check after playing starts
+                    if (success) {
+                        setTimeout(() => {
+                            console.log('MOD playback status check:', 
+                                       'Playing:', modPlayer.playing,
+                                       'Audio running:', modPlayer[Symbol.for('audio')]?.state);
+                        }, 500);
+                    }
+                } catch (err) {
+                    console.error('Error in MOD play Promise:', err);
+                }
+            } else {
+                // Handle boolean return value
+                console.log('MOD play attempt result:', playResult ? 'success' : 'failed');
+                
+                // Force another check after playing starts
+                if (playResult) {
+                    setTimeout(() => {
+                        console.log('MOD playback status check:', 
+                                   'Playing:', modPlayer.playing,
+                                   'Audio running:', modPlayer[Symbol.for('audio')]?.state);
+                    }, 500);
+                }
+            }
+        } else {
+            console.error('Failed to load MOD: mod property is undefined');
+        }
+    } catch (error) {
+        console.error('Failed to load or play MOD music:', error);
+        console.error('Error details:', error.message);
+        if (error.stack) console.error(error.stack);
     }
 }
 
@@ -2356,6 +2534,11 @@ function keyPressed() {
     // Transition from start screen to high scores
     gameState = 'highScores';
     highScores = null; // Reset to show loading
+    
+    // Slightly increase volume for highscores screen
+    if (modPlayer && modPlayer.playing) {
+      modPlayer.fadeVolume(0.1, 1000); 
+    }
     // Load high scores asynchronously
     highScoreManager.getHighScores().then(scores => {
       highScores = scores;
@@ -2367,6 +2550,11 @@ function keyPressed() {
     // Transition from high scores to game
     gameState = 'loading';
     showLoadingOverlay("GENERATING LEVEL");
+    
+    // Set low background music volume for gameplay
+    if (modPlayer && modPlayer.playing) {
+      modPlayer.fadeVolume(0.1, 1000); // Lower volume for gameplay background music
+    }
     
     // Use setTimeout to allow loading screen to render
     setTimeout(() => {
@@ -2714,6 +2902,12 @@ function drawGameOverScreen() {
     isHighScoreChecked = true;
     console.log('Checking if score', totalScore, 'is a high score...');
     
+    // Make sure music is stopped on game over screen
+    if (modPlayer && modPlayer.playing) {
+      console.log("Found music still playing on game over screen - stopping it");
+      modPlayer.silence();
+    }
+    
     highScoreManager.isHighScore(totalScore).then(result => {
       isHighScoreResult = result;
       if (result) {
@@ -3003,6 +3197,44 @@ function drawPlayingState() {
   let distanceToGoal = dist(player.pos.x, player.pos.y, cave.goalPos.x, cave.goalPos.y);
   text(`Distance to Reactor: ${floor(distanceToGoal)} meters`, HUD_MARGIN_X, HUD_MARGIN_Y + HUD_LINE_SPACING * 4);
 
+  // Draw reactor direction indicator (compass)
+  let dirToReactor = createVector(cave.goalPos.x - player.pos.x, cave.goalPos.y - player.pos.y).normalize();
+  let indicatorSize = 20;
+  let indicatorX = width - 70;
+  let indicatorY = HUD_MARGIN_Y + HUD_LINE_SPACING * 2;
+  
+  // Draw indicator background
+  noStroke();
+  fill(0, 0, 0, 150); // Semi-transparent black
+  ellipse(indicatorX, indicatorY, indicatorSize * 2.2, indicatorSize * 2.2);
+  
+  // Draw compass direction arrow
+  push();
+  translate(indicatorX, indicatorY);
+  rotate(atan2(dirToReactor.y, dirToReactor.x));
+  
+  // Draw arrow
+  stroke(GOAL_SQUARE_VISUAL_COLOR_H, GOAL_SQUARE_VISUAL_COLOR_S, GOAL_SQUARE_VISUAL_COLOR_B);
+  strokeWeight(3);
+  line(0, 0, indicatorSize, 0);
+  
+  // Draw arrow head
+  noStroke();
+  fill(GOAL_SQUARE_VISUAL_COLOR_H, GOAL_SQUARE_VISUAL_COLOR_S, GOAL_SQUARE_VISUAL_COLOR_B);
+  triangle(indicatorSize, 0, indicatorSize - 8, -5, indicatorSize - 8, 5);
+  
+  // Draw center dot
+  fill(255);
+  ellipse(0, 0, 4, 4);
+  pop();
+  
+  // Add compass text
+  textAlign(CENTER, TOP);
+  fill(HUD_TEXT_COLOR_H, HUD_TEXT_COLOR_S, HUD_TEXT_COLOR_B);
+  textSize(12);
+  text("REACTOR", indicatorX, indicatorY + indicatorSize + 5);
+  textAlign(LEFT, TOP); // Reset text alignment
+  
   // Render mobile controls after HUD
   renderMobileControls();
 
@@ -3062,6 +3294,58 @@ function draw() {
   }
   // gameState === 'playing'
   drawPlayingState();
+  
+  // Check win/lose conditions for playing state
+  if (gameState === 'playing') {
+    // Check win/lose conditions
+    if (player.health <= 0 || player.airSupply <= 0) {
+      gameState = 'gameOver';
+      // Calculate final score before game over
+      levelScore = 0;
+      playSound('gameOver');
+      
+      // Silence and stop music on game over
+      if (modPlayer) {
+        console.log("Game over - stopping music");
+        modPlayer.silence(); // Immediately silence and stop the music
+        // Double-check after a short delay to ensure it's really stopped
+        setTimeout(() => {
+          if (modPlayer.playing) {
+            console.log("Failsafe: Music still playing after game over, forcing stop");
+            modPlayer.stop();
+          }
+        }, 200);
+      }
+    } else if (cave.isGoal(player.pos.x, player.pos.y) && enemiesKilledThisLevel >= getKillsRequiredForLevel(currentLevel)) {
+      gameState = 'levelComplete';
+      // Calculate level score
+      let timeLeftInSeconds = Math.floor(player.airSupply / AIR_SUPPLY_FRAMES_TO_SECONDS_DIVISOR);
+      levelScore = enemiesKilledThisLevel * 100 + timeLeftInSeconds * 10;
+      totalScore += levelScore;
+      
+      // Silence and stop music on level completion
+      if (modPlayer) {
+        console.log("Level complete - stopping music");
+        modPlayer.silence(); // Immediately silence and stop the music
+        // Double-check after a short delay to ensure it's really stopped
+        setTimeout(() => {
+          if (modPlayer.playing) {
+            console.log("Failsafe: Music still playing after level complete, forcing stop");
+            modPlayer.stop();
+          }
+        }, 200);
+      }
+      
+      if (currentLevel >= MAX_LEVELS) {
+        gameState = 'gameComplete';
+        // Make sure music is also stopped for game complete
+        if (modPlayer && modPlayer.playing) {
+          console.log("Game complete - stopping music");
+          modPlayer.silence();
+        }
+      }
+    }
+  }
 }
 function windowResized() { resizeCanvas(windowWidth, windowHeight); }
 
@@ -3109,6 +3393,12 @@ function touchStarted() {
     if (gameState === 'highScores') {
       gameState = 'loading';
       showLoadingOverlay("GENERATING LEVEL");
+      
+      // Set low background music volume for gameplay
+      if (modPlayer && modPlayer.playing) {
+        modPlayer.fadeVolume(0.1, 1000); // Lower volume for gameplay background music
+      }
+      
       setTimeout(() => {
         initGameObjects();
         player.health = PLAYER_INITIAL_HEALTH;
