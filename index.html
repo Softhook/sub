@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
-    <script src="p5.js"></script>
-    <script src="p5.sound.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/p5@1.11.7/lib/p5.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/p5@1.11.7/lib/addons/p5.sound.min.js"></script>
     <link rel="stylesheet" type="text/css" href="style.css">
     <meta charset="utf-8" />
     <!-- Web App Manifest for fullscreen on mobile -->
@@ -36,20 +36,8 @@
     <input type="text" id="highscoreInput" maxlength="20" placeholder="Enter your name" 
            style="position: fixed; top: -1000px; left: -1000px; opacity: 0; pointer-events: none;">
     
-    <script src="mod.js"></script>
-    <script src="loader.js"></script>
-    <script src="player.js"></script>
-    <script src="mobileControls.js?v=6"></script>
-    <script src="gamepadControls.js?v=1"></script>
-    <script src="bubbles.js?v=6"></script>
-    <script src="cave.js?v=9"></script>
-    <script src="enemy.js?v=6"></script>
-    <script src="JSONBase.js?v=6"></script>
-    <script src="playerSub.js?v=8"></script>
-    <script src="projectile.js?v=7"></script>
-    <script src="powerup.js?v=8"></script>
-    <script src="sketch.js?v=11"></script>
-    
+    <script src="mobileControls.js"></script>
+    <script src="sketch.js"></script>
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {

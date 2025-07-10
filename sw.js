@@ -1,155 +1,74 @@
-const CACHE_NAME = 'reactor-dive-cache-v24'; // Completely fixed Cave class syntax errors
-
-// Core application files
-const CORE_FILES = [
+const CACHE_NAME = 'reactor-dive-cache-v13'; // Bump version for display_override
+const URLS_TO_CACHE = [
   './', // The start URL
   'index.html',
   'style.css',
-  'manifest.json'
-];
-
-// Game JavaScript files
-const GAME_FILES = [
   'sketch.js',
-  'playerSub.js',
-  'enemy.js', 
-  'projectile.js',
-  'cave.js',
-  'bubbles.js',
   'mobileControls.js',
-  'JSONBase.js' // Updated from JSONBIN.js to JSONBase.js
-];
-
-// External libraries
-const LIBRARY_FILES = [
-  'p5.js',
-  'p5.sound.min.js'
-];
-
-// Assets
-const ASSET_FILES = [
+  'manifest.json',
   'icon-192x192.png',
   'icon-512x512.png',
   'Berpatroli.otf',
-  'spinner.svg'
-];
-
-// All files to cache
-const URLS_TO_CACHE = [
-  ...CORE_FILES,
-  ...GAME_FILES,
-  ...LIBRARY_FILES,
-  ...ASSET_FILES
+  'spinner.svg',
+  'p5.js',
+  'p5.sound.min.js',
 ];
 
 // Install: cache all static assets
 self.addEventListener('install', event => {
-  console.log('[SW] Install event - caching resources');
+  console.log('[SW] Install event');
   event.waitUntil(
-    installCache()
-      .then(() => {
-        console.log('[SW] Installation complete');
-        return self.skipWaiting();
+    caches.open(CACHE_NAME)
+      .then(cache => {
+        console.log('[SW] Caching app shell:', URLS_TO_CACHE);
+        return cache.addAll(URLS_TO_CACHE);
       })
-      .catch(error => {
-        console.error('[SW] Installation failed:', error);
-        throw error;
-      })
+      .then(() => self.skipWaiting())
   );
 });
 
-// Activate: clean up old caches and take control
+// Activate: clean up old caches
 self.addEventListener('activate', event => {
-  console.log('[SW] Activate event - cleaning up old caches');
+  console.log('[SW] Activate event');
   event.waitUntil(
-    cleanupOldCaches()
-      .then(() => {
-        console.log('[SW] Activation complete, taking control');
-        return self.clients.claim();
-      })
-      .catch(error => {
-        console.error('[SW] Activation failed:', error);
-        throw error;
-      })
+    caches.keys().then(cacheNames => {
+      return Promise.all(
+        cacheNames.map(cacheName => {
+          if (cacheName !== CACHE_NAME) {
+            console.log('[SW] Deleting old cache:', cacheName);
+            return caches.delete(cacheName);
+          }
+        })
+      );
+    }).then(() => self.clients.claim())
   );
 });
 
-// Fetch: serve from cache with network fallback
+// Fetch: serve from cache, or network, with a fallback for navigation
 self.addEventListener('fetch', event => {
-  // Skip non-GET requests and chrome-extension requests
-  if (event.request.method !== 'GET' || event.request.url.startsWith('chrome-extension://')) {
-    return;
-  }
+  const requestUrl = new URL(event.request.url);
+  const scopeUrl = new URL(self.registration.scope);
+
+  // Check if the request is for the root of the scope (the start_url)
+  const isStartUrlRequest = event.request.method === 'GET' && requestUrl.pathname === scopeUrl.pathname;
 
   event.respondWith(
-    handleFetchRequest(event.request)
-      .catch(error => {
-        console.error('[SW] Fetch error for', event.request.url, ':', error);
-        // Return a basic response or let it fail naturally
-        return new Response('Network error', { 
-          status: 503, 
-          statusText: 'Service Unavailable' 
-        });
+    caches.match(event.request)
+      .then(response => {
+        // Return from cache if available
+        if (response) {
+          return response;
+        }
+
+        // If the request is for the start_url, or any other navigation,
+        // serve the app shell from the cache. This is the crucial fallback.
+        if (isStartUrlRequest || event.request.mode === 'navigate') {
+          console.log(`[SW] Fallback for ${event.request.mode} to ${event.request.url}. Serving root from cache.`);
+          return caches.match('./');
+        }
+
+        // Otherwise, fetch from network
+        return fetch(event.request);
       })
   );
 });
-
-// Helper function to install and cache resources
-async function installCache() {
-  const cache = await caches.open(CACHE_NAME);
-  console.log('[SW] Caching app shell:', URLS_TO_CACHE.length, 'files');
-  
-  // Cache core files first, then others
-  await cache.addAll(CORE_FILES);
-  console.log('[SW] Core files cached');
-  
-  await cache.addAll(GAME_FILES);
-  console.log('[SW] Game files cached');
-  
-  await cache.addAll(LIBRARY_FILES);
-  console.log('[SW] Library files cached');
-  
-  await cache.addAll(ASSET_FILES);
-  console.log('[SW] Asset files cached');
-  
-  return cache;
-}
-
-// Helper function to clean up old caches
-async function cleanupOldCaches() {
-  const cacheNames = await caches.keys();
-  const deletePromises = cacheNames
-    .filter(cacheName => cacheName !== CACHE_NAME)
-    .map(cacheName => {
-      console.log('[SW] Deleting old cache:', cacheName);
-      return caches.delete(cacheName);
-    });
-  
-  return Promise.all(deletePromises);
-}
-
-// Helper function to handle fetch requests
-async function handleFetchRequest(request) {
-  const requestUrl = new URL(request.url);
-  const scopeUrl = new URL(self.registration.scope);
-  const isStartUrlRequest = requestUrl.pathname === scopeUrl.pathname;
-  
-  // Try cache first
-  const cachedResponse = await caches.match(request);
-  if (cachedResponse) {
-    return cachedResponse;
-  }
-  
-  // For navigation requests or start URL, serve the app shell
-  if (isStartUrlRequest || request.mode === 'navigate') {
-    console.log(`[SW] Serving app shell for ${request.mode} request to ${request.url}`);
-    const appShell = await caches.match('./');
-    if (appShell) {
-      return appShell;
-    }
-  }
-  
-  // Try network as fallback
-  console.log('[SW] Fetching from network:', request.url);
-  return fetch(request);
-}
