@@ -1,5 +1,4 @@
 // --- Configuration Constants ---
-
 // Game Mechanics & World
 const BASE_CELL_SIZE = 20; // Base size, will increase per level
 let currentCellSize = BASE_CELL_SIZE; // Variable to hold current cell size
@@ -13,8 +12,13 @@ const BASE_AIR_DEPLETION_RATE = 1; // Base air depletion per frame
 const AIR_DEPLETION_LEVEL_INCREASE = 0.1; // Additional depletion per level
 const LEVEL_EXIT_MAX_ENEMIES_THRESHOLD = 0; // Max enemies to exit level
 
-// Fullscreen on initial interaction
-let initialInteractionDone = false;
+// Spawning constants
+const MAX_PLAYER_SPAWN_ATTEMPTS = 50;
+const PLAYER_SPAWN_RADIUS_BUFFER_CELL_FACTOR = 1.5; // Multiplier of CELL_SIZE
+const PLAYER_START_X_BASE_CELLS = 5;
+const PLAYER_START_X_ATTEMPT_INCREMENT_CELLS = 0.2;
+const PLAYER_START_Y_RANDOM_RANGE_CELLS = 4; // +/- from center
+const PLAYER_SPAWN_MAX_X_SEARCH_FACTOR = 1/5; // Max distance to search for player spawn (world width factor)
 
 // Player Constants
 const PLAYER_RADIUS = 14;
@@ -33,6 +37,32 @@ const PLAYER_ENEMY_COLLISION_KNOCKBACK = 1.5;
 const PLAYER_LOW_AIR_THRESHOLD_FACTOR = 0.25; // Percentage of air remaining to trigger warning
 const PLAYER_PROJECTILE_OFFSET_FACTOR = 0.8; // Multiplier of radius for projectile start
 
+// Player submarine appearance constants
+const PLAYER_BODY_WIDTH_FACTOR = 2.0;
+const PLAYER_BODY_HEIGHT_FACTOR = 1.0;
+const PLAYER_SAIL_WIDTH_FACTOR = 0.5;
+const PLAYER_SAIL_HEIGHT_FACTOR = 0.8;
+const PLAYER_SAIL_OFFSET_X_FACTOR = -0.25;
+const PLAYER_SAIL_CORNER_RADIUS_FACTOR = 0.1;
+const PLAYER_FIN_X1_FACTOR = 0.8;
+const PLAYER_FIN_Y1_FACTOR = 0.4;
+const PLAYER_FIN_X2_FACTOR = 0.8;
+const PLAYER_FIN_Y2_FACTOR = 0.4;
+const PLAYER_FIN_X3_FACTOR = 0.4;
+const PLAYER_FIN_Y3_FACTOR = 0.1;
+const PLAYER_FIN_X4_FACTOR = 0.4;
+const PLAYER_FIN_Y4_FACTOR = 0.1;
+const PLAYER_PROPELLER_X_OFFSET_FACTOR = -1.2; // Offset from player center, behind the body
+const PLAYER_PROPELLER_THICKNESS_FACTOR = 0.3; // Thickness of the propeller from side view (relative to player radius)
+const PLAYER_PROPELLER_MAX_SIDE_HEIGHT_FACTOR = 0.8; // Max apparent height from side view (relative to player radius)
+const PLAYER_PROPELLER_SPIN_SPEED_FACTOR = 0.2; // How fast the propeller appears to spin
+
+// Propeller bubble constants
+const PROPELLER_BUBBLE_SPAWN_CHANCE_MOVING = 0.4; // Chance each frame when moving
+const PROPELLER_BUBBLE_MAX_COUNT_PER_SPAWN = 1; // Max bubbles if chance passes
+const PROPELLER_BUBBLE_SPAWN_X_OFFSET_FACTOR = PLAYER_PROPELLER_X_OFFSET_FACTOR; // Spawn near propeller
+const PROPELLER_BUBBLE_SPAWN_AREA_RADIUS = 5; // Radius of random spawn area
+
 // Player Sonar
 const PLAYER_SONAR_RANGE = 350;
 const PLAYER_SONAR_PULSES = 180;
@@ -45,49 +75,86 @@ const PLAYER_SONAR_WALL_INTENSITY_MAX = 1.0;
 const PLAYER_SONAR_WALL_INTENSITY_MIN = 0.3;
 const PLAYER_SONAR_HIT_MAX_AGE_FACTOR = 2; // Multiplier for sonarDisplayTime for filtering hits
 const PLAYER_SONAR_HIT_ALPHA_MAX = 200;
+
+// Bubble constants
+const SONAR_BUBBLE_MIN_SPEED_Y = 0.2;
+const SONAR_BUBBLE_MAX_SPEED_Y = 0.5;
+const SONAR_BUBBLE_MIN_SIZE = 1;
+const SONAR_BUBBLE_MAX_SIZE = 2;
+const SONAR_BUBBLE_MAX_LIFESPAN_FRAMES = 75;
+const SONAR_BUBBLE_COLOR_H = 180;
+const SONAR_BUBBLE_COLOR_S = 70;
+const SONAR_BUBBLE_COLOR_B = 95;
+const SONAR_BUBBLE_ALPHA_MAX = 180;
+
+// Additional constants
+const BUBBLE_LIFESPAN_FRAMES = 180; // 3 seconds at 60fps - for current area bubbles
+
+// Font
+let customFont;
+
+// START SCREEN CONSTANTS
+// Title
+const START_SCREEN_TITLE_TEXT_SIZE = 48;
+const START_SCREEN_TITLE_Y_OFFSET = -80;
+const START_SCREEN_TITLE_COLOR_H = 150;
+const START_SCREEN_TITLE_COLOR_S = 100;
+const START_SCREEN_TITLE_COLOR_B = 100;
+
+// Info text
+const START_SCREEN_INFO_TEXT_SIZE = 18;
+const START_SCREEN_INFO_Y_OFFSET_1 = -30;
+const START_SCREEN_INFO_Y_OFFSET_2 = 0;
+const START_SCREEN_INFO_Y_OFFSET_3 = 180;
+
+// Prompt text
+const START_SCREEN_PROMPT_TEXT_SIZE = 24;
+const START_SCREEN_PROMPT_Y_OFFSET = 100;
+const START_SCREEN_PROMPT_COLOR_H = 150;
+const START_SCREEN_PROMPT_COLOR_S = 100;
+const START_SCREEN_PROMPT_COLOR_B = 100;
+
+// Audio note
+const START_SCREEN_AUDIO_NOTE_TEXT_SIZE = 16;
+const START_SCREEN_AUDIO_NOTE_Y_OFFSET = 130;
+const START_SCREEN_AUDIO_NOTE_COLOR_H = 0;
+const START_SCREEN_AUDIO_NOTE_COLOR_S = 0;
+const START_SCREEN_AUDIO_NOTE_COLOR_B = 75;
+
+// Level complete screen
+const LEVEL_COMPLETE_TITLE_TEXT_SIZE = 40;
+const LEVEL_COMPLETE_TITLE_Y_OFFSET = -80;
+const LEVEL_COMPLETE_TITLE_COLOR_H = 120;
+const LEVEL_COMPLETE_TITLE_COLOR_S = 100;
+const LEVEL_COMPLETE_TITLE_COLOR_B = 100;
+const LEVEL_COMPLETE_INFO_TEXT_SIZE = 20;
+const LEVEL_COMPLETE_INFO_Y_OFFSET = 0;
+const LEVEL_COMPLETE_PROMPT_Y_OFFSET = 100;
+
+// Game complete screen
+const GAME_COMPLETE_TITLE_TEXT_SIZE = 40;
+const GAME_COMPLETE_TITLE_Y_OFFSET = -80;
+const GAME_COMPLETE_TITLE_COLOR_H = 60;
+const GAME_COMPLETE_TITLE_COLOR_S = 100;
+const GAME_COMPLETE_TITLE_COLOR_B = 100;
+const GAME_COMPLETE_INFO_TEXT_SIZE = 20;
+const GAME_COMPLETE_INFO_Y_OFFSET = 0;
+const GAME_COMPLETE_PROMPT_Y_OFFSET = 100;
+
+// Game over screen
+const GAME_OVER_TITLE_TEXT_SIZE = 40;
+const GAME_OVER_TITLE_Y_OFFSET = -80;
+const GAME_OVER_TITLE_COLOR_H = 0;
+const GAME_OVER_TITLE_COLOR_S = 100;
+const GAME_OVER_TITLE_COLOR_B = 80;
+const GAME_OVER_INFO_TEXT_SIZE = 20;
+const GAME_OVER_INFO_Y_OFFSET = 0;
+const GAME_OVER_PROMPT_Y_OFFSET = 100;
 const PLAYER_SONAR_HIT_ALPHA_MIN = 0;
 const PLAYER_SONAR_HIT_SIZE_MAX = 25;
 const PLAYER_SONAR_HIT_SIZE_MIN = 10;
 const PLAYER_SONAR_HIT_OFFSCREEN_BUFFER = 20;
 const PLAYER_SONAR_ENEMY_HIT_SIZE_FACTOR = 1.3;
-
-// Sonar Bubbles (Now Propeller Bubbles - constants might be reused or renamed)
-
-const SONAR_BUBBLE_GROUP_SPAWN_CHANCE = 0.3; // Kept for reference, but new mechanism below
-const SONAR_BUBBLE_MAX_COUNT = 5; // Kept for reference
-const SONAR_BUBBLE_MAX_LIFESPAN_FRAMES = 75;
-const SONAR_BUBBLE_MIN_SPEED_Y = 0.2;
-const SONAR_BUBBLE_MAX_SPEED_Y = 0.5;
-const SONAR_BUBBLE_MIN_SIZE = 1;
-const SONAR_BUBBLE_MAX_SIZE = 2;
-const SONAR_BUBBLE_COLOR_H = 180; const SONAR_BUBBLE_COLOR_S = 70; const SONAR_BUBBLE_COLOR_B = 95;
-const SONAR_BUBBLE_ALPHA_MAX = 180;
-
-// General Bubble Constants
-const BUBBLE_LIFESPAN_FRAMES = 180; // 3 seconds at 60fps - for current area bubbles
-
-// Propeller Bubble Constants
-const PLAYER_PROPELLER_X_OFFSET_FACTOR = -1.2; // Offset from player center, behind the body
-const PLAYER_PROPELLER_MAX_SIDE_HEIGHT_FACTOR = 0.8; // New: Max apparent height from side view (relative to player radius)
-const PLAYER_PROPELLER_THICKNESS_FACTOR = 0.3;   // New: Thickness of the propeller from side view (relative to player radius)
-const PLAYER_PROPELLER_SPIN_SPEED_FACTOR = 0.2; // How fast it appears to spin (adjust for visual preference)
-const PROPELLER_BUBBLE_SPAWN_CHANCE_MOVING = 0.4; // Chance each frame when moving
-const PROPELLER_BUBBLE_MAX_COUNT_PER_SPAWN = 1;  // Max bubbles if chance passes
-const PROPELLER_BUBBLE_SPAWN_X_OFFSET_FACTOR = PLAYER_PROPELLER_X_OFFSET_FACTOR; // Spawn near propeller
-const PROPELLER_BUBBLE_SPAWN_AREA_RADIUS = 8; // Small radius for spawn randomization
-
-
-// Player Rendering
-const PLAYER_BODY_WIDTH_FACTOR = 2.2;
-const PLAYER_BODY_HEIGHT_FACTOR = 1;
-const PLAYER_SAIL_OFFSET_X_FACTOR = 0.1; // Renamed from PLAYER_COCKPIT_OFFSET_X_FACTOR
-const PLAYER_SAIL_WIDTH_FACTOR = 0.8;    // Renamed from PLAYER_COCKPIT_WIDTH_FACTOR
-const PLAYER_SAIL_HEIGHT_FACTOR = 1.2;   // Renamed from PLAYER_COCKPIT_HEIGHT_FACTOR
-const PLAYER_SAIL_CORNER_RADIUS_FACTOR = 0.2; // Renamed from PLAYER_COCKPIT_CORNER_RADIUS_FACTOR
-const PLAYER_FIN_X1_FACTOR = -0.9; const PLAYER_FIN_Y1_FACTOR = -0.5;
-const PLAYER_FIN_X2_FACTOR = -0.9; const PLAYER_FIN_Y2_FACTOR = 0.5;
-const PLAYER_FIN_X3_FACTOR = -1.4; const PLAYER_FIN_Y3_FACTOR = 0.3;
-const PLAYER_FIN_X4_FACTOR = -1.4; const PLAYER_FIN_Y4_FACTOR = -0.3;
 const PLAYER_SONAR_ARC_RADIUS_FACTOR = 3.5;
 const PLAYER_SHOT_ARC_RADIUS_FACTOR = 2.5;
 
@@ -98,7 +165,7 @@ const PROJECTILE_LIFESPAN_FRAMES = 100;
 const PLAYER_SHOT_COOLDOWN_FRAMES = 70;
 const PROJECTILE_WALL_COLLISION_RADIUS_FACTOR = 0.5; // For more accurate feel
 
-// New Torpedo Visual Constants
+// Torpedo Visual Constants
 const TORPEDO_BODY_LENGTH_FACTOR = 3.5; // e.g., 3.5 * PROJECTILE_RADIUS
 const TORPEDO_BODY_WIDTH_FACTOR = 1;  // e.g., PROJECTILE_RADIUS
 const TORPEDO_FIN_SIZE_FACTOR = 0.3;    // e.g., 1.0 * PROJECTILE_RADIUS (for small side fins)
@@ -108,21 +175,21 @@ const TORPEDO_COLOR_S = 80;
 const TORPEDO_COLOR_B = 90;
 const TORPEDO_COLOR_A = 220; // Slightly more opaque
 
-// New Torpedo Trail Particle Constants
+// Torpedo Trail Particle Constants
 const TORPEDO_TRAIL_PARTICLE_SPAWN_CHANCE = 0.7; // High chance per frame per torpedo
+const TORPEDO_TRAIL_PARTICLE_SPREAD_ANGLE = Math.PI / 4; // Cone of spread for particles
+const TORPEDO_TRAIL_PARTICLE_SPEED_MIN = 0.1; // Slow drift
+const TORPEDO_TRAIL_PARTICLE_SPEED_MAX = 0.3;
+const TORPEDO_TRAIL_OFFSET_FACTOR = -1.8; // How far behind the torpedo center particles spawn
 const TORPEDO_TRAIL_PARTICLE_MAX_LIFESPAN = 40; // Shorter lifespan
 const TORPEDO_TRAIL_PARTICLE_MIN_SIZE = 0.5;
 const TORPEDO_TRAIL_PARTICLE_MAX_SIZE = 1.5;
-const TORPEDO_TRAIL_PARTICLE_SPEED_MIN = 0.1; // Slow drift
-const TORPEDO_TRAIL_PARTICLE_SPEED_MAX = 0.3;
-const TORPEDO_TRAIL_PARTICLE_SPREAD_ANGLE = Math.PI / 4; // Cone of spread for particles - USE Math.PI
-const TORPEDO_TRAIL_OFFSET_FACTOR = -1.8; // How far behind the torpedo center particles spawn (negative of TORPEDO_BODY_LENGTH_FACTOR / 2)
 const TORPEDO_TRAIL_PARTICLE_COLOR_H = 180; // Similar to sonar bubbles
 const TORPEDO_TRAIL_PARTICLE_COLOR_S = 60;
 const TORPEDO_TRAIL_PARTICLE_COLOR_B = 90;
 const TORPEDO_TRAIL_PARTICLE_ALPHA_MAX = 150;
 
-// New Explosion Particle Constants
+// Explosion Particle Constants
 const EXPLOSION_PARTICLE_COUNT_TORPEDO_WALL = 15;
 const EXPLOSION_PARTICLE_COUNT_TORPEDO_ENEMY = 25;
 const EXPLOSION_PARTICLE_MAX_LIFESPAN = 30; // Slightly longer than trail
@@ -138,36 +205,14 @@ const EXPLOSION_PARTICLE_COLOR_S_ENEMY = 90;
 const EXPLOSION_PARTICLE_COLOR_B_ENEMY = 90;
 const EXPLOSION_PARTICLE_ALPHA_MAX = 200;
 
-
-// Enemy Constants
-const ENEMY_RADIUS = 14; // Note: PlayerSub also has radius 14, consider if they should differ
-const ENEMY_MIN_BASE_SPEED = 0.4;
-const ENEMY_MAX_BASE_SPEED = 0.8;
-const ENEMY_SPEED_LEVEL_MULTIPLIER = 0.1;
-const ENEMY_AI_NEW_VEL_MIN_SPEED_FACTOR = 0.3; // When AI decides new velocity
-const ENEMY_AI_NEW_VEL_MAX_SPEED_FACTOR = 0.7; // When AI decides new velocity
-const ENEMY_AI_DECISION_MIN_INTERVAL_FRAMES = 60; // Min frames before changing direction
-const ENEMY_AI_DECISION_MAX_INTERVAL_BASE_FRAMES = 180; // Max base frames before changing direction
-const ENEMY_AI_DECISION_INTERVAL_LEVEL_REDUCTION_FRAMES = 10; // Reduces max random interval per level
-const ENEMY_AI_WALL_HIT_DECISION_MIN_INTERVAL_FRAMES = 20; // Quicker decision after hitting a wall
-const ENEMY_AI_WALL_HIT_DECISION_MAX_INTERVAL_FRAMES = 60;
-const ENEMY_HOMING_START_LEVEL = 0; // New: Level at which enemies start homing
-const ENEMY_HOMING_CHANCE = 0.3; // 30% chance of homing behavior
-
-// Jellyfish Constants
-const JELLYFISH_RADIUS = 40; // Larger than regular enemies
-const JELLYFISH_HEALTH = 3; // Requires 3 hits
-const JELLYFISH_DAMAGE = 30; // More damage than regular enemies (was 20)
-const JELLYFISH_MIN_SPEED = 0.2; // Slower than regular enemies
-const JELLYFISH_MAX_SPEED = 0.5;
-const JELLYFISH_TENTACLE_COUNT = 8; // Number of tentacles
-const JELLYFISH_TENTACLE_LENGTH = 40; // Length of tentacles
-const JELLYFISH_BODY_COLOR_H = 280; // Purple/magenta hue
-const JELLYFISH_BODY_COLOR_S = 80;
-const JELLYFISH_BODY_COLOR_B = 70;
-const JELLYFISH_TENTACLE_COLOR_H = 290;
-const JELLYFISH_TENTACLE_COLOR_S = 60;
-const JELLYFISH_TENTACLE_COLOR_B = 50;
+// PowerUp Constants
+const POWERUP_SPAWN_CHANCE_ON_ENEMY_DEATH = 0.5; // 50% chance to spawn powerup when enemy dies
+const POWERUP_SPAWN_CHANCE_ON_JELLYFISH_DEATH = 0.75; // 75% chance to spawn powerup when jellyfish dies
+const POWERUP_HEALTH_AMOUNT = 25; // Amount of health restored by health powerup
+const POWERUP_AIR_AMOUNT = 1200; // Amount of air restored by air powerup (frames)
+const POWERUP_SHIELD_DURATION = 600; // Duration of shield powerup (frames)
+const POWERUP_RADIUS = 15; // Size of powerup
+const POWERUP_LIFESPAN = 900; // How long powerups stay in the world (15 seconds)
 
 // Cave Generation
 const CAVE_EXIT_X_OFFSET_CELLS = 10; // How many cells from the right edge the exit starts
@@ -211,14 +256,41 @@ const CURRENT_BUBBLE_LIFESPAN_FACTOR = 1.5;
 const CURRENT_AREA_PADDING_FROM_PLAYER_START = 100;
 const CURRENT_AREA_PADDING_FROM_GOAL = 80;
 
-// Spawning
-const MAX_PLAYER_SPAWN_ATTEMPTS = 50;
-const PLAYER_SPAWN_RADIUS_BUFFER_CELL_FACTOR = 1.5; // Multiplier of CELL_SIZE
-const PLAYER_START_X_BASE_CELLS = 5;
-const PLAYER_START_X_ATTEMPT_INCREMENT_CELLS = 0.2;
-const PLAYER_START_Y_RANDOM_RANGE_CELLS = 4; // +/- from center
-const PLAYER_SPAWN_MAX_X_SEARCH_FACTOR = 1/5; // Max distance to search for player spawn (world width factor)
+// UI Colors & Styles
+const BACKGROUND_COLOR_H = 220; const BACKGROUND_COLOR_S = 70; const BACKGROUND_COLOR_B = 15;
+const DEFAULT_STROKE_WEIGHT = 1;
 
+const PLAYER_COLOR_BODY_H = 80; const PLAYER_COLOR_BODY_S = 70; const PLAYER_COLOR_BODY_B = 90;
+const PLAYER_COLOR_SAIL_H = 70; const PLAYER_COLOR_SAIL_S = 65; const PLAYER_COLOR_SAIL_B = 85; // Renamed from PLAYER_COLOR_COCKPIT
+const PLAYER_COLOR_FIN_H = 75; const PLAYER_COLOR_FIN_S = 68; const PLAYER_COLOR_FIN_B = 88;
+const PLAYER_COLOR_PROPELLER_H = 60; const PLAYER_COLOR_PROPELLER_S = 50; const PLAYER_COLOR_PROPELLER_B = 70; // New Propeller Color
+const PROJECTILE_COLOR_H = 60; const PROJECTILE_COLOR_S = 100; const PROJECTILE_COLOR_B = 100; const PROJECTILE_COLOR_A = 200;
+const PLAYER_SONAR_WALL_COLOR_H = 100; const PLAYER_SONAR_WALL_COLOR_S = 50; const PLAYER_SONAR_WALL_COLOR_B = 50;
+const PLAYER_SONAR_ENEMY_COLOR_H = 0; const PLAYER_SONAR_ENEMY_COLOR_S = 70; const PLAYER_SONAR_ENEMY_COLOR_B = 70;
+const PLAYER_SONAR_JELLYFISH_COLOR_H = 280; const PLAYER_SONAR_JELLYFISH_COLOR_S = 80; const PLAYER_SONAR_JELLYFISH_COLOR_B = 80; // Purple for jellyfish
+const PLAYER_SONAR_GOAL_COLOR_H = 60; const PLAYER_SONAR_GOAL_COLOR_S = 100; const PLAYER_SONAR_GOAL_COLOR_B = 100; // Yellow for goal
+const PLAYER_SONAR_ARC_WEIGHT = 3;
+const PLAYER_SONAR_ARC_COLOR_H = 120; const PLAYER_SONAR_ARC_COLOR_S = 100; const PLAYER_SONAR_ARC_COLOR_B = 100; const PLAYER_SONAR_ARC_COLOR_A = 100;
+const PLAYER_SHOT_ARC_WEIGHT = 2;
+const PLAYER_SHOT_ARC_COLOR_H = 0; const PLAYER_SHOT_ARC_COLOR_S = 100; const PLAYER_SHOT_ARC_COLOR_B = 100; const PLAYER_SHOT_ARC_COLOR_A = 80;
+const ENEMY_COLOR_H = 0; const ENEMY_COLOR_S = 80; const ENEMY_COLOR_B = 80; // Example for direct enemy rendering if added
+
+// Enemy Constants
+const ENEMY_RADIUS = 14; // Note: PlayerSub also has radius 14, consider if they should differ
+const ENEMY_MIN_BASE_SPEED = 0.4;
+const ENEMY_MAX_BASE_SPEED = 0.8;
+const ENEMY_SPEED_LEVEL_MULTIPLIER = 0.1;
+const ENEMY_AI_NEW_VEL_MIN_SPEED_FACTOR = 0.3; // When AI decides new velocity
+const ENEMY_AI_NEW_VEL_MAX_SPEED_FACTOR = 0.7; // When AI decides new velocity
+const ENEMY_AI_DECISION_MIN_INTERVAL_FRAMES = 60; // Min frames before changing direction
+const ENEMY_AI_DECISION_MAX_INTERVAL_BASE_FRAMES = 180; // Max base frames before changing direction
+const ENEMY_AI_DECISION_INTERVAL_LEVEL_REDUCTION_FRAMES = 10; // Reduces max random interval per level
+const ENEMY_AI_WALL_HIT_DECISION_MIN_INTERVAL_FRAMES = 20; // Quicker decision after hitting a wall
+const ENEMY_AI_WALL_HIT_DECISION_MAX_INTERVAL_FRAMES = 60;
+const ENEMY_HOMING_START_LEVEL = 0; // New: Level at which enemies start homing
+const ENEMY_HOMING_CHANCE = 0.3; // 30% chance of homing behavior
+
+// Enemy Spawning
 const BASE_ENEMY_COUNT = 7; // Initial number of enemies at level 1
 const ENEMY_COUNT_PER_LEVEL_INCREASE = 5; // How many more enemies per level
 const MAX_ENEMY_COUNT = 30; // Absolute maximum number of enemies
@@ -229,9 +301,20 @@ const ENEMY_SPAWN_MAX_Y_WORLD_FACTOR = 0.9;
 const ENEMY_SPAWN_WALL_CHECK_RADIUS = 25; // Radius to check for walls when finding an enemy spawn point
 const MAX_ENEMY_SPAWN_ATTEMPTS = 50;    // Max attempts to find a clear spawn spot for a single enemy
 
-
-// Sound General
-const LOW_AIR_BEEP_INTERVAL = 1000; // milliseconds
+// Jellyfish Constants
+const JELLYFISH_RADIUS = 40; // Larger than regular enemies
+const JELLYFISH_HEALTH = 3; // Requires 3 hits
+const JELLYFISH_DAMAGE = 30; // More damage than regular enemies (was 20)
+const JELLYFISH_MIN_SPEED = 0.2; // Slower than regular enemies
+const JELLYFISH_MAX_SPEED = 0.5;
+const JELLYFISH_TENTACLE_COUNT = 8; // Number of tentacles
+const JELLYFISH_TENTACLE_LENGTH = 40; // Length of tentacles
+const JELLYFISH_BODY_COLOR_H = 280; // Purple/magenta hue
+const JELLYFISH_BODY_COLOR_S = 80;
+const JELLYFISH_BODY_COLOR_B = 70;
+const JELLYFISH_TENTACLE_COLOR_H = 290;
+const JELLYFISH_TENTACLE_COLOR_S = 60;
+const JELLYFISH_TENTACLE_COLOR_B = 50;
 
 // Sound ADSR and Frequencies (AttackTime, DecayTime, SustainRatio, ReleaseTime, AttackLevel, ReleaseLevel)
 const SONAR_ENV_ADSR = { aT: 0.01, dT: 0.1, sR: 0, rT: 0.1 };
@@ -274,12 +357,18 @@ const CREATURE_GROWL_MAX_FREQ = 85;
 // Reactor Hum Constants
 const REACTOR_HUM_ENV_ADSR = { aT: 0.1, dT: 0.1, sR: 1.0, rT: 0.1 }; // Quick attack, sustain continuously
 const REACTOR_HUM_ENV_LEVELS = { aL: 0.15, rL: 0 };
-const REACTOR_HUM_FREQ = 35; // Lower frequency hum (was 60)
+const REACTOR_HUM_FREQ = 35; // Lower frequency hum
 const REACTOR_HUM_MAX_DISTANCE = 2500; // Max distance where hum is audible
 
 const LOW_AIR_ENV_ADSR = { aT: 0.05, dT: 0.1, sR: 0.6, rT: 0.2 };
 const LOW_AIR_ENV_LEVELS = { aL: 0.2, rL: 0 };
 const LOW_AIR_FREQ = 1200;
+
+// Powerup sound
+const POWERUP_ENV_ADSR = { aT: 0.01, dT: 0.1, sR: 0.3, rT: 0.3 };
+const POWERUP_ENV_LEVELS = { aL: 0.4, rL: 0 };
+const POWERUP_START_FREQ = 600;
+const POWERUP_END_FREQ = 1200;
 
 const GAME_OVER_IMPACT_ENV_ADSR = { aT: 0.005, dT: 0.1, sR: 0, rT: 0.05 };
 const GAME_OVER_IMPACT_ENV_LEVELS = { aL: 0.6, rL: 0 };
@@ -295,103 +384,7 @@ const GAME_OVER_FINAL_BOOM_ENV_LEVELS = { aL: 0.7, rL: 0 };
 const GAME_OVER_GROAN_DELAY_MS = 50;
 const GAME_OVER_FINAL_BOOM_DELAY_MS = 2000;
 
-// UI Colors & Styles
-const BACKGROUND_COLOR_H = 220; const BACKGROUND_COLOR_S = 70; const BACKGROUND_COLOR_B = 15;
-const DEFAULT_STROKE_WEIGHT = 1;
-
-const PLAYER_COLOR_BODY_H = 80; const PLAYER_COLOR_BODY_S = 70; const PLAYER_COLOR_BODY_B = 90;
-const PLAYER_COLOR_SAIL_H = 70; const PLAYER_COLOR_SAIL_S = 65; const PLAYER_COLOR_SAIL_B = 85; // Renamed from PLAYER_COLOR_COCKPIT
-const PLAYER_COLOR_FIN_H = 75; const PLAYER_COLOR_FIN_S = 68; const PLAYER_COLOR_FIN_B = 88;
-const PLAYER_COLOR_PROPELLER_H = 60; const PLAYER_COLOR_PROPELLER_S = 50; const PLAYER_COLOR_PROPELLER_B = 70; // New Propeller Color
-const PROJECTILE_COLOR_H = 60; const PROJECTILE_COLOR_S = 100; const PROJECTILE_COLOR_B = 100; const PROJECTILE_COLOR_A = 200;
-const PLAYER_SONAR_WALL_COLOR_H = 100; const PLAYER_SONAR_WALL_COLOR_S = 50; const PLAYER_SONAR_WALL_COLOR_B = 50;
-const PLAYER_SONAR_ENEMY_COLOR_H = 0; const PLAYER_SONAR_ENEMY_COLOR_S = 70; const PLAYER_SONAR_ENEMY_COLOR_B = 70;
-const PLAYER_SONAR_JELLYFISH_COLOR_H = 280; const PLAYER_SONAR_JELLYFISH_COLOR_S = 80; const PLAYER_SONAR_JELLYFISH_COLOR_B = 80; // Purple for jellyfish
-const PLAYER_SONAR_GOAL_COLOR_H = 60; const PLAYER_SONAR_GOAL_COLOR_S = 100; const PLAYER_SONAR_GOAL_COLOR_B = 100; // Yellow for goal
-const PLAYER_SONAR_ARC_WEIGHT = 3;
-const PLAYER_SONAR_ARC_COLOR_H = 120; const PLAYER_SONAR_ARC_COLOR_S = 100; const PLAYER_SONAR_ARC_COLOR_B = 100; const PLAYER_SONAR_ARC_COLOR_A = 100;
-const PLAYER_SHOT_ARC_WEIGHT = 2;
-const PLAYER_SHOT_ARC_COLOR_H = 0; const PLAYER_SHOT_ARC_COLOR_S = 100; const PLAYER_SHOT_ARC_COLOR_B = 100; const PLAYER_SHOT_ARC_COLOR_A = 80;
-const ENEMY_COLOR_H = 0; const ENEMY_COLOR_S = 80; const ENEMY_COLOR_B = 80; // Example for direct enemy rendering if added
-
-// UI Text Sizes & Positions
-const HUD_TEXT_COLOR_H = 50; const HUD_TEXT_COLOR_S = 80; const HUD_TEXT_COLOR_B = 100;
-const HUD_TEXT_SIZE = 18;
-const HUD_MARGIN_X = 10;
-const HUD_MARGIN_Y = 10;
-const HUD_LINE_SPACING = 25; // Was 25, derived from 35-10, 60-35 etc.
-const AIR_SUPPLY_FRAMES_TO_SECONDS_DIVISOR = 60; // Assuming 60fps for display
-
-const START_SCREEN_TITLE_COLOR_H = 50; const START_SCREEN_TITLE_COLOR_S = 100; const START_SCREEN_TITLE_COLOR_B = 100;
-const START_SCREEN_TITLE_TEXT_SIZE = 60;
-const START_SCREEN_TITLE_Y_OFFSET = -180; // Title at top
-const START_SCREEN_INFO_TEXT_SIZE = 20;
-const START_SCREEN_INFO_Y_OFFSET_1 = -60; // Game objective
-const START_SCREEN_INFO_Y_OFFSET_2 = -30; // Controls
-const START_SCREEN_INFO_Y_OFFSET_3 = -90; // Credit
-const START_SCREEN_INFO_Y_OFFSET_4 = 10; // Not used
-const START_SCREEN_FULLSCREEN_Y_OFFSET = 40;
-const START_SCREEN_PROMPT_TEXT_SIZE = 28;
-const START_SCREEN_PROMPT_COLOR_H = 120; const START_SCREEN_PROMPT_COLOR_S = 100; const START_SCREEN_PROMPT_COLOR_B = 100;
-const START_SCREEN_PROMPT_Y_OFFSET = 80; // Enter prompt
-const START_SCREEN_AUDIO_NOTE_TEXT_SIZE = 16;
-const START_SCREEN_AUDIO_NOTE_COLOR_H = 200; const START_SCREEN_AUDIO_NOTE_COLOR_S = 80; const START_SCREEN_AUDIO_NOTE_COLOR_B = 80;
-const START_SCREEN_AUDIO_NOTE_Y_OFFSET = 110;
-
-const LEVEL_COMPLETE_TITLE_COLOR_H = 100; const LEVEL_COMPLETE_TITLE_COLOR_S = 100; const LEVEL_COMPLETE_TITLE_COLOR_B = 100;
-const LEVEL_COMPLETE_TITLE_TEXT_SIZE = 48;
-const LEVEL_COMPLETE_TITLE_Y_OFFSET = -80; // Title higher up
-const LEVEL_COMPLETE_INFO_TEXT_SIZE = 24;
-const LEVEL_COMPLETE_INFO_Y_OFFSET = -20; // Score info area
-const LEVEL_COMPLETE_PROMPT_Y_OFFSET = 80; // Enter prompt lower
-
-const GAME_COMPLETE_TITLE_COLOR_H = 120; const GAME_COMPLETE_TITLE_COLOR_S = 100; const GAME_COMPLETE_TITLE_COLOR_B = 100;
-const GAME_COMPLETE_TITLE_TEXT_SIZE = 60;
-const GAME_COMPLETE_TITLE_Y_OFFSET = -80; // Title higher up
-const GAME_COMPLETE_INFO_TEXT_SIZE = 24;
-const GAME_COMPLETE_INFO_Y_OFFSET = -20; // Info area
-const GAME_COMPLETE_PROMPT_Y_OFFSET = 80; // Enter prompt lower
-
-const GAME_OVER_TITLE_COLOR_H = 0; const GAME_OVER_TITLE_COLOR_S = 80; const GAME_OVER_TITLE_COLOR_B = 70;
-const GAME_OVER_TITLE_TEXT_SIZE = 60;
-const GAME_OVER_TITLE_Y_OFFSET = -80; // Title higher up
-const GAME_OVER_INFO_TEXT_SIZE = 24;
-const GAME_OVER_INFO_Y_OFFSET = -20; // Info area
-const GAME_OVER_PROMPT_Y_OFFSET = 80; // Enter prompt lower
-
-// Key Codes
-const KEY_CODE_SPACE = 32;
-const KEY_CODE_W = 87;
-const KEY_CODE_S = 83;
-const KEY_CODE_A = 65;
-const KEY_CODE_D = 68;
-// Note: ENTER key is already a p5.js constant, no need to redefine.
-
-// Sound objects
-let audioInitialized = false;
-let lastLowAirBeepTime = 0;
-var sonarOsc, sonarEnv;
-var explosionNoise, explosionEnv, explosionBoomOsc, explosionBoomEnv, explosionBassOsc, explosionBassEnv; // Wall Explosion
-var creatureExplosionNoise, creatureExplosionEnv, creatureExplosionBoomOsc, creatureExplosionBoomEnv, creatureExplosionBassOsc, creatureExplosionBassEnv; // Creature Explosion
-var bumpOsc, bumpEnv;
-var torpedoNoise, torpedoEnv; // Changed from Osc to Noise for woosh
-var lowAirOsc, lowAirEnv;
-var gameOverImpactNoise, gameOverImpactEnv, gameOverGroanOsc, gameOverGroanEnv, gameOverFinalBoomNoise, gameOverFinalBoomEnv; // Sub Destruction
-
-// MOD Player object
-let modPlayer = null;
-
-// Current Flow Audio
-var currentFlowNoise, currentFlowNoiseEnv, currentFlowBassOsc, currentFlowBassEnv;
-
-// Reactor Hum Audio
-let reactorHumOsc, reactorHumEnv;
-let reactorHumAmplitude = 0;
-
-// Creature Growl Audio
-let creatureGrowlOsc, creatureGrowlEnv;
-
-// --- Creature Explosion Sound Constants (less boomy than wall explosions) ---
+// Creature Explosion Sound Constants (less boomy than wall explosions)
 const CREATURE_EXPLOSION_NOISE_ENV_ADSR = { aT: 0.001, dT: 0.3, sR: 0, rT: 0.1 };
 const CREATURE_EXPLOSION_NOISE_ENV_LEVELS = { aL: 0.6, rL: 0 };
 const CREATURE_EXPLOSION_BOOM_ENV_ADSR = { aT: 0.001, dT: 0.8, sR: 0, rT: 0.1 };
@@ -411,6 +404,7 @@ let jellyfish = []; // Array for jellyfish creatures
 let projectiles = [];
 let sonarBubbles = [];
 let particles = []; // New global array for torpedo trail particles
+let powerups = []; // Array for powerups
 let currentAreas = []; // Array for underwater current areas
 let cameraOffsetX, cameraOffsetY;
 let gameState = 'start';
@@ -435,128 +429,8 @@ let isMobileInputFocused = false; // New flag to track focus state
 // Highscore system variables
 let highScores = null; // Will hold the array of high scores
 
-// --- JSONBin HighScore Manager ---
-class JSONBinHighScores {
-  constructor() {
-    // Provided credentials
-    this.apiKey = '$2a$10$XRHnUXHeO2GrvFemcCQxvOZTa9EyvkQsd8HELile0yws/UkuVIC46'; // X-Master-Key
-    this.accessKey = '$2a$10$7wznneBgwFUQbnCsNIQ.eO/O9UBheBQomVH6oNlSv7voOtxDaawFW'; // X-Access-Key
-    this.accessKeyId = '684eb2228960c979a5aa3f65'; // Access Key ID
-    // Use a fixed bin ID for global highscores across all devices
-    this.binId = '6853faef8960c979a5acc795'; // Fixed global bin ID
-    this.baseUrl = 'https://api.jsonbin.io/v3/b';
-    this.binName = 'SUBMARINE';
-  }
-
-  async initializeBin() {
-    try {
-      // First, try to access the fixed global bin
-      const response = await fetch(`${this.baseUrl}/${this.binId}`, {
-        headers: {
-          'X-Master-Key': this.apiKey,
-          'X-Access-Key': this.accessKey
-        }
-      });
-      
-      if (response.ok) {
-        console.log('Using existing global SUBMARINE highscore bin:', this.binId);
-        return true;
-      } else {
-        console.error('Global bin not accessible, status:', response.status);
-        return false;
-      }
-    } catch (error) {
-      console.error('Error accessing global bin:', error);
-      return false;
-    }
-  }
-
-  async getHighScores() {
-    if (!this.binId) {
-      const initialized = await this.initializeBin();
-      if (!initialized) return [];
-    }
-
-    try {
-      const response = await fetch(`${this.baseUrl}/${this.binId}/latest`, {
-        headers: {
-          'X-Master-Key': this.apiKey,
-          'X-Access-Key': this.accessKey
-        }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        const scores = data.record.scores || [];
-        return scores.sort((a, b) => b.score - a.score).slice(0, 10);
-      }
-      return [];
-    } catch (error) {
-      console.error('Error fetching scores:', error);
-      return [];
-    }
-  }
-
-  async submitScore(playerName, score) {
-    if (!this.binId) {
-      const initialized = await this.initializeBin();
-      if (!initialized) return false;
-    }
-
-    try {
-      const currentData = await this.getCurrentBinData();
-      if (!currentData) return false;
-
-      const newScore = {
-        name: playerName.substring(0, 20),
-        score: score,
-        date: new Date().toISOString().split('T')[0],
-        timestamp: Date.now(),
-        gameVersion: '1.0'
-      };
-
-      if (!currentData.scores) currentData.scores = [];
-      currentData.scores.push(newScore);
-      currentData.scores = currentData.scores
-        .sort((a, b) => b.score - a.score)
-        .slice(0, 50);
-
-      const response = await fetch(`${this.baseUrl}/${this.binId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Master-Key': this.apiKey,
-          'X-Access-Key': this.accessKey
-        },
-        body: JSON.stringify(currentData)
-      });
-
-      return response.ok;
-    } catch (error) {
-      console.error('Error submitting score:', error);
-      return false;
-    }
-  }
-
-  async getCurrentBinData() {
-    try {
-      const response = await fetch(`${this.baseUrl}/${this.binId}/latest`, {
-        headers: {
-          'X-Master-Key': this.apiKey,
-          'X-Access-Key': this.accessKey
-        }
-      });
-      return response.ok ? (await response.json()).record : null;
-    } catch (error) {
-      return null;
-    }
-  }
-
-  async isHighScore(score) {
-    const scores = await this.getHighScores();
-    return scores.length < 10 || score > (scores[scores.length - 1]?.score || 0);
-  }
-}
+// Audio system variables
+let audioInitialized = false;
 
 // Initialize the highscore manager
 const highScoreManager = new JSONBinHighScores();
@@ -574,2460 +448,6 @@ function submitHighScoreXHR(binId, apiKey, accessKey, scoreData, callback) {
   req.setRequestHeader("X-Master-Key", apiKey);
   if (accessKey) req.setRequestHeader("X-Access-Key", accessKey);
   req.send(JSON.stringify(scoreData));
-}
-
-// Helper function to process game object arrays (update, render, remove offscreen)
-function processGameObjectArray(arr, offsetX, offsetY, caveContext = null) {
-  let margin = 50; // Margin for objects slightly off-screen
-  
-  for (let i = arr.length - 1; i >= 0; i--) {
-    let obj = arr[i];
-    
-    // Always update object logic
-    if (obj.update) {
-        if (caveContext && obj instanceof Projectile) {
-            obj.update(caveContext);
-        } else {
-            obj.update(); 
-        }
-    }
-    
-    // Only render if object is near the viewport
-    if (obj.render && obj.pos) {
-      let objRadius = obj.radius || obj.size || 10; // Default radius if not specified
-      
-      if (obj.pos.x + objRadius >= offsetX - margin &&
-          obj.pos.x - objRadius <= offsetX + width + margin &&
-          obj.pos.y + objRadius >= offsetY - margin &&
-          obj.pos.y - objRadius <= offsetY + height + margin) {
-        obj.render(offsetX, offsetY);
-      }
-    } else if (obj.render) {
-      // Fallback for objects without position (render anyway)
-      obj.render(offsetX, offsetY);
-    }
-    
-    // Remove dead objects
-    if (obj.isOffscreen && obj.isOffscreen()) {
-      arr.splice(i, 1);
-    }
-  }
-}
-
-// --- Projectile Class ---
-class Projectile {
-  constructor(x, y, angle) {
-    this.pos = createVector(x, y);
-    this.vel = p5.Vector.fromAngle(angle).mult(PROJECTILE_SPEED);
-    this.radius = PROJECTILE_RADIUS; // Base size for torpedo
-    this.life = PROJECTILE_LIFESPAN_FRAMES;
-    this.angle = angle; // Store the angle for rendering and trail
-  }
-  update(cave) {
-    this.pos.add(this.vel); this.life--;
-
-    // Spawn trail particles
-    if (random() < TORPEDO_TRAIL_PARTICLE_SPAWN_CHANCE) {
-        let particleAngleOffset = random(-TORPEDO_TRAIL_PARTICLE_SPREAD_ANGLE / 2, TORPEDO_TRAIL_PARTICLE_SPREAD_ANGLE / 2);
-        let particleBaseAngle = this.angle + Math.PI; // Particles move away from torpedo\'s rear
-        let finalParticleAngle = particleBaseAngle + particleAngleOffset;
-        let particleSpeed = random(TORPEDO_TRAIL_PARTICLE_SPEED_MIN, TORPEDO_TRAIL_PARTICLE_SPEED_MAX);
-        
-        // Spawn particles from the rear of the torpedo
-        let trailSpawnX = this.pos.x + cos(this.angle) * (this.radius * TORPEDO_TRAIL_OFFSET_FACTOR);
-        let trailSpawnY = this.pos.y + sin(this.angle) * (this.radius * TORPEDO_TRAIL_OFFSET_FACTOR);
-
-        let particleVel = p5.Vector.fromAngle(finalParticleAngle, particleSpeed); // More concise
-
-        particles.push(new Particle(
-            trailSpawnX,
-            trailSpawnY,
-            particleVel.x, // Use components of the vector
-            particleVel.y,
-            TORPEDO_TRAIL_PARTICLE_MAX_LIFESPAN,
-            TORPEDO_TRAIL_PARTICLE_MIN_SIZE,
-            TORPEDO_TRAIL_PARTICLE_MAX_SIZE,
-            TORPEDO_TRAIL_PARTICLE_COLOR_H,
-            TORPEDO_TRAIL_PARTICLE_COLOR_S,
-            TORPEDO_TRAIL_PARTICLE_COLOR_B,
-            TORPEDO_TRAIL_PARTICLE_ALPHA_MAX
-        ));
-    }
-
-    // Check collision with a smaller radius for projectiles to feel more accurate
-    if (cave.isWall(this.pos.x, this.pos.y, this.radius * PROJECTILE_WALL_COLLISION_RADIUS_FACTOR)) {
-        this.life = 0;
-        
-        // Destroy cave blocks around the impact point
-        cave.destroyBlocks(this.pos.x, this.pos.y, 25); // 25 pixel radius destruction
-        
-        createExplosion(this.pos.x, this.pos.y, 'wall');
-        playSound('explosion'); // Play explosion sound for wall hit
-    }
-  }
-  render(offsetX, offsetY) {
-    push();
-    translate(this.pos.x - offsetX, this.pos.y - offsetY);
-    rotate(this.angle); // Rotate by the stored angle
-
-    rectMode(CENTER);
-    fill(TORPEDO_COLOR_H, TORPEDO_COLOR_S, TORPEDO_COLOR_B, TORPEDO_COLOR_A);
-    noStroke();
-
-    let bodyLen = this.radius * TORPEDO_BODY_LENGTH_FACTOR;
-    let bodyWid = this.radius * TORPEDO_BODY_WIDTH_FACTOR;
-
-    // Body
-    rect(0, 0, bodyLen, bodyWid);
-
-    // Fins
-    // TORPEDO_FIN_SIZE_FACTOR determines the fin's dimension extending outwards from the body.
-    // TORPEDO_FIN_OFFSET_FACTOR determines how far back from the torpedo's center the fin's center is.
-    let finOutwardSize = this.radius * TORPEDO_FIN_SIZE_FACTOR;
-    let finBodyLength = bodyLen * 0.35; // Fin length along the torpedo's body (e.g., 35% of body length)
-    let finCenterX = -this.radius * TORPEDO_FIN_OFFSET_FACTOR; // Negative to place it towards the rear
-
-    // Top Fin: Extends upwards from the body
-    // rect(x_center_of_fin, y_center_of_fin, fin_length_along_torpedo, fin_width_extending_outward)
-    rect(finCenterX, -bodyWid / 2 - finOutwardSize / 2, finBodyLength, finOutwardSize);
-
-    // Bottom Fin: Extends downwards from the body
-    rect(finCenterX,  bodyWid / 2 + finOutwardSize / 2, finBodyLength, finOutwardSize);
-    
-    rectMode(CORNER); // Reset rectMode
-    pop();
-  }
-  isOffscreen() { return this.life <= 0; }
-}
-
-// --- SonarBubble Class ---
-class SonarBubble {
-  constructor(x, y) {
-    this.pos = createVector(x, y); // Position is now exact as passed
-    this.velY = random(SONAR_BUBBLE_MIN_SPEED_Y, SONAR_BUBBLE_MAX_SPEED_Y);
-    this.lifespan = SONAR_BUBBLE_MAX_LIFESPAN_FRAMES;
-    this.size = random(SONAR_BUBBLE_MIN_SIZE, SONAR_BUBBLE_MAX_SIZE);
-    this.initialLifespan = this.lifespan;
-  }
-
-  update() {
-    // Check if this bubble has custom velocity (from current areas)
-    if (this.vel) {
-      this.pos.add(this.vel); // Use vector velocity for current bubbles
-    } else {
-      this.pos.y -= this.velY; // Use default upward movement for regular sonar bubbles
-    }
-    this.lifespan--;
-  }
-
-  render(offsetX, offsetY) {
-    let ageRatio = this.lifespan / this.initialLifespan;
-    let alpha = SONAR_BUBBLE_ALPHA_MAX * ageRatio;
-    fill(SONAR_BUBBLE_COLOR_H, SONAR_BUBBLE_COLOR_S, SONAR_BUBBLE_COLOR_B, alpha);
-    noStroke();
-    ellipse(this.pos.x - offsetX, this.pos.y - offsetY, this.size);
-  }
-
-  isOffscreen() {
-    return this.lifespan <= 0;
-  }
-}
-
-// --- Particle Class (for Torpedo Trails and other effects) ---
-class Particle {
-  constructor(x, y, velX, velY, lifespan, minSize, maxSize, colorH, colorS, colorB, alphaMax) {
-    this.pos = createVector(x, y);
-    this.vel = createVector(velX, velY);
-    this.lifespan = lifespan;
-    this.initialLifespan = lifespan;
-    this.size = random(minSize, maxSize);
-    this.colorH = colorH;
-    this.colorS = colorS;
-    this.colorB = colorB;
-    this.alphaMax = alphaMax;
-  }
-
-  update() {
-    this.pos.add(this.vel);
-    this.lifespan--;
-  }
-
-  render(offsetX, offsetY) {
-    let ageRatio = this.lifespan / this.initialLifespan;
-    let currentAlpha = this.alphaMax * ageRatio;
-    fill(this.colorH, this.colorS, this.colorB, currentAlpha);
-    noStroke();
-    ellipse(this.pos.x - offsetX, this.pos.y - offsetY, this.size);
-  }
-
-  isOffscreen() {
-    return this.lifespan <= 0;
-  }
-}
-
-// --- CurrentArea Class ---
-class CurrentArea {
-  constructor(x, y, w, h, forceDirection, forceMagnitude) {
-    this.x = x;
-    this.y = y;
-    this.width = w;
-    this.height = h;
-    this.forceDirection = forceDirection; // p5.Vector
-    this.forceMagnitude = forceMagnitude;
-    this.force = p5.Vector.mult(this.forceDirection, this.forceMagnitude);
-  }
-
-  // Check if a point (px, py) is inside this current area
-  contains(px, py) {
-    return px >= this.x && px <= this.x + this.width &&
-           py >= this.y && py <= this.y + this.height;
-  }
-
-  // Spawn bubbles within the area to indicate the current
-  spawnBubbles(cave, cameraOffsetX, cameraOffsetY) {
-    if (!cave) return; // Safety check
-    
-    // Only spawn bubbles if current area is visible on screen (with some margin)
-    let margin = 100; // Extra margin to spawn bubbles just off-screen
-    let screenLeft = cameraOffsetX - margin;
-    let screenRight = cameraOffsetX + width + margin;
-    let screenTop = cameraOffsetY - margin;
-    let screenBottom = cameraOffsetY + height + margin;
-    
-    // Check if current area intersects with visible screen area
-    if (this.x + this.width < screenLeft || this.x > screenRight ||
-        this.y + this.height < screenTop || this.y > screenBottom) {
-      return; // Current area not visible, skip bubble spawning
-    }
-    
-    // Only calculate spawning for the visible portion of the current area
-    let visibleLeft = Math.max(this.x, screenLeft);
-    let visibleRight = Math.min(this.x + this.width, screenRight);
-    let visibleTop = Math.max(this.y, screenTop);
-    let visibleBottom = Math.min(this.y + this.height, screenBottom);
-    
-    let visibleWidth = visibleRight - visibleLeft;
-    let visibleHeight = visibleBottom - visibleTop;
-    
-    if (visibleWidth <= 0 || visibleHeight <= 0) return;
-    
-    // Density determines how many bubbles to try to spawn per frame (based on visible area)
-    let bubblesToSpawn = floor(visibleWidth * visibleHeight * CURRENT_BUBBLE_SPAWN_DENSITY);
-    if (random() < (visibleWidth * visibleHeight * CURRENT_BUBBLE_SPAWN_DENSITY) % 1) {
-        bubblesToSpawn++; // Probabilistically add one more bubble for fractional parts
-    }
-
-    for (let i = 0; i < bubblesToSpawn; i++) {
-      let bubbleX = random(visibleLeft, visibleRight);
-      let bubbleY = random(visibleTop, visibleBottom);
-      
-      // Only spawn bubbles in open water (not in walls)
-      if (cave.isWall(bubbleX, bubbleY)) {
-        continue; // Skip this bubble if it would spawn in a wall
-      }
-      
-      // Bubbles should generally move with the current, but with some randomness
-      let bubbleVel = p5.Vector.add(this.force, p5.Vector.random2D().mult(0.1)); // Slight random drift
-      bubbleVel.mult(CURRENT_BUBBLE_SPEED_MULTIPLIER);
-
-      // Create a sonar bubble instead of regular bubble
-      let newBubble = new SonarBubble(bubbleX, bubbleY);
-      
-      // Override the default sonar bubble velocity to move with the current
-      newBubble.vel = bubbleVel; // Override default upward movement
-      
-      // Adjust lifespan for current bubbles
-      newBubble.lifespan = BUBBLE_LIFESPAN_FRAMES * CURRENT_BUBBLE_LIFESPAN_FACTOR;
-      newBubble.initialLifespan = newBubble.lifespan;
-      
-      sonarBubbles.push(newBubble);
-    }
-  }
-
-  // Render the current area (with debug visuals if enabled)
-  render(offsetX, offsetY) {
-    if (!debugShowWalls) return; // Early exit if debug mode is off
-    
-    // Only render if current area is visible on screen
-    let screenLeft = offsetX;
-    let screenRight = offsetX + width;
-    let screenTop = offsetY;
-    let screenBottom = offsetY + height;
-    
-    // Check if current area intersects with visible screen area
-    if (this.x + this.width < screenLeft || this.x > screenRight ||
-        this.y + this.height < screenTop || this.y > screenBottom) {
-      return; // Current area not visible, skip rendering
-    }
-    
-    // Debug visualization of current area
-    push();
-    stroke(255, 0, 0, 100); // Red border with transparency
-    strokeWeight(2);
-    noFill();
-    rect(this.x - offsetX, this.y - offsetY, this.width, this.height);
-    
-    // Draw force direction arrow
-    let centerX = this.x + this.width / 2 - offsetX;
-    let centerY = this.y + this.height / 2 - offsetY;
-    let arrowLength = 30;
-    let arrowEndX = centerX + this.forceDirection.x * arrowLength;
-    let arrowEndY = centerY + this.forceDirection.y * arrowLength;
-    
-    stroke(255, 255, 0, 150); // Yellow arrow
-    strokeWeight(3);
-    line(centerX, centerY, arrowEndX, arrowEndY);
-    
-    // Arrow head
-    push();
-    translate(arrowEndX, arrowEndY);
-    rotate(atan2(this.forceDirection.y, this.forceDirection.x));
-    noStroke();
-    fill(255, 255, 0, 150);
-    triangle(0, 0, -8, -3, -8, 3);
-    pop();
-    
-    pop();
-  }
-}
-
-// --- Cave Class ---
-class Cave {
-  constructor(worldWidth, worldHeight, cellSize) { // Accept cellSize as a parameter
-    // Validate constructor parameters
-    if (isNaN(worldWidth) || worldWidth <= 0) worldWidth = 4000;
-    if (isNaN(worldHeight) || worldHeight <= 0) worldHeight = 2000;
-    if (isNaN(cellSize) || cellSize <= 0) cellSize = 20;
-    
-    this.worldWidth = worldWidth; this.worldHeight = worldHeight; this.cellSize = cellSize; // Use passed cellSize
-    this.gridWidth = Math.ceil(worldWidth / this.cellSize); // Use this.cellSize
-    this.gridHeight = Math.ceil(worldHeight / this.cellSize); // Use this.cellSize
-    this.grid = []; this.exitPathY = 0; this.exitPathRadius = 0;
-    this.goalPos = createVector(0,0);
-    this.goalSize = GOAL_SQUARE_SIZE_CELLS * this.cellSize; // Use this.cellSize
-    
-    // Initialize exitX before cave generation (needed for validation)
-    this.exitX = worldWidth - this.cellSize * CAVE_EXIT_X_OFFSET_CELLS; // Use this.cellSize
-    
-    this.generateCave();
-    this.goalPos.x = this.exitX + this.goalSize / 2;
-    
-    // Ensure exitPathY is valid before setting goal position
-    if (isNaN(this.exitPathY) || this.exitPathY === undefined || this.exitPathY === null) {
-      this.exitPathY = this.gridHeight / 2;
-      console.warn("exitPathY was invalid after cave generation, using grid center");
-    }
-    this.goalPos.y = this.exitPathY * this.cellSize; // Use this.cellSize
-  }
-  generateCave() {
-    for (let i = 0; i < this.gridWidth; i++) {
-      this.grid[i] = [];
-      for (let j = 0; j < this.gridHeight; j++) this.grid[i][j] = false; // Initialize as open space
-    }
-    let pathY = this.gridHeight / 2; let currentPathRadius = 0;
-    let pathMinRadius = CAVE_PATH_MIN_RADIUS_CELLS; let pathMaxRadius = CAVE_PATH_MAX_RADIUS_CELLS;
-    
-    // Store the main path for later validation
-    let mainPath = [];
-    
-    noiseSeed(millis() + currentLevel * 1000); // Seed for consistent cave per level, varied by run
-    for (let i = 0; i < this.gridWidth; i++) {
-      pathY += (noise(i * CAVE_PATH_Y_NOISE_FACTOR_1, CAVE_PATH_Y_NOISE_OFFSET_1 + currentLevel) - 0.5) * CAVE_PATH_Y_NOISE_MULT_1;
-      pathY = constrain(pathY, pathMaxRadius + 1, this.gridHeight - pathMaxRadius - 1); // Keep path within bounds
-      currentPathRadius = map(noise(i * CAVE_PATH_RADIUS_NOISE_FACTOR, CAVE_PATH_RADIUS_NOISE_OFFSET + currentLevel), 0, 1, pathMinRadius, pathMaxRadius);
-      
-      // Store main path data for validation
-      mainPath.push({x: i, y: pathY, radius: currentPathRadius});
-      
-      for (let j = 0; j < this.gridHeight; j++) {
-        if (abs(j - pathY) > currentPathRadius) this.grid[i][j] = true; // Mark as wall
-      }
-      if (i === this.gridWidth - 1) { this.exitPathY = pathY; this.exitPathRadius = currentPathRadius; } // Store exit path details
-    }
-    
-    // Add some random obstacles and clearings, but ensure main path remains clear
-    for (let i = 1; i < this.gridWidth - 1; i++) {
-      for (let j = 1; j < this.gridHeight - 1; j++) {
-        if (!this.grid[i][j]) { // If it's currently open path
-          // Only add obstacles if they don't block the guaranteed main path
-          let pathPoint = mainPath[i];
-          let minClearanceFromPath = (PLAYER_RADIUS / this.cellSize) + 1; // Ensure submarine can pass
-          
-          if (noise(i * CAVE_OBSTACLE_NOISE_FACTOR_1, j * CAVE_OBSTACLE_NOISE_FACTOR_1, CAVE_OBSTACLE_NOISE_OFFSET_1 + currentLevel) > CAVE_OBSTACLE_THRESHOLD_1 && 
-              abs(j - pathPoint.y) > pathPoint.radius + CAVE_OBSTACLE_DIST_BUFFER_1 &&
-              abs(j - pathPoint.y) > minClearanceFromPath) {
-            this.grid[i][j] = true; // Add an obstacle
-          }
-        } else { // If it's currently a wall
-          if (noise(i * CAVE_CLEARING_NOISE_FACTOR, j * CAVE_CLEARING_NOISE_FACTOR, CAVE_CLEARING_NOISE_OFFSET + currentLevel) < CAVE_CLEARING_THRESHOLD) {
-            this.grid[i][j] = false; // Carve a clearing
-          }
-        }
-      }
-    }
-    
-    // Ensure the main path has guaranteed clearance for submarine passage
-    this.ensureMainPathClearance(mainPath);
-    
-    // Find and connect all significant open spaces
-    this.connectAllSignificantSpaces();
-    
-    // Ensure borders are walls
-    for (let i = 0; i < this.gridWidth; i++) { this.grid[i][0] = true; this.grid[i][this.gridHeight - 1] = true; }
-    for (let j = 0; j < this.gridHeight; j++) this.grid[0][j] = true;
-    for (let j = 0; j < this.gridHeight; j++) {
-      // Ensure exitPathY is valid before using it
-      if (isNaN(this.exitPathY) || this.exitPathY === undefined || this.exitPathY === null) {
-        this.exitPathY = this.gridHeight / 2;
-        this.exitPathRadius = Math.max(CAVE_PATH_MIN_RADIUS_CELLS, 3);
-        console.warn("exitPathY was invalid during border generation, using defaults");
-      }
-      if (abs(j - this.exitPathY) > this.exitPathRadius) this.grid[this.gridWidth - 1][j] = true;
-      else this.grid[this.gridWidth - 1][j] = false;
-    }
-    
-    // Validate path connectivity and regenerate if needed (max 3 attempts)
-    let attempts = 0;
-    while (!this.validatePathConnectivity() && attempts < 3) {
-      console.log("Path validation failed, regenerating cave...");
-      attempts++;
-      // Clear and regenerate with slightly different parameters
-      this.ensureMainPathClearance(mainPath);
-      // Reduce obstacle threshold to make more open space
-      for (let i = 1; i < this.gridWidth - 1; i++) {
-        for (let j = 1; j < this.gridHeight - 1; j++) {
-          if (this.grid[i][j] && !this.grid[0][j] && !this.grid[this.gridWidth-1][j] && j !== 0 && j !== this.gridHeight-1) {
-            // Clear some walls to improve connectivity
-            if (noise(i * 0.2, j * 0.2, attempts * 100) > 0.6) {
-              this.grid[i][j] = false;
-            }
-          }
-        }
-      }
-      this.ensureMainPathClearance(mainPath);
-    }
-    // Ensure the goal area itself is not a wall in the grid, if it falls within the last column
-    // This is more for logical consistency as direct drawing handles its appearance.
-    let goalGridMinX = floor((this.goalPos.x - this.goalSize / 2) / this.cellSize);
-    let goalGridMaxX = floor((this.goalPos.x + this.goalSize / 2) / this.cellSize);
-    let goalGridMinY = floor((this.goalPos.y - this.goalSize / 2) / this.cellSize);
-    let goalGridMaxY = floor((this.goalPos.y + this.goalSize / 2) / this.cellSize);
-
-    for (let i = goalGridMinX; i <= goalGridMaxX; i++) {
-      for (let j = goalGridMinY; j <= goalGridMaxY; j++) {
-        if (i >= 0 && i < this.gridWidth && j >= 0 && j < this.gridHeight) {
-          // Check if this part of the goal is within the last column where exit path is defined
-          if (i === this.gridWidth - 1) {
-             // Only clear if it's part of the intended open exit path area
-             if (abs(j - this.exitPathY) <= this.exitPathRadius) {
-                this.grid[i][j] = false; 
-             }
-          } else if (i > this.gridWidth - CAVE_EXIT_X_OFFSET_CELLS) {
-            // For parts of the goal square that might extend beyond the last column but are in the exit zone
-            this.grid[i][j] = false;
-          }
-        }
-      }
-    }
-  }
-
-  // Ensure the main path has guaranteed clearance for submarine passage
-  ensureMainPathClearance(mainPath) {
-    let submarineRadiusInCells = PLAYER_RADIUS / this.cellSize;
-    let requiredClearance = Math.ceil(submarineRadiusInCells) + 1; // Extra buffer for safety
-    
-    for (let pathPoint of mainPath) {
-      let centerX = Math.round(pathPoint.x);
-      let centerY = Math.round(pathPoint.y);
-      
-      // Ensure clearance around each path point
-      for (let dx = -requiredClearance; dx <= requiredClearance; dx++) {
-        for (let dy = -requiredClearance; dy <= requiredClearance; dy++) {
-          let checkX = centerX + dx;
-          let checkY = centerY + dy;
-          
-          // Check if this point is within the required clearance distance
-          if (dist(0, 0, dx, dy) <= requiredClearance &&
-              checkX >= 0 && checkX < this.gridWidth &&
-              checkY >= 0 && checkY < this.gridHeight) {
-            this.grid[checkX][checkY] = false; // Clear the space
-          }
-        }
-      }
-    }
-  }
-
-  // Find and connect all significant open spaces to ensure full exploration
-  connectAllSignificantSpaces() {
-    const MIN_SPACE_SIZE = 25; // Minimum cells for a "significant" space
-    const SUBMARINE_RADIUS_CELLS = Math.ceil(PLAYER_RADIUS / this.cellSize);
-    
-    // Find all open space groups
-    let visited = this.createVisitedGrid();
-    let openSpaces = [];
-    
-    for (let i = 1; i < this.gridWidth - 1; i++) {
-      for (let j = 1; j < this.gridHeight - 1; j++) {
-        if (!this.grid[i][j] && !visited[i][j]) {
-          let space = this.floodFillOpenSpace(i, j, visited);
-          if (space.length >= MIN_SPACE_SIZE) {
-            openSpaces.push(space);
-          }
-        }
-      }
-    }
-    
-    // Connect all significant spaces to the main path
-    if (openSpaces.length > 1) {
-      this.connectSpacesToMainPath(openSpaces);
-    }
-  }
-  
-  // Create a visited grid for flood fill operations
-  createVisitedGrid() {
-    let visited = [];
-    for (let i = 0; i < this.gridWidth; i++) {
-      visited[i] = [];
-      for (let j = 0; j < this.gridHeight; j++) {
-        visited[i][j] = false;
-      }
-    }
-    return visited;
-  }
-  
-  // Flood fill to find connected open space
-  floodFillOpenSpace(startX, startY, visited) {
-    let space = [];
-    let queue = [{x: startX, y: startY}];
-    visited[startX][startY] = true;
-    
-    while (queue.length > 0) {
-      let current = queue.shift();
-      space.push(current);
-      
-      // Check 4 directions (not diagonal for more natural spaces)
-      const directions = [{x: 0, y: 1}, {x: 0, y: -1}, {x: 1, y: 0}, {x: -1, y: 0}];
-      
-      for (let dir of directions) {
-        let newX = current.x + dir.x;
-        let newY = current.y + dir.y;
-        
-        if (newX >= 0 && newX < this.gridWidth && 
-            newY >= 0 && newY < this.gridHeight &&
-            !visited[newX][newY] && !this.grid[newX][newY]) {
-          visited[newX][newY] = true;
-          queue.push({x: newX, y: newY});
-        }
-      }
-    }
-    
-    return space;
-  }
-  
-  // Connect isolated spaces to the main path with organic tunnels
-  connectSpacesToMainPath(openSpaces) {
-    // Find the main path space (largest connected component containing the center)
-    let mainSpaceIndex = this.findMainPathSpace(openSpaces);
-    
-    if (mainSpaceIndex === -1) return; // No main space found
-    
-    let mainSpace = openSpaces[mainSpaceIndex];
-    
-    // Connect all other spaces to the main space
-    for (let i = 0; i < openSpaces.length; i++) {
-      if (i !== mainSpaceIndex) {
-        this.carveOrganicTunnel(openSpaces[i], mainSpace);
-      }
-    }
-  }
-  
-  // Find the space that contains the main path
-  findMainPathSpace(openSpaces) {
-    let centerX = Math.floor(this.gridWidth / 4); // Near start area
-    let centerY = Math.floor(this.gridHeight / 2);
-    
-    for (let i = 0; i < openSpaces.length; i++) {
-      for (let cell of openSpaces[i]) {
-        if (dist(cell.x, cell.y, centerX, centerY) < 10) {
-          return i;
-        }
-      }
-    }
-    
-    // If not found, return the largest space
-    let largestIndex = 0;
-    for (let i = 1; i < openSpaces.length; i++) {
-      if (openSpaces[i].length > openSpaces[largestIndex].length) {
-        largestIndex = i;
-      }
-    }
-    
-    return largestIndex;
-  }
-  
-  // Carve an organic tunnel between two spaces
-  carveOrganicTunnel(fromSpace, toSpace) {
-    // Find closest points between the two spaces
-    let minDist = Infinity;
-    let startPoint = null;
-    let endPoint = null;
-    
-    for (let fromCell of fromSpace) {
-      for (let toCell of toSpace) {
-        let d = dist(fromCell.x, fromCell.y, toCell.x, toCell.y);
-        if (d < minDist) {
-          minDist = d;
-          startPoint = fromCell;
-          endPoint = toCell;
-        }
-      }
-    }
-    
-    if (!startPoint || !endPoint) return;
-    
-    // Carve organic path using noise-based curve
-    this.carveNoisyPath(startPoint.x, startPoint.y, endPoint.x, endPoint.y);
-  }
-  
-  // Carve a noisy, organic-looking path between two points
-  carveNoisyPath(x1, y1, x2, y2) {
-    let steps = Math.floor(dist(x1, y1, x2, y2)) + 5;
-    let tunnelWidth = Math.ceil(PLAYER_RADIUS / this.cellSize) + 1;
-    
-    for (let i = 0; i <= steps; i++) {
-      let t = i / steps;
-      
-      // Base interpolation
-      let baseX = lerp(x1, x2, t);
-      let baseY = lerp(y1, y2, t);
-      
-      // Add organic noise to the path
-      let noiseScale = 0.1;
-      let noiseAmplitude = 3;
-      let offsetX = (noise(baseX * noiseScale, baseY * noiseScale, 100) - 0.5) * noiseAmplitude;
-      let offsetY = (noise(baseX * noiseScale, baseY * noiseScale, 200) - 0.5) * noiseAmplitude;
-      
-      let currentX = Math.round(baseX + offsetX);
-      let currentY = Math.round(baseY + offsetY);
-      
-      // Carve tunnel with appropriate width
-      for (let dx = -tunnelWidth; dx <= tunnelWidth; dx++) {
-        for (let dy = -tunnelWidth; dy <= tunnelWidth; dy++) {
-          if (dist(0, 0, dx, dy) <= tunnelWidth) {
-            let carveX = currentX + dx;
-            let carveY = currentY + dy;
-            
-            if (carveX >= 1 && carveX < this.gridWidth - 1 &&
-                carveY >= 1 && carveY < this.gridHeight - 1) {
-              this.grid[carveX][carveY] = false;
-            }
-          }
-        }
-      }
-    }
-  }
-
-  // Validate that there's a connected path from start to goal that the submarine can traverse
-  validatePathConnectivity() {
-    let submarineRadiusInCells = Math.ceil(PLAYER_RADIUS / this.cellSize);
-    let startX = Math.floor(this.cellSize * 5 / this.cellSize); // Approximate player start
-    let startY = Math.floor(this.gridHeight / 2);
-    
-    // Ensure exitX is valid
-    if (isNaN(this.exitX) || this.exitX === undefined || this.exitX === null) {
-      this.exitX = this.worldWidth - this.cellSize * CAVE_EXIT_X_OFFSET_CELLS;
-      console.warn("exitX was invalid, recalculating");
-    }
-    let goalX = Math.floor(this.exitX / this.cellSize);
-    
-    // Ensure exitPathY is valid, use center if not
-    if (isNaN(this.exitPathY) || this.exitPathY === undefined || this.exitPathY === null) {
-      this.exitPathY = this.gridHeight / 2;
-      console.warn("exitPathY was invalid, using grid center");
-    }
-    let goalY = Math.floor(this.exitPathY);
-    
-    // Validate all calculated values are numbers
-    if (isNaN(startX)) startX = 5;
-    if (isNaN(startY)) startY = Math.floor(this.gridHeight / 2);
-    if (isNaN(goalX)) goalX = this.gridWidth - 10;
-    if (isNaN(goalY)) goalY = Math.floor(this.gridHeight / 2);
-    
-    // Validate goalX and goalY are within bounds
-    goalX = constrain(goalX, 0, this.gridWidth - 1);
-    goalY = constrain(goalY, 0, this.gridHeight - 1);
-    
-    // Use a simple flood fill to check connectivity
-    let visited = [];
-    for (let i = 0; i < this.gridWidth; i++) {
-      visited[i] = [];
-      for (let j = 0; j < this.gridHeight; j++) {
-        visited[i][j] = false;
-      }
-    }
-    
-    // BFS to check if goal is reachable from start
-    let queue = [{x: startX, y: startY}];
-    visited[startX][startY] = true;
-    
-    while (queue.length > 0) {
-      let current = queue.shift();
-      
-      // Check if we reached the goal area
-      if (dist(current.x, current.y, goalX, goalY) < 3) {
-        return true; // Path found
-      }
-      
-      // Check 8 directions for movement
-      for (let dx = -1; dx <= 1; dx++) {
-        for (let dy = -1; dy <= 1; dy++) {
-          if (dx === 0 && dy === 0) continue;
-          
-          let newX = current.x + dx;
-          let newY = current.y + dy;
-          
-          if (newX >= 0 && newX < this.gridWidth && 
-              newY >= 0 && newY < this.gridHeight && 
-              !visited[newX][newY] && 
-              this.canSubmarinePassThrough(newX, newY, submarineRadiusInCells)) {
-            visited[newX][newY] = true;
-            queue.push({x: newX, y: newY});
-          }
-        }
-      }
-    }
-    
-    return false; // No path found
-  }
-  
-  // Check if submarine can pass through a given grid cell
-  canSubmarinePassThrough(gridX, gridY, submarineRadiusInCells) {
-    // Check if submarine can fit at this position
-    for (let dx = -submarineRadiusInCells; dx <= submarineRadiusInCells; dx++) {
-      for (let dy = -submarineRadiusInCells; dy <= submarineRadiusInCells; dy++) {
-        if (dist(0, 0, dx, dy) <= submarineRadiusInCells) {
-          let checkX = gridX + dx;
-          let checkY = gridY + dy;
-          
-          if (checkX < 0 || checkX >= this.gridWidth || 
-              checkY < 0 || checkY >= this.gridHeight ||
-              (this.grid[checkX] && this.grid[checkX][checkY])) {
-            return false; // Blocked
-          }
-        }
-      }
-    }
-    return true; // Can pass through
-  }
-
-  isWall(worldX, worldY, objectRadius = 0) {
-    // Check for goal square collision first for sonar detection (not for player passage)
-    // This is a simplified check; sonar will treat it as a distinct object.
-    // For actual player collision with walls, the grid check below is primary.
-
-    if (worldX < 0 || worldX >= this.worldWidth || worldY < 0 || worldY >= this.worldHeight) return true; // Out of bounds is a wall
-    const checks = CAVE_WALL_CHECK_POINTS;
-    for (let i = 0; i < checks; i++) {
-      const angle = (TWO_PI / checks) * i;
-      const checkX = worldX + cos(angle) * objectRadius; const checkY = worldY + sin(angle) * objectRadius;
-      let gridX = floor(checkX / this.cellSize); let gridY = floor(checkY / this.cellSize);
-      gridX = constrain(gridX, 0, this.gridWidth - 1); gridY = constrain(gridY, 0, this.gridHeight - 1);
-      if (this.grid[gridX] && this.grid[gridX][gridY]) return true;
-    }
-    return false;
-  }
-
-  // New method to check if a point is within the goal square
-  isGoal(worldX, worldY) {
-    return worldX >= this.goalPos.x - this.goalSize / 2 &&
-           worldX <= this.goalPos.x + this.goalSize / 2 &&
-           worldY >= this.goalPos.y - this.goalSize / 2 &&
-           worldY <= this.goalPos.y + this.goalSize / 2;
-  }
-
-  // New method to render the goal square
-  renderGoal(offsetX, offsetY) {
-    push();
-    fill(GOAL_SQUARE_VISUAL_COLOR_H, GOAL_SQUARE_VISUAL_COLOR_S, GOAL_SQUARE_VISUAL_COLOR_B);
-    noStroke();
-    rectMode(CENTER);
-    rect(this.goalPos.x - offsetX, this.goalPos.y - offsetY, this.goalSize, this.goalSize);
-
-    // Draw nuclear symbol
-    let cx = this.goalPos.x - offsetX;
-    let cy = this.goalPos.y - offsetY;
-    
-    fill(0); // Black for the symbol
-    noStroke();
-
-    const overallSymbolRadius = this.goalSize * 0.40; // Overall radius of the symbol
-    const centerDiscRadius = overallSymbolRadius * 0.22; // Radius of the central filled circle
-    // Adjusted bladeInnerRadius to create a gap around the center circle
-    const bladeInnerRadius = centerDiscRadius * 1.35; // Blades start further out from the center circle
-    const bladeOuterRadius = overallSymbolRadius;  // Blades extend to the full symbol radius
-    const bladeSweepAngle = PI / 3; // Each blade is 60 degrees wide (PI/3 radians)
-    const angleStep = PI / 30; // Step for drawing arc segments (6 degrees per step)
-
-    // Center solid circle
-    ellipse(cx, cy, centerDiscRadius * 2, centerDiscRadius * 2);
-
-    // 3 blades
-    for (let i = 0; i < 3; i++) {
-      push();
-      translate(cx, cy); // Move origin to the center of the symbol
-      
-      // Calculate the central angle for this blade.
-      // Standard orientation: blades centered at 90 (PI/2), 210 (7PI/6), 330 (11PI/6) degrees.
-      let bladeCenterRotation = (PI / 2) + (i * TWO_PI / 3);
-      rotate(bladeCenterRotation);
-
-      // Define the blade shape symmetrically around the (new) positive X-axis.
-      // It will span from -30 degrees to +30 degrees relative to the rotated X-axis.
-      let startAng = -bladeSweepAngle / 2;
-      let endAng = bladeSweepAngle / 2;
-      
-      beginShape();
-      // Outer arc vertices (drawn from startAng to endAng)
-      for (let a = startAng; a <= endAng; a += angleStep) {
-        vertex(cos(a) * bladeOuterRadius, sin(a) * bladeOuterRadius);
-      }
-      // Ensure the final point of the outer arc is at endAng
-      vertex(cos(endAng) * bladeOuterRadius, sin(endAng) * bladeOuterRadius);
-
-      // Inner arc vertices (drawn from endAng back to startAng)
-      for (let a = endAng; a >= startAng; a -= angleStep) {
-         vertex(cos(a) * bladeInnerRadius, sin(a) * bladeInnerRadius);
-      }
-      // Ensure the final point of the inner arc (which is the start point) is at startAng
-      vertex(cos(startAng) * bladeInnerRadius, sin(startAng) * bladeInnerRadius);
-      endShape(CLOSE); // Close the shape to form a filled segment
-
-      pop(); // Restore previous transformation state
-    }
-    pop(); // Matches the initial push() at the start of renderGoal
-  }
-  
-  // Destroy cave blocks in a radius around the impact point
-  destroyBlocks(worldX, worldY, radius = 30) {
-    // Convert world coordinates to grid coordinates
-    let centerGridX = Math.floor(worldX / this.cellSize);
-    let centerGridY = Math.floor(worldY / this.cellSize);
-    
-    // Calculate grid radius
-    let gridRadius = Math.ceil(radius / this.cellSize);
-    
-    // Destroy blocks in a circular area
-    for (let dx = -gridRadius; dx <= gridRadius; dx++) {
-      for (let dy = -gridRadius; dy <= gridRadius; dy++) {
-        let gridX = centerGridX + dx;
-        let gridY = centerGridY + dy;
-        
-        // Check if within bounds
-        if (gridX >= 1 && gridX < this.gridWidth - 1 && 
-            gridY >= 1 && gridY < this.gridHeight - 1) {
-          
-          // Check if within circular radius
-          let distance = Math.sqrt(dx * dx + dy * dy) * this.cellSize;
-          if (distance <= radius) {
-            // Destroy the block (set to false = open space)
-            this.grid[gridX][gridY] = false;
-          }
-        }
-      }
-    }
-  }
-}
-
-// --- PlayerSub Class --- (Minor changes for sound triggers)
-class PlayerSub {
-  constructor(x, y, initialAir, airDepletionRatePerFrame) {
-    this.pos = createVector(x, y); this.vel = createVector(0, 0); this.angle = 0;
-    this.radius = PLAYER_RADIUS; this.thrustPower = PLAYER_THRUST_POWER; this.turnSpeed = PLAYER_TURN_SPEED;
-    this.damping = PLAYER_DAMPING; this.maxSpeed = PLAYER_MAX_SPEED;
-    this.sonarHits = []; this.sonarRange = PLAYER_SONAR_RANGE; this.sonarPulses = PLAYER_SONAR_PULSES;
-    this.sonarCooldown = PLAYER_SONAR_COOLDOWN_FRAMES; this.lastSonarTime = -this.sonarCooldown; // Allow immediate first sonar
-    this.sonarDisplayTime = PLAYER_SONAR_DISPLAY_TIME_FRAMES; this.health = PLAYER_INITIAL_HEALTH;
-    this.initialAirSupply = initialAir; this.airSupply = this.initialAirSupply;
-    this.airDepletionRate = airDepletionRatePerFrame;
-    this.shotCooldown = PLAYER_SHOT_COOLDOWN_FRAMES; this.lastShotTime = -this.shotCooldown; // Allow immediate first shot
-    this.propellerAngle = 0; // For propeller animation
-    this.wasInCurrent = false; // Track if player was in current area last frame
-    // No need to store bubbles in player, they will be global
-  }
-  fireSonar(cave, enemies, jellyfish) {
-    this.lastSonarTime = frameCount; playSound('sonar');
-    let playerInGoal = cave.isGoal(this.pos.x, this.pos.y); // Check if player is in goal
-
-    for (let i = 0; i < this.sonarPulses; i++) {
-      let rayAngle = this.angle - PI + (TWO_PI / this.sonarPulses) * i; // Sonar sweeps around the sub
-      let hitDetectedOnRay = false;
-      for (let dist = 0; dist < this.sonarRange; dist += PLAYER_SONAR_RAY_STEP) {
-        if (hitDetectedOnRay) break; // Optimization: stop ray if something is hit
-        let checkX = this.pos.x + cos(rayAngle) * dist; let checkY = this.pos.y + sin(rayAngle) * dist;
-        
-        // Check for goal hit first
-        // Only detect goal with sonar if player is NOT in goal
-        if (!playerInGoal && cave.isGoal(checkX, checkY)) { 
-            this.sonarHits.push({ 
-                x: checkX, y: checkY, type: 'goal', receivedAt: frameCount, 
-                intensity: map(dist, 0, this.sonarRange, PLAYER_SONAR_GOAL_HIT_INTENSITY_MAX, PLAYER_SONAR_GOAL_HIT_INTENSITY_MIN) 
-            });
-            hitDetectedOnRay = true; 
-            break; // Goal hit, stop this ray
-        }
-
-        // Check for enemy hits first
-        for (let enemy of enemies) {
-          if (p5.Vector.dist(createVector(checkX, checkY), enemy.pos) < enemy.radius) {
-            this.sonarHits.push({ x: checkX, y: checkY, type: 'enemy', receivedAt: frameCount, intensity: map(dist, 0, this.sonarRange, PLAYER_SONAR_ENEMY_INTENSITY_MAX, PLAYER_SONAR_ENEMY_INTENSITY_MIN) });
-            hitDetectedOnRay = true; 
-            // Play creature growl when enemy hit by sonar
-            playSound('creatureGrowl');
-            break;
-          }
-        }
-        if (hitDetectedOnRay) break; // If enemy hit, don't check for wall at same spot
-        
-        // Check for jellyfish hits
-        for (let jelly of jellyfish) {
-          if (p5.Vector.dist(createVector(checkX, checkY), jelly.pos) < jelly.radius) {
-            this.sonarHits.push({ x: checkX, y: checkY, type: 'jellyfish', receivedAt: frameCount, intensity: map(dist, 0, this.sonarRange, PLAYER_SONAR_ENEMY_INTENSITY_MAX, PLAYER_SONAR_ENEMY_INTENSITY_MIN) });
-            hitDetectedOnRay = true;
-            playSound('creatureGrowl');
-            break;
-          }
-        }
-        if (hitDetectedOnRay) break; // If jellyfish hit, don't check for wall at same spot
-        
-        // Check for wall hits
-        if (cave.isWall(checkX, checkY)) {
-          this.sonarHits.push({ x: checkX, y: checkY, type: 'wall', receivedAt: frameCount, intensity: map(dist, 0, this.sonarRange, PLAYER_SONAR_WALL_INTENSITY_MAX, PLAYER_SONAR_WALL_INTENSITY_MIN) });
-          hitDetectedOnRay = true;
-        }
-      }
-    }
-    // Filter out very old sonar hits to prevent memory buildup (though render also filters)
-    this.sonarHits = this.sonarHits.filter(hit => frameCount - hit.receivedAt < this.sonarDisplayTime * PLAYER_SONAR_HIT_MAX_AGE_FACTOR);
-  }
-  shoot() {
-    if (frameCount - this.lastShotTime >= this.shotCooldown) {
-      let pStartX = this.pos.x + cos(this.angle) * this.radius * PLAYER_PROJECTILE_OFFSET_FACTOR;
-      let pStartY = this.pos.y + sin(this.angle) * this.radius * PLAYER_PROJECTILE_OFFSET_FACTOR;
-      projectiles.push(new Projectile(pStartX, pStartY, this.angle));
-      this.lastShotTime = frameCount; playSound('torpedo');
-    }
-  }
-  update(cave, currentEnemies) {
-    if (keyIsDown(UP_ARROW) || keyIsDown(KEY_CODE_W)) this.vel.add(p5.Vector.fromAngle(this.angle).mult(this.thrustPower));
-    if (keyIsDown(DOWN_ARROW) || keyIsDown(KEY_CODE_S)) this.vel.add(p5.Vector.fromAngle(this.angle).mult(-this.thrustPower * PLAYER_REVERSE_THRUST_FACTOR));
-    if (keyIsDown(LEFT_ARROW) || keyIsDown(KEY_CODE_A)) this.angle -= this.turnSpeed;
-    if (keyIsDown(RIGHT_ARROW) || keyIsDown(KEY_CODE_D)) this.angle += this.turnSpeed;
-    // Removed keyIsDown(32) for shooting from here, as it\'s handled in keyPressed for single press
-
-    // Check if player is in any current area and play sound
-    let inCurrentArea = false;
-    for (let area of currentAreas) {
-      if (area.contains(this.pos.x, this.pos.y)) {
-        inCurrentArea = true;
-        break;
-      }
-    }
-
-    // Play current flow sound when entering current (track state to avoid spam)
-    if (inCurrentArea && !this.wasInCurrent) {
-      playSound('current_flow');
-    }
-    this.wasInCurrent = inCurrentArea;
-
-    // Apply current area forces
-    for (let area of currentAreas) {
-      if (area.contains(this.pos.x, this.pos.y)) {
-        this.vel.add(area.force);
-      }
-    }
-
-    // Update propeller angle based on movement
-    if (this.vel.magSq() > 0.01) { // Check if moving (magSq is cheaper than mag)
-        this.propellerAngle += this.vel.mag() * PLAYER_PROPELLER_SPIN_SPEED_FACTOR;
-
-        // Generate propeller bubbles
-        if (random() < PROPELLER_BUBBLE_SPAWN_CHANCE_MOVING) {
-            let numBubbles = floor(random(1, PROPELLER_BUBBLE_MAX_COUNT_PER_SPAWN + 1));
-            for (let i = 0; i < numBubbles; i++) {
-                // Calculate bubble spawn position relative to player center, then rotate by player angle
-                let relativeSpawnX = this.radius * PROPELLER_BUBBLE_SPAWN_X_OFFSET_FACTOR;
-                let relativeSpawnY = 0; // Bubbles originate from the center of the propeller vertically
-
-                // Add small random offset
-                let offsetX = random(-PROPELLER_BUBBLE_SPAWN_AREA_RADIUS, PROPELLER_BUBBLE_SPAWN_AREA_RADIUS);
-                let offsetY = random(-PROPELLER_BUBBLE_SPAWN_AREA_RADIUS, PROPELLER_BUBBLE_SPAWN_AREA_RADIUS);
-
-                let rotatedOffsetX = cos(this.angle) * (relativeSpawnX + offsetX) - sin(this.angle) * offsetY;
-                let rotatedOffsetY = sin(this.angle) * (relativeSpawnX + offsetX) + cos(this.angle) * offsetY;
-                
-                let bubbleX = this.pos.x + rotatedOffsetX;
-                let bubbleY = this.pos.y + rotatedOffsetY;
-                sonarBubbles.push(new SonarBubble(bubbleX, bubbleY));
-            }
-        }
-    }
-
-
-    if (frameCount - this.lastSonarTime >= this.sonarCooldown) this.fireSonar(cave, currentEnemies, jellyfish);
-
-    this.vel.limit(this.maxSpeed); let nextPos = p5.Vector.add(this.pos, this.vel);
-    if (cave.isWall(nextPos.x, nextPos.y, this.radius * PLAYER_COLLISION_RADIUS_FACTOR)) {
-      this.pos.sub(this.vel.copy().mult(PLAYER_BUMP_RECOIL_FACTOR)); // Move back slightly
-      this.vel.mult(PLAYER_BUMP_VELOCITY_REVERSE_FACTOR); // Reverse and dampen velocity
-      this.health -= PLAYER_BUMP_DAMAGE; if (this.health < 0) this.health = 0; playSound('bump');
-    } else {
-      this.pos.add(this.vel);
-    }
-    this.vel.mult(this.damping); this.airSupply -= this.airDepletionRate;
-    if (this.airSupply < 0) this.airSupply = 0;
-
-    // Low air warning sound
-    if (audioInitialized && this.airSupply > 0 && this.airSupply < this.initialAirSupply * PLAYER_LOW_AIR_THRESHOLD_FACTOR) {
-      if (millis() - lastLowAirBeepTime > LOW_AIR_BEEP_INTERVAL) { playSound('lowAir'); lastLowAirBeepTime = millis(); }
-    } else if (audioInitialized && lowAirOsc && lowAirOsc.started && typeof lowAirOsc.stop === 'function') {
-      // Ensure low air sound stops if air is replenished or game not active
-      lowAirEnv.triggerRelease(lowAirOsc);
-    }
-  }
-  _renderSonarHits(offsetX, offsetY) {
-    for (let i = this.sonarHits.length - 1; i >= 0; i--) {
-      let hit = this.sonarHits[i]; let age = frameCount - hit.receivedAt;
-      if (age < this.sonarDisplayTime) {
-        let alpha = map(age, 0, this.sonarDisplayTime, PLAYER_SONAR_HIT_ALPHA_MAX, PLAYER_SONAR_HIT_ALPHA_MIN);
-        let hitSize = map(age, 0, this.sonarDisplayTime, PLAYER_SONAR_HIT_SIZE_MAX, PLAYER_SONAR_HIT_SIZE_MIN) * hit.intensity;
-        let displayX = hit.x - offsetX; let displayY = hit.y - offsetY;
-        // Cull off-screen sonar pings for performance
-        if (displayX < -PLAYER_SONAR_HIT_OFFSCREEN_BUFFER || displayX > width + PLAYER_SONAR_HIT_OFFSCREEN_BUFFER || displayY < -PLAYER_SONAR_HIT_OFFSCREEN_BUFFER || displayY > height + PLAYER_SONAR_HIT_OFFSCREEN_BUFFER) continue;
-
-        if (hit.type === 'wall') fill(PLAYER_SONAR_WALL_COLOR_H, PLAYER_SONAR_WALL_COLOR_S, PLAYER_SONAR_WALL_COLOR_B, alpha * hit.intensity);
-        else if (hit.type === 'enemy') { fill(PLAYER_SONAR_ENEMY_COLOR_H, PLAYER_SONAR_ENEMY_COLOR_S, PLAYER_SONAR_ENEMY_COLOR_B, alpha * hit.intensity); hitSize *= PLAYER_SONAR_ENEMY_HIT_SIZE_FACTOR; }
-        else if (hit.type === 'goal') { fill(PLAYER_SONAR_GOAL_HIT_COLOR_H, PLAYER_SONAR_GOAL_HIT_COLOR_S, PLAYER_SONAR_GOAL_HIT_COLOR_B, alpha * hit.intensity); } // Use goal sonar color
-        else if (hit.type === 'jellyfish') { fill(PLAYER_SONAR_JELLYFISH_COLOR_H, PLAYER_SONAR_JELLYFISH_COLOR_S, PLAYER_SONAR_JELLYFISH_COLOR_B, alpha * hit.intensity); hitSize *= PLAYER_SONAR_ENEMY_HIT_SIZE_FACTOR; } // Jellyfish sonar color
-        noStroke(); ellipse(displayX, displayY, hitSize, hitSize);
-      } else {
-        this.sonarHits.splice(i, 1); // Remove old hits
-      }
-    }
-  }
-
-  _renderBody() {
-    fill(PLAYER_COLOR_BODY_H, PLAYER_COLOR_BODY_S, PLAYER_COLOR_BODY_B);
-    noStroke();
-    ellipse(0, 0, this.radius * PLAYER_BODY_WIDTH_FACTOR, this.radius * PLAYER_BODY_HEIGHT_FACTOR);
-  }
-
-  _renderSail() {
-    fill(PLAYER_COLOR_SAIL_H, PLAYER_COLOR_SAIL_S, PLAYER_COLOR_SAIL_B);
-    rectMode(CENTER);
-    rect(this.radius * PLAYER_SAIL_OFFSET_X_FACTOR, 0, this.radius * PLAYER_SAIL_WIDTH_FACTOR, this.radius * PLAYER_SAIL_HEIGHT_FACTOR, this.radius * PLAYER_SAIL_CORNER_RADIUS_FACTOR);
-    rectMode(CORNER); // Reset rectMode
-  }
-
-  _renderFin() {
-    fill(PLAYER_COLOR_FIN_H, PLAYER_COLOR_FIN_S, PLAYER_COLOR_FIN_B);
-    beginShape();
-    vertex(-this.radius * PLAYER_FIN_X1_FACTOR, -this.radius * PLAYER_FIN_Y1_FACTOR);
-    vertex(-this.radius * PLAYER_FIN_X2_FACTOR, this.radius * PLAYER_FIN_Y2_FACTOR);
-    vertex(-this.radius * PLAYER_FIN_X3_FACTOR, this.radius * PLAYER_FIN_Y3_FACTOR);
-    vertex(-this.radius * PLAYER_FIN_X4_FACTOR, -this.radius * PLAYER_FIN_Y4_FACTOR);
-    endShape(CLOSE);
-  }
-
-  _renderPropeller() {
-    push();
-    translate(this.radius * PLAYER_PROPELLER_X_OFFSET_FACTOR, 0); // Position propeller at the back
-
-    fill(PLAYER_COLOR_PROPELLER_H, PLAYER_COLOR_PROPELLER_S, PLAYER_COLOR_PROPELLER_B);
-    noStroke();
-
-    let apparentHeight = this.radius * PLAYER_PROPELLER_MAX_SIDE_HEIGHT_FACTOR * abs(sin(this.propellerAngle));
-    let thickness = this.radius * PLAYER_PROPELLER_THICKNESS_FACTOR;
-
-    rectMode(CENTER);
-    rect(0, 0, thickness, apparentHeight);
-    rectMode(CORNER); // Reset rectMode
-
-    pop(); // End propeller transformations
-  }
-
-  render(offsetX, offsetY) {
-    // Render Sonar Hits FIRST, so they are behind the player sub
-    this._renderSonarHits(offsetX, offsetY);
-
-    push();
-    translate(width / 2, height / 2); // Player is always centered
-    rotate(this.angle); // And rotated
-
-    this._renderBody();
-    this._renderSail();
-    this._renderFin();
-    this._renderPropeller();
-    
-    // Note: rectMode(CORNER) is reset inside _renderSail and _renderPropeller if they use CENTER.
-    // If other parts used rectMode(CENTER) and didn't reset, it might be an issue.
-    // However, ellipse and beginShape/endShape are not affected by rectMode.
-    // The main pop() will restore the drawing context anyway.
-
-    pop(); // End player transformations
-
-    // Sonar Cooldown Indicator (currently commented out)
-    //let sonarCycleProgress = (frameCount - this.lastSonarTime) / this.sonarCooldown;
-    //sonarCycleProgress = sonarCycleProgress - floor(sonarCycleProgress); // Keep it 0-1
-    //noFill(); strokeWeight(PLAYER_SONAR_ARC_WEIGHT); stroke(PLAYER_SONAR_ARC_COLOR_H, PLAYER_SONAR_ARC_COLOR_S, PLAYER_SONAR_ARC_COLOR_B, PLAYER_SONAR_ARC_COLOR_A);
-    //arc(width / 2, height / 2, this.radius * PLAYER_SONAR_ARC_RADIUS_FACTOR, this.radius * PLAYER_SONAR_ARC_RADIUS_FACTOR, -PI / 2, -PI / 2 + TWO_PI * sonarCycleProgress);
-
-    strokeWeight(DEFAULT_STROKE_WEIGHT); // Reset stroke weight
-  }
-  handleEnemyCollisions(enemies) {
-    for (let i = enemies.length - 1; i >= 0; i--) {
-      let enemy = enemies[i];
-      let d = dist(this.pos.x, this.pos.y, enemy.pos.x, enemy.pos.y);
-      if (d < this.radius * PLAYER_COLLISION_RADIUS_FACTOR + enemy.radius) { // Use consistent collision factor
-        this.health -= PLAYER_ENEMY_COLLISION_DAMAGE; if (this.health < 0) this.health = 0;
-        let knockbackPlayer = p5.Vector.sub(this.pos, enemy.pos).normalize().mult(PLAYER_ENEMY_COLLISION_KNOCKBACK);
-        this.vel.add(knockbackPlayer);
-        playSound('explosion'); // Play explosion sound for enemy destruction
-      }
-    }
-  }
-  handleJellyfishCollisions(jellyfish) {
-    for (let i = jellyfish.length - 1; i >= 0; i--) {
-      let jelly = jellyfish[i];
-      let d = dist(this.pos.x, this.pos.y, jelly.pos.x, jelly.pos.y);
-      if (d < this.radius * PLAYER_COLLISION_RADIUS_FACTOR + jelly.radius) {
-        this.health -= JELLYFISH_DAMAGE; // More damage than regular enemies
-        if (this.health < 0) this.health = 0;
-        let knockbackPlayer = p5.Vector.sub(this.pos, jelly.pos).normalize().mult(PLAYER_ENEMY_COLLISION_KNOCKBACK * 1.5); // Stronger knockback
-        this.vel.add(knockbackPlayer);
-        playSound('explosion'); // Play explosion sound for collision
-      }
-    }
-  }
-}
-
-// --- Enemy Class ---
-class Enemy {
-  constructor(x, y) {
-    this.pos = createVector(x, y); this.radius = ENEMY_RADIUS;
-    // Initial velocity calculation uses ENEMY_MIN_BASE_SPEED and ENEMY_MAX_BASE_SPEED
-    this.vel = p5.Vector.random2D().mult(random(ENEMY_MIN_BASE_SPEED, ENEMY_MAX_BASE_SPEED + currentLevel * ENEMY_SPEED_LEVEL_MULTIPLIER));
-    this.type = 'enemy'; this.nextDecisionTime = 0; // For AI behavior
-    
-
-  }
-  update(cave, player) { // Added player argument
-    if (frameCount > this.nextDecisionTime) {
-      // Speed calculation for new velocity decision
-      // Note: The original code used ENEMY_AI_NEW_VEL_MIN_SPEED_FACTOR and MAX_SPEED_FACTOR here.
-      // For consistency with constructor and homing, let's use the base speed logic.
-      let newSpeed = random(ENEMY_MIN_BASE_SPEED, ENEMY_MAX_BASE_SPEED + currentLevel * ENEMY_SPEED_LEVEL_MULTIPLIER);
-
-      if (currentLevel >= ENEMY_HOMING_START_LEVEL && player && random() < ENEMY_HOMING_CHANCE) {
-        // Homing behavior
-        let directionToPlayer = p5.Vector.sub(player.pos, this.pos).normalize();
-        this.vel = directionToPlayer.mult(newSpeed);
-      } else {
-        // Standard random behavior
-        this.vel = p5.Vector.random2D().mult(newSpeed);
-      }
-      // Reset decision time, ensuring it doesn't become too short or negative
-      let maxDecisionInterval = ENEMY_AI_DECISION_MAX_INTERVAL_BASE_FRAMES - currentLevel * ENEMY_AI_DECISION_INTERVAL_LEVEL_REDUCTION_FRAMES;
-      maxDecisionInterval = max(maxDecisionInterval, ENEMY_AI_DECISION_MIN_INTERVAL_FRAMES); // Ensure max is not less than min
-      this.nextDecisionTime = frameCount + random(ENEMY_AI_DECISION_MIN_INTERVAL_FRAMES, maxDecisionInterval);
-    }
-    let nextPos = p5.Vector.add(this.pos, this.vel);
-    if (cave.isWall(nextPos.x, nextPos.y, this.radius)) {
-      this.vel.mult(-1); // Reverse direction
-      // Quicker decision after hitting a wall
-      this.nextDecisionTime = frameCount + random(ENEMY_AI_WALL_HIT_DECISION_MIN_INTERVAL_FRAMES, ENEMY_AI_WALL_HIT_DECISION_MAX_INTERVAL_FRAMES); 
-    } else {
-      this.pos.add(this.vel);
-    }
-    // Constrain enemy to world bounds (though cave should mostly handle this)
-    this.pos.x = constrain(this.pos.x, this.radius, cave.worldWidth - this.radius);
-    this.pos.y = constrain(this.pos.y, this.radius, cave.worldHeight - this.radius);
-  }
-  // Enemy render (simple circle, can be expanded) - Rendered in main draw loop if needed, or here
-  render(offsetX, offsetY) {
-    // Placeholder: Enemies are currently not explicitly rendered via their own render method in the main loop.
-    // Sonar picks them up. If direct visual is needed, add it here and call from draw().
-    // push();
-    // fill(ENEMY_COLOR_H, ENEMY_COLOR_S, ENEMY_COLOR_B);
-    // noStroke();
-    // ellipse(this.pos.x - offsetX, this.pos.y - offsetY, this.radius * 2);
-    // pop();
-  }
-}
-
-// --- Jellyfish Class ---
-class Jellyfish {
-  constructor(x, y) {
-    this.pos = createVector(x, y);
-    this.radius = JELLYFISH_RADIUS;
-    this.health = JELLYFISH_HEALTH;
-    this.maxHealth = JELLYFISH_HEALTH;
-    this.vel = p5.Vector.random2D().mult(random(JELLYFISH_MIN_SPEED, JELLYFISH_MAX_SPEED));
-    this.type = 'jellyfish';
-    this.nextDecisionTime = 0;
-    this.tentacleOffsets = []; // For tentacle animation
-    this.tentaclePhase = random(TWO_PI); // Random starting phase for animation
-    
-    // Initialize tentacle offsets for wavy animation
-    for (let i = 0; i < JELLYFISH_TENTACLE_COUNT; i++) {
-      this.tentacleOffsets.push(random(TWO_PI));
-    }
-  }
-  
-  update(cave, player) {
-    if (frameCount > this.nextDecisionTime) {
-      let newSpeed = random(JELLYFISH_MIN_SPEED, JELLYFISH_MAX_SPEED);
-
-      // Jellyfish always move toward player
-      if (player) {
-        let dirToPlayer = p5.Vector.sub(player.pos, this.pos);
-        dirToPlayer.normalize();
-        this.vel = dirToPlayer.mult(newSpeed);
-      } else {
-        // Fallback if player is not defined (should not happen in normal gameplay)
-        this.vel = p5.Vector.random2D().mult(newSpeed);
-      }
-      
-      let maxDecisionInterval = 240; // Slower decision making
-      this.nextDecisionTime = frameCount + random(120, maxDecisionInterval);
-    }
-    
-    // Handle wall collisions
-    if (cave.isWall(this.pos.x, this.pos.y)) {
-      this.vel.mult(-1); // Reverse direction
-      this.nextDecisionTime = frameCount + random(30, 90);
-    }
-    
-    this.pos.add(this.vel);
-    
-    // Keep jellyfish within world bounds
-    this.pos.x = constrain(this.pos.x, this.radius, cave.worldWidth - this.radius);
-    this.pos.y = constrain(this.pos.y, this.radius, cave.worldHeight - this.radius);
-    
-    // Update tentacle animation phase
-    this.tentaclePhase += 0.05;
-  }
-  
-  takeDamage() {
-    this.health--;
-    return this.health <= 0; // Return true if destroyed
-  }
-}
-
-// --- Sound Setup and Functions ---
-function initializeSounds() {
-  function setupSound(type, freqOrNoiseType, adsr, levels) {
-    let soundObj;
-    let env = new p5.Envelope();
-    env.setADSR(adsr.aT, adsr.dT, adsr.sR, adsr.rT);
-    env.setRange(levels.aL, levels.rL);
-
-    if (type === 'osc') {
-      soundObj = new p5.Oscillator(freqOrNoiseType); // freqOrNoiseType is actual frequency string like 'sine' or 'triangle'
-    } else { // 'noise'
-      soundObj = new p5.Noise(freqOrNoiseType); // freqOrNoiseType is noise type string like 'white' or 'pink'
-    }
-    soundObj.amp(env);
-    return { sound: soundObj, envelope: env };
-  }
-
-  let sonarSound = setupSound('osc', 'sine', SONAR_ENV_ADSR, SONAR_ENV_LEVELS);
-  sonarOsc = sonarSound.sound; sonarEnv = sonarSound.envelope;
-
-  let explosionNoiseSound = setupSound('noise', 'brown', EXPLOSION_NOISE_ENV_ADSR, EXPLOSION_NOISE_ENV_LEVELS);
-  explosionNoise = explosionNoiseSound.sound; explosionEnv = explosionNoiseSound.envelope;
-  let explosionBoomSound = setupSound('osc', 'sine', EXPLOSION_BOOM_ENV_ADSR, EXPLOSION_BOOM_ENV_LEVELS);
-  explosionBoomOsc = explosionBoomSound.sound; explosionBoomEnv = explosionBoomSound.envelope;
-  let explosionBassSound = setupSound('osc', 'sine', EXPLOSION_BASS_ENV_ADSR, EXPLOSION_BASS_ENV_LEVELS);
-  explosionBassOsc = explosionBassSound.sound; explosionBassEnv = explosionBassSound.envelope;
-
-  // Initialize creature explosion sounds (less boomy)
-  let creatureExplosionNoiseSound = setupSound('noise', 'brown', CREATURE_EXPLOSION_NOISE_ENV_ADSR, CREATURE_EXPLOSION_NOISE_ENV_LEVELS);
-  creatureExplosionNoise = creatureExplosionNoiseSound.sound; creatureExplosionEnv = creatureExplosionNoiseSound.envelope;
-  let creatureExplosionBoomSound = setupSound('osc', 'sine', CREATURE_EXPLOSION_BOOM_ENV_ADSR, CREATURE_EXPLOSION_BOOM_ENV_LEVELS);
-  creatureExplosionBoomOsc = creatureExplosionBoomSound.sound; creatureExplosionBoomEnv = creatureExplosionBoomSound.envelope;
-  let creatureExplosionBassSound = setupSound('osc', 'sine', CREATURE_EXPLOSION_BASS_ENV_ADSR, CREATURE_EXPLOSION_BASS_ENV_LEVELS);
-  creatureExplosionBassOsc = creatureExplosionBassSound.sound; creatureExplosionBassEnv = creatureExplosionBassSound.envelope;
-
-  let bumpSound = setupSound('osc', 'triangle', BUMP_ENV_ADSR, BUMP_ENV_LEVELS);
-  bumpOsc = bumpSound.sound; bumpEnv = bumpSound.envelope;
-
-  let torpedoSound = setupSound('noise', 'pink', TORPEDO_ENV_ADSR, TORPEDO_ENV_LEVELS);
-  torpedoNoise = torpedoSound.sound; torpedoEnv = torpedoSound.envelope;
-
-  // Initialize current flow sounds
-  let currentFlowNoiseSound = setupSound('noise', 'brown', CURRENT_FLOW_NOISE_ENV_ADSR, CURRENT_FLOW_NOISE_ENV_LEVELS);
-  currentFlowNoise = currentFlowNoiseSound.sound; currentFlowNoiseEnv = currentFlowNoiseSound.envelope;
-  let currentFlowBassSound = setupSound('osc', 'sine', CURRENT_FLOW_BASS_ENV_ADSR, CURRENT_FLOW_BASS_ENV_LEVELS);
-  currentFlowBassOsc = currentFlowBassSound.sound; currentFlowBassEnv = currentFlowBassSound.envelope;
-
-  let lowAirSound = setupSound('osc', 'square', LOW_AIR_ENV_ADSR, LOW_AIR_ENV_LEVELS);
-  lowAirOsc = lowAirSound.sound; lowAirEnv = lowAirSound.envelope;
-
-  // Initialize reactor hum
-  let reactorHumSound = setupSound('osc', 'sawtooth', REACTOR_HUM_ENV_ADSR, REACTOR_HUM_ENV_LEVELS);
-  reactorHumOsc = reactorHumSound.sound; reactorHumEnv = reactorHumSound.envelope;
-  reactorHumOsc.freq(REACTOR_HUM_FREQ);
-  // Set up for continuous play with amplitude control
-  reactorHumOsc.amp(0); // Start at zero volume
-
-  // Initialize creature growl
-  let creatureGrowlSound = setupSound('osc', 'sawtooth', CREATURE_GROWL_ENV_ADSR, CREATURE_GROWL_ENV_LEVELS);
-  creatureGrowlOsc = creatureGrowlSound.sound; creatureGrowlEnv = creatureGrowlSound.envelope;
-
-  let gameOverImpact = setupSound('noise', 'white', GAME_OVER_IMPACT_ENV_ADSR, GAME_OVER_IMPACT_ENV_LEVELS);
-  gameOverImpactNoise = gameOverImpact.sound; gameOverImpactEnv = gameOverImpact.envelope;
-  let gameOverGroan = setupSound('osc', 'sawtooth', GAME_OVER_GROAN_ENV_ADSR, GAME_OVER_GROAN_ENV_LEVELS);
-  gameOverGroanOsc = gameOverGroan.sound; gameOverGroanEnv = gameOverGroan.envelope;
-  let gameOverFinalBoom = setupSound('noise', 'brown', GAME_OVER_FINAL_BOOM_ENV_ADSR, GAME_OVER_FINAL_BOOM_ENV_LEVELS);
-  gameOverFinalBoomNoise = gameOverFinalBoom.sound; gameOverFinalBoomEnv = gameOverFinalBoom.envelope;
-  // Note: The original code had gameOverFinalBoomEnv.setRange(GAME_OVER_FINAL_BOOM_ENV_LEVELS.aL, GAME_OVER_FINAL_BOOM_ENV_LEVELS.rL);
-  // but it was missing the ADSR setting for gameOverFinalBoomEnv. The helper now handles both.
-}
-
-function playSound(soundName) {
-  if (!audioInitialized || (getAudioContext() && getAudioContext().state !== 'running')) return;
-
-  function ensureStarted(soundObject) {
-    if (soundObject && !soundObject.started && typeof soundObject.start === 'function') {
-      soundObject.start();
-    }
-  }
-
-  try {
-    if (soundName === 'sonar') {
-      ensureStarted(sonarOsc); sonarOsc.freq(SONAR_FREQ); sonarEnv.play(sonarOsc);
-    } else if (soundName === 'explosion') {
-      ensureStarted(explosionNoise); explosionEnv.play(explosionNoise);
-      ensureStarted(explosionBoomOsc); explosionBoomOsc.freq(random(EXPLOSION_BOOM_MIN_FREQ, EXPLOSION_BOOM_MAX_FREQ)); explosionBoomEnv.play(explosionBoomOsc);
-      ensureStarted(explosionBassOsc); explosionBassOsc.freq(random(EXPLOSION_BASS_MIN_FREQ, EXPLOSION_BASS_MAX_FREQ)); explosionBassEnv.play(explosionBassOsc);
-    } else if (soundName === 'creatureExplosion') {
-      ensureStarted(creatureExplosionNoise); creatureExplosionEnv.play(creatureExplosionNoise);
-      ensureStarted(creatureExplosionBoomOsc); creatureExplosionBoomOsc.freq(random(CREATURE_EXPLOSION_BOOM_MIN_FREQ, CREATURE_EXPLOSION_BOOM_MAX_FREQ)); creatureExplosionBoomEnv.play(creatureExplosionBoomOsc);
-      ensureStarted(creatureExplosionBassOsc); creatureExplosionBassOsc.freq(random(CREATURE_EXPLOSION_BASS_MIN_FREQ, CREATURE_EXPLOSION_BASS_MAX_FREQ)); creatureExplosionBassEnv.play(creatureExplosionBassOsc);
-    } else if (soundName === 'bump') {
-      ensureStarted(bumpOsc); bumpOsc.freq(BUMP_FREQ); bumpEnv.play(bumpOsc);
-    } else if (soundName === 'torpedo') {
-      ensureStarted(torpedoNoise); torpedoEnv.play(torpedoNoise);
-    } else if (soundName === 'current_flow') {
-      // Current flow rushing water sound
-      ensureStarted(currentFlowNoise); currentFlowNoiseEnv.play(currentFlowNoise);
-      ensureStarted(currentFlowBassOsc); 
-      currentFlowBassOsc.freq(random(CURRENT_FLOW_BASS_MIN_FREQ, CURRENT_FLOW_BASS_MAX_FREQ)); 
-      currentFlowBassEnv.play(currentFlowBassOsc);
-    } else if (soundName === 'lowAir') {
-      ensureStarted(lowAirOsc); lowAirOsc.freq(LOW_AIR_FREQ); lowAirEnv.play(lowAirOsc);
-    } else if (soundName === 'creatureGrowl') {
-      ensureStarted(creatureGrowlOsc); 
-      creatureGrowlOsc.freq(random(CREATURE_GROWL_MIN_FREQ, CREATURE_GROWL_MAX_FREQ)); 
-      creatureGrowlEnv.play(creatureGrowlOsc);
-    } else if (soundName === 'gameOver') {
-      ensureStarted(gameOverImpactNoise);
-      gameOverImpactEnv.play(gameOverImpactNoise);
-
-      setTimeout(() => {
-        ensureStarted(gameOverGroanOsc);
-        gameOverGroanOsc.freq(random(GAME_OVER_GROAN_MIN_FREQ, GAME_OVER_GROAN_MAX_FREQ));
-        gameOverGroanEnv.play(gameOverGroanOsc);
-        gameOverGroanOsc.freq(GAME_OVER_GROAN_PITCH_DOWN_TARGET_FREQ, GAME_OVER_GROAN_PITCH_DOWN_TIME, GAME_OVER_GROAN_PITCH_DOWN_DELAY); // Pitch down
-      }, GAME_OVER_GROAN_DELAY_MS);
-
-      setTimeout(() => {
-        ensureStarted(gameOverFinalBoomNoise);
-        gameOverFinalBoomEnv.play(gameOverFinalBoomNoise);
-      }, GAME_OVER_FINAL_BOOM_DELAY_MS);
-    }
-  } catch (e) { /* console.error("Sound error:", soundName, e); */ }
-}
-
-function updateReactorHum(distanceToGoal) {
-  if (!audioInitialized || !reactorHumOsc) return;
-  
-  // Calculate volume based on distance (closer = louder)
-  let volume = 0;
-  if (distanceToGoal < REACTOR_HUM_MAX_DISTANCE) {
-    // Exponential falloff for more realistic audio spatialization
-    let normalizedDistance = distanceToGoal / REACTOR_HUM_MAX_DISTANCE;
-    volume = REACTOR_HUM_ENV_LEVELS.aL * (1 - Math.pow(normalizedDistance, 0.7));
-  }
-
-  // Reduce overall hum volume by multiplying with a factor (e.g., 0.5 for half volume)
-  const HUM_VOLUME_FACTOR = 0.3; // Lower this value for quieter hum
-  volume *= HUM_VOLUME_FACTOR;
-  
-  // Apply volume directly to oscillator for continuous play
-  if (reactorHumOsc.started) {
-    reactorHumOsc.amp(volume, 0.1); // Smooth transition over 0.1 seconds
-  }
-  
-  reactorHumAmplitude = volume;
-}
-
-// --- Loading overlay control functions ---
-function showLoadingOverlay(text = "GENERATING LEVEL") {
-  const overlay = document.getElementById('loadingOverlay');
-  const loadingText = overlay.querySelector('.loading-text');
-  if (overlay) {
-    if (loadingText) {
-      loadingText.textContent = text;
-    }
-    overlay.classList.remove('hidden');
-    overlay.style.display = 'flex';
-  }
-}
-
-function hideLoadingOverlay() {
-  const overlay = document.getElementById('loadingOverlay');
-  if (overlay) {
-    overlay.classList.add('hidden');
-    // Completely hide after transition
-    setTimeout(() => {
-      if (overlay.classList.contains('hidden')) {
-        overlay.style.display = 'none';
-      }
-    }, 500);
-  }
-}
-
-function updateLoadingText(text) {
-  const overlay = document.getElementById('loadingOverlay');
-  const loadingText = overlay.querySelector('.loading-text');
-  if (loadingText) {
-    loadingText.textContent = text;
-  }
-}
-
-// --- Main Game Functions ---
-function setup() {
-  createCanvas(windowWidth, windowHeight);
-  colorMode(HSB, 360, 100, 100, 255); // Max values for HSB and Alpha
-  textAlign(CENTER, CENTER); textFont('monospace');
-  initializeSounds(); 
-  
-  // Initialize mobile controls
-  initMobileControls();
-  
-  // Initialize highscore input element
-  highscoreInputElement = document.getElementById('highscoreInput');
-  if (highscoreInputElement) {
-    // Setup input event listener
-    highscoreInputElement.addEventListener('input', function(e) {
-      if (isSubmittingHighScore) {
-        playerNameInput = e.target.value;
-      }
-    });
-    
-    // Setup enter key listener for mobile
-    highscoreInputElement.addEventListener('keydown', function(e) {
-      if (e.key === 'Enter' && isSubmittingHighScore && playerNameInput.trim().length > 0 && !isSubmissionInProgress) {
-        submitHighScore();
-      }
-    });
-  }
-
-  // Attempt fullscreen and audio initialization on first user interaction
-  function handleInitialInteraction() {
-    if (initialInteractionDone) return;
-    initialInteractionDone = true;
-    // Start audio if not already initialized
-    if (typeof startAudioRoutine === 'function' && !audioInitialized) {
-      startAudioRoutine();
-    }
-    // Attempt to go fullscreen
-    if (!fullscreen()) {
-      fullscreen(true);
-    }
-    console.log('Initial interaction: Audio started and fullscreen requested');
-  }
-  // Add one-time event listeners to canvas
-  const canvasElt = document.querySelector('canvas');
-  if (canvasElt) {
-    canvasElt.addEventListener('click', handleInitialInteraction, { once: true });
-    canvasElt.addEventListener('touchstart', handleInitialInteraction, { once: true });
-  }
-  
-  if (customFont) {
-    textFont(customFont);
-  }
-  resetGame();
-  
-  // Hide the initial loading overlay once p5.js is ready
-  setTimeout(() => {
-    hideLoadingOverlay();
-  }, 100);
-  // Initialize audio after a user gesture (e.g., click or key press)
-}
-
-function initGameObjects() {
-  showLoadingOverlay("GENERATING LEVEL");
-  
-  currentCellSize = BASE_CELL_SIZE + (currentLevel - 1) * 2; // Calculate current cell size
-
-  let baseAir = INITIAL_AIR_SUPPLY_BASE;
-  let airForLevel = baseAir; // Initialize airForLevel with baseAir
-  airForLevel = max(airForLevel, MIN_AIR_SUPPLY_PER_LEVEL); // Ensure minimum air
-  let airDepletion = BASE_AIR_DEPLETION_RATE + (currentLevel - 1) * AIR_DEPLETION_LEVEL_INCREASE;
-  
-  let playerStartX, playerStartY;
-  let attempts = 0;
-  // MAX_PLAYER_SPAWN_ATTEMPTS is defined in Spawning constants
-  let playerSpawnRadiusBuffer = currentCellSize * PLAYER_SPAWN_RADIUS_BUFFER_CELL_FACTOR; // Use currentCellSize
-
-  cave = new Cave(WORLD_WIDTH, WORLD_HEIGHT, currentCellSize); // Pass currentCellSize to Cave constructor
-
-  // Find a safe starting position for the player
-  do {
-    playerStartX = currentCellSize * (PLAYER_START_X_BASE_CELLS + attempts * PLAYER_START_X_ATTEMPT_INCREMENT_CELLS); // Use currentCellSize
-    playerStartY = WORLD_HEIGHT / 2 + random(-currentCellSize * PLAYER_START_Y_RANDOM_RANGE_CELLS, currentCellSize * PLAYER_START_Y_RANDOM_RANGE_CELLS); // Use currentCellSize
-    attempts++;
-    if (playerStartX > WORLD_WIDTH * PLAYER_SPAWN_MAX_X_SEARCH_FACTOR) {
-        playerStartX = currentCellSize * PLAYER_START_X_BASE_CELLS; playerStartY = WORLD_HEIGHT / 2; break; // Use currentCellSize
-    }
-  } while (cave.isWall(playerStartX, playerStartY, playerSpawnRadiusBuffer) && attempts < MAX_PLAYER_SPAWN_ATTEMPTS);
-  
-  if (attempts >= MAX_PLAYER_SPAWN_ATTEMPTS) { // If still no safe spot, use a default
-      playerStartX = currentCellSize * PLAYER_START_X_BASE_CELLS; playerStartY = WORLD_HEIGHT / 2; // Use currentCellSize
-  }
-
-  player = new PlayerSub(playerStartX, playerStartY, airForLevel, airDepletion);
-  
-  enemies = []; projectiles = [];
-  sonarBubbles = []; // Initialize sonar bubbles array
-  particles = []; // Initialize global particles array
-  
-  let enemyCount = BASE_ENEMY_COUNT + (currentLevel - 1) * ENEMY_COUNT_PER_LEVEL_INCREASE;
-  enemyCount = min(enemyCount, MAX_ENEMY_COUNT); // Cap enemy count
-  for (let i = 0; i < enemyCount; i++) {
-    let enemyX, enemyY, eAttempts = 0;
-    do { // Try to spawn enemy in a clear area
-      enemyX = random(WORLD_WIDTH * ENEMY_SPAWN_MIN_X_WORLD_FACTOR, WORLD_WIDTH * ENEMY_SPAWN_MAX_X_WORLD_FACTOR);
-      enemyY = random(WORLD_HEIGHT * ENEMY_SPAWN_MIN_Y_WORLD_FACTOR, WORLD_HEIGHT * ENEMY_SPAWN_MAX_Y_WORLD_FACTOR); eAttempts++;
-    } while (cave.isWall(enemyX, enemyY, ENEMY_SPAWN_WALL_CHECK_RADIUS) && eAttempts < MAX_ENEMY_SPAWN_ATTEMPTS);
-    if (eAttempts < MAX_ENEMY_SPAWN_ATTEMPTS) enemies.push(new Enemy(enemyX, enemyY));
-
-  }
-  
-  // Spawn jellyfish - 1 on level 1, +1 each level
-  jellyfish = [];
-  let jellyfishCount = currentLevel; // 1 on level 1, 2 on level 2, etc.
-  for (let i = 0; i < jellyfishCount; i++) {
-    let jellyfishX, jellyfishY, jAttempts = 0;
-    do { // Try to spawn jellyfish in a clear area, away from player
-      jellyfishX = random(WORLD_WIDTH * 0.3, WORLD_WIDTH * 0.9); // Spawn in middle to right area
-      jellyfishY = random(WORLD_HEIGHT * 0.2, WORLD_HEIGHT * 0.8);
-      jAttempts++;
-    } while (cave.isWall(jellyfishX, jellyfishY, JELLYFISH_RADIUS + 10) && jAttempts < MAX_ENEMY_SPAWN_ATTEMPTS);
-    
-    if (jAttempts < MAX_ENEMY_SPAWN_ATTEMPTS) {
-      // Make sure jellyfish isn't too close to player start
-      let distFromPlayer = dist(jellyfishX, jellyfishY, playerStartX, playerStartY);
-      if (distFromPlayer > 150) { // Minimum distance from player
-        jellyfish.push(new Jellyfish(jellyfishX, jellyfishY));
-      }
-    }
-  }
-  
-  // Spawn current areas
-  spawnCurrentAreas();
-  
-  // Hide loading overlay after a short delay
-  setTimeout(() => {
-    hideLoadingOverlay();
-  }, 200);
-}
-
-function spawnCurrentAreas() {
-  currentAreas = []; // Clear existing areas
-  
-  for (let i = 0; i < CURRENT_AREAS_PER_LEVEL; i++) {
-    let attempts = 0;
-    let areaX, areaY, areaWidth, areaHeight;
-    let validArea = false;
-    
-    while (!validArea && attempts < 50) {
-      // Random dimensions
-      areaWidth = random(CURRENT_AREA_MIN_WIDTH, CURRENT_AREA_MAX_WIDTH);
-      areaHeight = random(CURRENT_AREA_MIN_HEIGHT, CURRENT_AREA_MAX_HEIGHT);
-      
-      // Random position, avoiding player start and goal areas
-      areaX = random(CURRENT_AREA_PADDING_FROM_PLAYER_START, 
-                    WORLD_WIDTH - areaWidth - CURRENT_AREA_PADDING_FROM_GOAL);
-      areaY = random(areaHeight / 2, WORLD_HEIGHT - areaHeight / 2);
-      
-      // Check if the area is mostly in open water
-      let openCells = 0;
-      let totalCells = 0;
-      let checkStep = 20; // Check every 20 pixels for performance
-      
-      for (let checkX = areaX; checkX < areaX + areaWidth; checkX += checkStep) {
-        for (let checkY = areaY; checkY < areaY + areaHeight; checkY += checkStep) {
-          totalCells++;
-          if (!cave.isWall(checkX, checkY)) {
-            openCells++;
-          }
-        }
-      }
-      
-      // Area is valid if at least 70% is open water
-      if (totalCells > 0 && (openCells / totalCells) > 0.7) {
-        validArea = true;
-      }
-      
-      attempts++;
-    }
-    
-    if (validArea) {
-      // Create random force direction
-      let forceDirection = p5.Vector.random2D();
-      let forceMagnitude = random(CURRENT_FORCE_MAGNITUDE_MIN, CURRENT_FORCE_MAGNITUDE_MAX);
-      
-      currentAreas.push(new CurrentArea(areaX, areaY, areaWidth, areaHeight, forceDirection, forceMagnitude));
-    }
-  }
-  
-  console.log(`Spawned ${currentAreas.length} current areas for level ${currentLevel}`);
-}
-
-function resetGame() {
-  currentLevel = 1;
-  enemiesKilledThisLevel = 0; // Reset kills tracking
-  totalScore = 0; // Reset total score for new game
-  levelScore = 0; // Reset level score for the current level
-  
-  // Reset highscore submission variables
-  isHighScoreChecked = false;
-  isSubmittingHighScore = false;
-  playerNameInput = '';
-  isHighScoreResult = false;
-  isMobileInputFocused = false; // Reset flag
-  isSubmissionInProgress = false; // Reset submission flag
-  
-  // Clear any existing game state
-  sonarBubbles = []; // Clear bubbles on reset
-  particles = []; // Clear global particles on reset
-  
-  // Stop any audio that might be playing
-  if (audioInitialized && lowAirOsc && lowAirOsc.started) lowAirEnv.triggerRelease(lowAirOsc);
-  // Reset reactor hum to zero volume when resetting game
-  if (audioInitialized && reactorHumOsc && reactorHumOsc.started) {
-    reactorHumOsc.amp(0, 0);
-    reactorHumAmplitude = 0;
-  }
-  lastLowAirBeepTime = 0; // Reset beep timer
-  
-  // Restart MOD music if it was playing
-  if (modPlayer && !modPlayer.playing) {
-    modPlayer.play();
-  }
-  
-  // Return to start screen (don't initialize game objects yet)
-  gameState = 'start';
-}
-
-// --- Helper function to create explosions ---
-function createExplosion(x, y, type) {
-  let particleCount = 0;
-  let colorH, colorS, colorB;
-
-  if (type === 'wall') {
-    particleCount = EXPLOSION_PARTICLE_COUNT_TORPEDO_WALL;
-    colorH = EXPLOSION_PARTICLE_COLOR_H_WALL;
-    colorS = EXPLOSION_PARTICLE_COLOR_S_WALL;
-    colorB = EXPLOSION_PARTICLE_COLOR_B_WALL;
-  } else if (type === 'enemy') {
-    particleCount = EXPLOSION_PARTICLE_COUNT_TORPEDO_ENEMY;
-    colorH = EXPLOSION_PARTICLE_COLOR_H_ENEMY;
-    colorS = EXPLOSION_PARTICLE_COLOR_S_ENEMY;
-    colorB = EXPLOSION_PARTICLE_COLOR_B_ENEMY;
-  } else if (type === 'creature') {
-    // Creature explosion uses a different set of particles and colors
-    particleCount = EXPLOSION_PARTICLE_COUNT_TORPEDO_ENEMY; // Same count as enemy for now
-    colorH = 300; // Purple hue for creature explosion
-    colorS = 80;
-    colorB = 70;
-  }
-
-  for (let i = 0; i < particleCount; i++) {
-    let angle = random(TWO_PI);
-    let speed = random(EXPLOSION_PARTICLE_SPEED_MIN, EXPLOSION_PARTICLE_SPEED_MAX);
-    let vel = p5.Vector.fromAngle(angle, speed);
-    particles.push(new Particle(
-      x, y, 
-      vel.x, vel.y, 
-      EXPLOSION_PARTICLE_MAX_LIFESPAN, 
-      EXPLOSION_PARTICLE_MIN_SIZE, 
-      EXPLOSION_PARTICLE_MAX_SIZE, 
-      colorH, colorS, colorB, 
-      EXPLOSION_PARTICLE_ALPHA_MAX
-    ));
-  }
-}
-
-function prepareNextLevel() {
-  currentLevel++;
-  enemiesKilledThisLevel = 0; // Reset kills tracking
-  levelScore = 0; // Reset level score for new level
-  
-  // Set loading state and defer heavy initialization
-  gameState = 'loading';
-  showLoadingOverlay(`LEVEL ${currentLevel}`);
-  
-  // Use setTimeout to allow loading screen to render
-  setTimeout(() => {
-    initGameObjects(); // This will create new cave, player (with new air), enemies
-    // Player position is set by initGameObjects to a safe start in the new cave
-    player.vel = createVector(0,0); player.angle = 0; // Reset movement
-    player.health = PLAYER_INITIAL_HEALTH; // Replenish health
-    // Air supply is set by initGameObjects based on the new level
-    player.lastSonarTime = frameCount - player.sonarCooldown;
-    player.lastShotTime = frameCount - player.shotCooldown;
-    gameState = 'playing';
-    // Reactor hum is continuously playing, just reset to zero volume
-    if (audioInitialized && reactorHumOsc && reactorHumOsc.started) {
-      reactorHumOsc.amp(0, 0);
-    }
-    if (audioInitialized && lowAirOsc && lowAirOsc.started) lowAirEnv.triggerRelease(lowAirOsc);
-    lastLowAirBeepTime = 0;
-  }, 100); // Small delay to allow loading screen to render
-}
-
-function startAudioRoutine() {
-    function startAllSoundObjects() {
-        const soundObjects = [
-            sonarOsc, explosionNoise, explosionBoomOsc, explosionBassOsc, 
-            creatureExplosionNoise, creatureExplosionBoomOsc, creatureExplosionBassOsc,
-            bumpOsc, torpedoNoise, 
-            currentFlowNoise, currentFlowBassOsc,
-            lowAirOsc, reactorHumOsc, creatureGrowlOsc, gameOverImpactNoise, gameOverGroanOsc, gameOverFinalBoomNoise
-        ];
-        for (const soundObj of soundObjects) {
-            if (soundObj && !soundObj.started && typeof soundObj.start === 'function') {
-                soundObj.start();
-            }
-        }
-        // Start reactor hum playing continuously
-        if (reactorHumOsc && reactorHumOsc.started) {
-            // Reactor hum plays continuously, volume controlled by amp()
-        }
-        
-        // Initialize MOD player
-        initializeModPlayer();
-    }
-
-    if (typeof userStartAudio === 'function') {
-        userStartAudio().then(() => { audioInitialized = true; startAllSoundObjects(); })
-                        .catch(e => { /* console.error("userStartAudio error", e); */ });
-    } else {
-        let ctx = getAudioContext();
-        if (ctx && ctx.state !== 'running') {
-            ctx.resume().then(() => { audioInitialized = true; startAllSoundObjects(); })
-                        .catch(e => { /* console.error("AudioContext.resume error", e); */ });
-        } else if (ctx && ctx.state === 'running') { audioInitialized = true; startAllSoundObjects(); }
-    }
-    
-    // Initialize MOD player separately if audio is already running
-    if (audioInitialized && !modPlayer) {
-        initializeModPlayer();
-    }
-}
-
-// Initialize and set up the MOD player
-function initializeModPlayer() {
-    if (modPlayer) return; // Already initialized
-    
-    console.log('Initializing MOD player...');
-    
-    try {
-        // Make sure we have a valid audio context first
-        let ctx;
-        try {
-            if (typeof getAudioContext === 'function') {
-                ctx = getAudioContext();
-                console.log('Got p5 audio context:', ctx ? ctx.state : 'null');
-            }
-        } catch (e) {
-            console.error('Error accessing audio context:', e);
-        }
-        
-        if (!ctx) {
-            console.warn('No p5 audio context available, creating new one');
-            try {
-                // Create a new AudioContext as fallback
-                ctx = new (window.AudioContext || window.webkitAudioContext)();
-                console.log('Created new audio context:', ctx.state);
-            } catch (e) {
-                console.error('Failed to create audio context:', e);
-                return; // Can't continue without audio context
-            }
-        }
-        
-        // Create ModPlayer with the audio context
-        try {
-            modPlayer = new ModPlayer(ctx);
-            console.log('MOD player initialized with audio context');
-            
-            // If context is already running, load music immediately
-            if (ctx.state === 'running') {
-                loadModMusic();
-            } else {
-                // Try to resume the context first
-                console.log('Audio context not running, attempting to resume...');
-                ctx.resume().then(() => {
-                    console.log('Audio context resumed, loading music...');
-                    loadModMusic();
-                }).catch(err => {
-                    console.error('Could not resume audio context:', err);
-                    // We'll still try to load music, but it might not play until user interaction
-                    loadModMusic();
-                });
-            }
-        } catch (e) {
-            console.error('Failed to create ModPlayer:', e);
-        }
-    } catch (error) {
-        console.error('Error in initializeModPlayer:', error);
-    }
-}
-
-// Load and play the MOD file
-async function loadModMusic() {
-    if (!modPlayer) {
-        console.error('Cannot load MOD music: ModPlayer is not initialized');
-        return;
-    }
-    
-    try {
-        console.log('Loading MOD music...');
-        
-        // Directly interact with user gesture to unlock audio
-        // This can help in browsers that require user interaction
-        if (typeof getAudioContext === 'function') {
-            try {
-                const audioCtx = getAudioContext();
-                console.log('Audio context state before resume:', audioCtx?.state);
-                
-                if (audioCtx && audioCtx.state !== 'running') {
-                    console.log('p5 Audio context not running, attempting to resume...');
-                    // Wait for audio context to resume
-                    await audioCtx.resume();
-                    console.log('p5 Audio context resumed:', audioCtx.state);
-                    
-                    // Use a small delay after resume to ensure it took effect
-                    await new Promise(resolve => setTimeout(resolve, 100));
-                }
-            } catch (e) {
-                console.warn('Issue with audio context:', e);
-            }
-        }
-        
-        // Try to use a fetch to load MOD as ArrayBuffer for more reliable loading
-        let modData;
-        try {
-            console.log('Fetching MOD file...');
-            const response = await fetch('start.mod');
-            modData = await response.arrayBuffer();
-            console.log('MOD file fetched successfully, size:', modData.byteLength);
-        } catch (fetchErr) {
-            console.warn('Failed to fetch MOD file, falling back to standard loading:', fetchErr);
-            modData = 'start.mod'; // Fall back to string path
-        }
-        
-        // Load the MOD file with the data we obtained
-        await modPlayer.load(modData);
-        
-        if (modPlayer.mod) {
-            console.log('MOD loaded:', modPlayer.mod.title);
-            
-            // Set initial volume before playing
-            modPlayer.setVolume(0.1); // Set moderate initial volume
-            
-            // Double-check audio context is resumed before playing
-            if (modPlayer[Symbol.for('audio')] && 
-                modPlayer[Symbol.for('audio')].state !== 'running') {
-                console.log('Final audio context resume before playing...');
-                await modPlayer[Symbol.for('audio')].resume();
-            }
-            
-            console.log('Starting MOD playback...');
-            
-            // Handle play result (may be a Promise or boolean)
-            const playResult = modPlayer.play();
-            
-            if (playResult instanceof Promise) {
-                // If play() returns a Promise
-                try {
-                    const success = await playResult;
-                    console.log('MOD play Promise resolved:', success ? 'success' : 'failed');
-                    
-                    // Force another check after playing starts
-                    if (success) {
-                        setTimeout(() => {
-                            console.log('MOD playback status check:', 
-                                       'Playing:', modPlayer.playing,
-                                       'Audio running:', modPlayer[Symbol.for('audio')]?.state);
-                        }, 500);
-                    }
-                } catch (err) {
-                    console.error('Error in MOD play Promise:', err);
-                }
-            } else {
-                // Handle boolean return value
-                console.log('MOD play attempt result:', playResult ? 'success' : 'failed');
-                
-                // Force another check after playing starts
-                if (playResult) {
-                    setTimeout(() => {
-                        console.log('MOD playback status check:', 
-                                   'Playing:', modPlayer.playing,
-                                   'Audio running:', modPlayer[Symbol.for('audio')]?.state);
-                    }, 500);
-                }
-            }
-        } else {
-            console.error('Failed to load MOD: mod property is undefined');
-        }
-    } catch (error) {
-        console.error('Failed to load or play MOD music:', error);
-        console.error('Error details:', error.message);
-        if (error.stack) console.error(error.stack);
-    }
-}
-
-function preload() {
-  customFont = loadFont('Berpatroli.otf');
-}
-
-function mousePressed() {
-    if (!audioInitialized) { // If audio not started, mouse click can also start it
-        startAudioRoutine();
-    }
-    let fs = fullscreen();
-    fullscreen(!fs);
-}
-
-function keyPressed() {
-  // Start audio on Enter press from certain game states if not already started
-  if (!audioInitialized && (keyCode === ENTER && (gameState === 'start' || gameState === 'highScores' || gameState === 'levelComplete' || gameState === 'gameOver' || gameState === 'gameComplete'))) {
-    startAudioRoutine();
-  }
-
-  if (gameState === 'playing') {
-    if (keyCode === KEY_CODE_SPACE) player.shoot(); // Use constant for space key
-  }
-  
-  // Debug toggle for showing cave walls (works in any state)
-  if (key === ']') {
-    debugShowWalls = !debugShowWalls;
-    console.log("Debug wall view:", debugShowWalls ? "ON" : "OFF");
-  }
-  
-  if (gameState === 'start' && keyCode === ENTER) {
-    // Transition from start screen to high scores
-    gameState = 'highScores';
-    highScores = null; // Reset to show loading
-    
-    // Slightly increase volume for highscores screen
-    if (modPlayer && modPlayer.playing) {
-      modPlayer.fadeVolume(0.1, 1000); 
-    }
-    // Load high scores asynchronously
-    highScoreManager.getHighScores().then(scores => {
-      highScores = scores;
-    }).catch(error => {
-      console.error('Failed to load high scores:', error);
-      highScores = []; // Set to empty array on error
-    });
-  } else if (gameState === 'highScores' && keyCode === ENTER) {
-    // Transition from high scores to game
-    gameState = 'loading';
-    showLoadingOverlay("GENERATING LEVEL");
-    
-    // Set low background music volume for gameplay
-    if (modPlayer && modPlayer.playing) {
-      modPlayer.fadeVolume(0.1, 1000); // Lower volume for gameplay background music
-    }
-    
-    // Use setTimeout to allow loading screen to render
-    setTimeout(() => {
-      // currentCellSize will be set in initGameObjects based on currentLevel
-      initGameObjects();
-      player.health = PLAYER_INITIAL_HEALTH; 
-      player.airSupply = player.initialAirSupply; // Reset to full for new game
-      player.lastSonarTime = frameCount - player.sonarCooldown; // Allow immediate sonar
-      player.lastShotTime = frameCount - player.shotCooldown;   // Allow immediate shot
-      gameState = 'playing';
-      // Reactor hum is continuously playing, just needs to be started if not already
-      if (audioInitialized && reactorHumOsc && reactorHumOsc.started) {
-        reactorHumOsc.amp(0, 0);
-      }
-    }, 100); // Small delay to allow loading screen to render
- }  else if (gameState === 'gameOver' && keyCode === ENTER) {
-    if (isSubmittingHighScore && playerNameInput.trim().length > 0 && !isSubmissionInProgress) {
-      // Submit the high score (desktop)
-      submitHighScore();
-    } else if (!isSubmittingHighScore) {
-      resetGame();
-    }
-  } else if (gameState === 'gameComplete' && keyCode === ENTER) {
-    resetGame();
-  } else if (gameState === 'levelComplete' && keyCode === ENTER) {
-    prepareNextLevel();
-  }
-}
-
-function keyTyped() {
-  // Handle name input for high score submission (desktop only)
-  if (gameState === 'gameOver' && isSubmittingHighScore && !isMobileControlsEnabled()) {
-    if (key.length === 1 && key.match(/[a-zA-Z0-9 ]/)) {
-      // Allow letters, numbers, and spaces
-      if (playerNameInput.length < 20) { // Limit name length
-        playerNameInput += key;
-      }
-    } else if (keyCode === BACKSPACE && playerNameInput.length > 0) {
-      playerNameInput = playerNameInput.slice(0, -1);
-    }
-  }
-}
-
-function drawDebugCaveWalls(offsetX, offsetY) {
-  push();
-  
-  // Set up drawing style for walls
-  //stroke(255, 0, 0); // Red outline for walls
-  //strokeWeight(1);
-  noFill();
-  
-  // Calculate which grid cells are visible on screen
-  let startGridX = Math.max(0, Math.floor(offsetX / cave.cellSize));
-  let endGridX = Math.min(cave.gridWidth - 1, Math.floor((offsetX + width) / cave.cellSize) + 1);
-  let startGridY = Math.max(0, Math.floor(offsetY / cave.cellSize));
-  let endGridY = Math.min(cave.gridHeight - 1, Math.floor((offsetY + height) / cave.cellSize) + 1);
-  
-  // Draw wall cells as red rectangles
-  for (let i = startGridX; i <= endGridX; i++) {
-    for (let j = startGridY; j <= endGridY; j++) {
-      if (cave.grid[i] && cave.grid[i][j]) {
-        let worldX = i * cave.cellSize - offsetX;
-        let worldY = j * cave.cellSize - offsetY;
-        rect(worldX, worldY, cave.cellSize, cave.cellSize);
-      }
-    }
-  }
-  
-  // Also draw open spaces as green rectangles with transparency
-  fill(255,100); // Semi-transparent green for open spaces
- // stroke(0, 255, 0); // Green outline
-  
-  for (let i = startGridX; i <= endGridX; i++) {
-    for (let j = startGridY; j <= endGridY; j++) {
-      if (cave.grid[i] && !cave.grid[i][j]) {
-        let worldX = i * cave.cellSize - offsetX;
-        let worldY = j * cave.cellSize - offsetY;
-        rect(worldX, worldY, cave.cellSize, cave.cellSize);
-      }
-    }
-  }
-  
-  // Draw enemies as filled shapes
-  fill(255, 0, 255); // Magenta for enemies
-  noStroke();
-  for (let enemy of enemies) {
-    let enemyX = enemy.pos.x - offsetX;
-    let enemyY = enemy.pos.y - offsetY;
-    // Only draw if enemy is visible on screen
-    if (enemyX >= -enemy.radius && enemyX <= width + enemy.radius &&
-        enemyY >= -enemy.radius && enemyY <= height + enemy.radius) {
-      ellipse(enemyX, enemyY, enemy.radius * 2, enemy.radius * 2);
-      
-      // Add enemy info text
-      fill(255, 255, 255); // White text
-      textAlign(CENTER, CENTER);
-      textSize(10);
-      text("E", enemyX, enemyY);
-      fill(255, 0, 255); // Back to magenta
-    }
-  }
-  
-  // Draw jellyfish as filled shapes
-  fill(0, 255, 255); // Cyan for jellyfish
-  noStroke();
-  for (let jelly of jellyfish) {
-    let jellyX = jelly.pos.x - offsetX;
-    let jellyY = jelly.pos.y - offsetY;
-    // Only draw if jellyfish is visible on screen
-    if (jellyX >= -jelly.radius && jellyX <= width + jelly.radius &&
-        jellyY >= -jelly.radius && jellyY <= height + jelly.radius) {
-      ellipse(jellyX, jellyY, jelly.radius * 2, jelly.radius * 2);
-      
-      // Add jellyfish info text with health
-      fill(255, 255, 255); // White text
-      textAlign(CENTER, CENTER);
-      textSize(10);
-      text(`J${jelly.health}`, jellyX, jellyY);
-      fill(0, 255, 255); // Back to cyan
-    }
-  }
-  
-  // Add debug info text
-  fill(255, 255, 0); // Yellow text
-  noStroke();
-  textAlign(RIGHT, TOP);
-  textSize(16);
-  text("DEBUG: Cave Walls & Enemies (Press ] to toggle)", width - 10, 10);
-  text(`Grid: ${cave.gridWidth}x${cave.gridHeight}, Cell: ${cave.cellSize}px`, width - 10, 30);
-  text(`Enemies: ${enemies.length}, Jellyfish: ${jellyfish.length}`, width - 10, 50);
-
-  pop();
-}
-
-function drawLoadingScreen() {
-  background(BACKGROUND_COLOR_H, BACKGROUND_COLOR_S, BACKGROUND_COLOR_B); // Use same background as game
-  
-  // Center the loading text
-  fill(60, 100, 90); // Yellow color (HSB)
-  noStroke();
-  textAlign(CENTER, CENTER);
-  textSize(48);
-  text("LOADING", width / 2, height / 2);
-  
-  // Add spinning indicator
-  push();
-  translate(width / 2, height / 2 + 60);
-  rotate(millis() * 0.01); // Rotate based on time
-  stroke(60, 100, 100); // Yellow color in HSB
-  strokeWeight(4);
-  noFill();
-  // Draw partial circle (spinner)
-  arc(0, 0, 40, 40, 0, PI * 1.5);
-  pop();
-  
-  // Optional: Add level information
-  if (typeof currentLevel !== 'undefined') {
-    fill(0, 0, 80, 180); // Semi-transparent white (HSB)
-    noStroke(); // Ensure no stroke for text
-    textAlign(CENTER, CENTER);
-    textSize(24);
-    text(`Generating Level ${currentLevel}`, width / 2, height / 2 + 120);
-  }
-}
-
-function drawStartScreen() {
-
-  // Animate submarine
-  let subX = width / 2;
-  let subY = height / 2 + START_SCREEN_TITLE_Y_OFFSET - 80;
-  
-  push();
-  translate(subX, subY);
-  
-  // Use the same rendering as the gameplay submarine
-  let subRadius = PLAYER_RADIUS; // Use actual player radius
-  
-  // Submarine body (same as _renderBody)
-  fill(PLAYER_COLOR_BODY_H, PLAYER_COLOR_BODY_S, PLAYER_COLOR_BODY_B);
-  noStroke();
-  ellipse(0, 0, subRadius * PLAYER_BODY_WIDTH_FACTOR, subRadius * PLAYER_BODY_HEIGHT_FACTOR);
-  
-  // Sail (same as _renderSail)
-  fill(PLAYER_COLOR_SAIL_H, PLAYER_COLOR_SAIL_S, PLAYER_COLOR_SAIL_B);
-  rectMode(CENTER);
-  rect(subRadius * PLAYER_SAIL_OFFSET_X_FACTOR, 0, subRadius * PLAYER_SAIL_WIDTH_FACTOR, subRadius * PLAYER_SAIL_HEIGHT_FACTOR, subRadius * PLAYER_SAIL_CORNER_RADIUS_FACTOR);
-  rectMode(CORNER); // Reset rectMode
-  
-  // Fin (same as _renderFin)
-  fill(PLAYER_COLOR_FIN_H, PLAYER_COLOR_FIN_S, PLAYER_COLOR_FIN_B);
-  beginShape();
-  vertex(-subRadius * PLAYER_FIN_X1_FACTOR, -subRadius * PLAYER_FIN_Y1_FACTOR);
-  vertex(-subRadius * PLAYER_FIN_X2_FACTOR, subRadius * PLAYER_FIN_Y2_FACTOR);
-  vertex(-subRadius * PLAYER_FIN_X3_FACTOR, subRadius * PLAYER_FIN_Y3_FACTOR);
-  vertex(-subRadius * PLAYER_FIN_X4_FACTOR, -subRadius * PLAYER_FIN_Y4_FACTOR);
-  endShape(CLOSE);
-  
-  // Propeller (same as _renderPropeller)
-  push();
-  translate(subRadius * PLAYER_PROPELLER_X_OFFSET_FACTOR, 0); // Position propeller at the back
-  
-  fill(PLAYER_COLOR_PROPELLER_H, PLAYER_COLOR_PROPELLER_S, PLAYER_COLOR_PROPELLER_B);
-  noStroke();
-
-  let apparentHeight = subRadius * PLAYER_PROPELLER_MAX_SIDE_HEIGHT_FACTOR * abs(sin(startScreenPropellerAngle));
-  let thickness = subRadius * PLAYER_PROPELLER_THICKNESS_FACTOR;
-
-  rectMode(CENTER);
-  rect(0, 0, thickness, apparentHeight);
-  rectMode(CORNER); // Reset rectMode
-  pop();
-  
-  pop();
-  
-  // Update propeller animation
-  startScreenPropellerAngle += 0.3;
-  
-  // Spawn bubbles from propeller
-  if (frameCount % 10 === 0) {
-    sonarBubbles.push(new SonarBubble(subX - 20 + random(-5, 5), subY + random(-5, 5)));
-  }
-  
-  // Update and render bubbles
-  for (let i = sonarBubbles.length - 1; i >= 0; i--) {
-    sonarBubbles[i].update();
-    sonarBubbles[i].render(0, 0);
-    if (sonarBubbles[i].isOffscreen()) {
-      sonarBubbles.splice(i, 1);
-    }
-  }
-  
-
-
-  textAlign(CENTER, CENTER);
-  fill(START_SCREEN_TITLE_COLOR_H, START_SCREEN_TITLE_COLOR_S, START_SCREEN_TITLE_COLOR_B); textSize(START_SCREEN_TITLE_TEXT_SIZE);
-  text(`Reactor Dive`, width / 2, height / 2 + START_SCREEN_TITLE_Y_OFFSET);
-  
-  textSize(START_SCREEN_INFO_TEXT_SIZE);
-  text("Christian Nold 2025", width / 2, height / 2 + START_SCREEN_INFO_Y_OFFSET_3);
-
-  let killsForLevel1 = getKillsRequiredForLevel(1);
-  text(`Destroy ${killsForLevel1} mutated creatures and reach the flooded reactor`, width / 2, height / 2 + START_SCREEN_INFO_Y_OFFSET_1);
-  
-  // Show different control instructions based on device
-  if (typeof isMobileControlsEnabled === 'function' && isMobileControlsEnabled()) {
-    text("Touch controls: Joystick (left) and Fire button (right)", width / 2, height / 2 + START_SCREEN_INFO_Y_OFFSET_2);
-  } else {
-    text("WASD/Arrows: Move. SPACE: Shoot.", width / 2, height / 2 + START_SCREEN_INFO_Y_OFFSET_2);
-  }
-  
-  textSize(START_SCREEN_PROMPT_TEXT_SIZE); fill(START_SCREEN_PROMPT_COLOR_H, START_SCREEN_PROMPT_COLOR_S, START_SCREEN_PROMPT_COLOR_B);
-  
-  // Show different instructions based on whether mobile controls are active
-  if (typeof isMobileControlsEnabled === 'function' && isMobileControlsEnabled()) {
-    text("Tap anywhere to Dive", width / 2, height / 2 + START_SCREEN_PROMPT_Y_OFFSET);
-  } else {
-    text("Press ENTER to Dive", width / 2, height / 2 + START_SCREEN_PROMPT_Y_OFFSET);
-  }
-  if (!audioInitialized) {
-      textSize(START_SCREEN_AUDIO_NOTE_TEXT_SIZE); fill(START_SCREEN_AUDIO_NOTE_COLOR_H, START_SCREEN_AUDIO_NOTE_COLOR_S, START_SCREEN_AUDIO_NOTE_COLOR_B);
-      //text("(Sound will enable after you press Enter or Click)", width/2, height/2 + START_SCREEN_AUDIO_NOTE_Y_OFFSET);
- }
-}
-
-function drawHighScoreScreen() {
-  background(BACKGROUND_COLOR_H, BACKGROUND_COLOR_S, BACKGROUND_COLOR_B);
-  textAlign(CENTER, CENTER);
-  
-  // Title
-  fill(0, 0, 100); // White text
-  textSize(48);
-  text("HIGH SCORES", width / 2, height / 2 - 200);
-  
-  // High scores list
-  textSize(24);
-  if (!highScores) {
-    // Loading state
-    fill(60, 100, 80); // Yellow loading text
-    text("Loading scores...", width / 2, height / 2);
-  } else if (highScores.length === 0) {
-    // No scores yet
-    fill(0, 0, 60); // Gray text
-    text("No scores yet. Be the first!", width / 2, height / 2);
-  } else {
-    // Display scores
-    fill(0, 0, 90); // Light gray for scores
-    for (let i = 0; i < Math.min(highScores.length, 10); i++) {
-      let score = highScores[i];
-      let yPos = height / 2 - 150 + i * 30;
-      text(`${i + 1}. ${score.name}: ${score.score}`, width / 2, yPos);
-    }
-  }
-  
-  // Instructions
-  textSize(20);
-  fill(60, 100, 100); // Yellow prompt text
-  if (typeof isMobileControlsEnabled === 'function' && isMobileControlsEnabled()) {
-    text("Tap to Play", width / 2, height / 2 + 200);
-  } else {
-    text("Press ENTER to Play", width / 2, height / 2 + 200);
-  }
-}
-
-function drawLevelCompleteScreen() {
-  textAlign(CENTER, CENTER); 
-  fill(LEVEL_COMPLETE_TITLE_COLOR_H, LEVEL_COMPLETE_TITLE_COLOR_S, LEVEL_COMPLETE_TITLE_COLOR_B); textSize(LEVEL_COMPLETE_TITLE_TEXT_SIZE);
-  text(`LEVEL ${currentLevel} CLEARED!`, width / 2, height / 2 + LEVEL_COMPLETE_TITLE_Y_OFFSET); 
-  
-  // Show score information
-  textSize(LEVEL_COMPLETE_INFO_TEXT_SIZE);
-  let timeLeftInSeconds = Math.max(0, Math.floor(player.airSupply / 60));
-  let timeBonus = timeLeftInSeconds * 10;
-  let levelBonus = 500;
-  text(`Time bonus: ${timeLeftInSeconds} seconds`, width / 2, height / 2 + LEVEL_COMPLETE_INFO_Y_OFFSET);
-  let killsForNextLevel = getKillsRequiredForLevel(currentLevel+1);
-  text(`Next Level: Destroy ${killsForNextLevel} enemies and reach the reactor`, width/2, height / 2 + LEVEL_COMPLETE_INFO_Y_OFFSET + 60);
-  
-  // Show appropriate continue instruction
-  if (typeof isMobileControlsEnabled === 'function' && isMobileControlsEnabled()) {
-    text("Tap to Continue", width / 2, height / 2 + LEVEL_COMPLETE_PROMPT_Y_OFFSET);
-  } else {
-    text("ENTER to Continue", width / 2, height / 2 + LEVEL_COMPLETE_PROMPT_Y_OFFSET);
-  }
-}
-
-function drawGameCompleteScreen() {
-  textAlign(CENTER, CENTER);
-  fill(GAME_COMPLETE_TITLE_COLOR_H, GAME_COMPLETE_TITLE_COLOR_S, GAME_COMPLETE_TITLE_COLOR_B); textSize(GAME_COMPLETE_TITLE_TEXT_SIZE);
-  text("MISSION ACCOMPLISHED!", width / 2, height / 2 + GAME_COMPLETE_TITLE_Y_OFFSET);
-  textSize(GAME_COMPLETE_INFO_TEXT_SIZE);
-  text(`You cleared all ${MAX_LEVELS} levels!`, width/2, height/2 + GAME_COMPLETE_INFO_Y_OFFSET);
-  text(`Final Score: ${totalScore}`, width/2, height/2 + GAME_COMPLETE_INFO_Y_OFFSET + 30);
-  
-  // Show appropriate restart instruction
-  if (typeof isMobileControlsEnabled === 'function' && isMobileControlsEnabled()) {
-    text("Tap to Play Again", width / 2, height / 2 + GAME_COMPLETE_PROMPT_Y_OFFSET);
-  } else {
-    text("Press ENTER to Play Again", width / 2, height / 2 + GAME_COMPLETE_PROMPT_Y_OFFSET);
-  }
-}
-
-function drawGameOverScreen() {
-  // Check if this is a high score (only do this once)
-  if (!isHighScoreChecked) {
-    isHighScoreChecked = true;
-    console.log('Checking if score', totalScore, 'is a high score...');
-    
-    // Make sure music is stopped on game over screen
-    if (modPlayer && modPlayer.playing) {
-      console.log("Found music still playing on game over screen - stopping it");
-      modPlayer.silence();
-    }
-    
-    highScoreManager.isHighScore(totalScore).then(result => {
-      isHighScoreResult = result;
-      if (result) {
-        console.log('Score qualifies as a high score!');
-        isSubmittingHighScore = true;
-        playerNameInput = '';
-      } else {
-        console.log('Score does not qualify as a high score.');
-      }
-    }).catch(error => {
-      console.error('Error checking high score:', error);
-      isHighScoreResult = false;
-    });
-  }
-
-  textAlign(CENTER, CENTER);
-  fill(GAME_OVER_TITLE_COLOR_H, GAME_OVER_TITLE_COLOR_S, GAME_OVER_TITLE_COLOR_B); textSize(GAME_OVER_TITLE_TEXT_SIZE);
-  text("MISSION FAILED", width/2, height/2 + GAME_OVER_TITLE_Y_OFFSET);
-  textSize(GAME_OVER_INFO_TEXT_SIZE);
-  text(player.health <= 0 ? "Submarine Destroyed!" : "Air Supply Depleted!", width/2, height/2 + GAME_OVER_INFO_Y_OFFSET);
-  text(`Total Score: ${totalScore}`, width/2, height/2 + GAME_OVER_INFO_Y_OFFSET + 30);
-  
-  // Handle high score submission
-  if (isSubmittingHighScore) {
-    // Highlight "NEW HIGH SCORE!" with a background
-    push();
-    fill(60, 100, 100); // Bright yellow
-    textSize(GAME_OVER_INFO_TEXT_SIZE + 6); // Slightly larger
-    text("NEW HIGH SCORE!", width/2, height/2 + GAME_OVER_INFO_Y_OFFSET + 70);
-    pop();
-    
-    // "Enter your name:" instruction
-    fill(60, 80, 90); // Slightly dimmer yellow
-    textSize(GAME_OVER_INFO_TEXT_SIZE - 2);
-    text("Enter your name:", width/2, height/2 + GAME_OVER_INFO_Y_OFFSET + 110);
-    
-    // Show mobile input field or desktop text input
-    if (isMobileControlsEnabled()) {
-      // Position the HTML input field with better spacing for mobile
-      if (highscoreInputElement) {
-        highscoreInputElement.style.position = 'fixed';
-        highscoreInputElement.style.top = '65%'; // Moved down to avoid overlap
-        highscoreInputElement.style.left = '50%';
-        highscoreInputElement.style.transform = 'translate(-50%, -50%)';
-        highscoreInputElement.style.opacity = '1';
-        highscoreInputElement.style.pointerEvents = 'auto';
-        highscoreInputElement.style.zIndex = '10000';
-        highscoreInputElement.style.padding = '12px 20px';
-        highscoreInputElement.style.fontSize = '20px';
-        highscoreInputElement.style.textAlign = 'center';
-        highscoreInputElement.style.border = '3px solid #ffff00';
-        highscoreInputElement.style.borderRadius = '8px';
-        highscoreInputElement.style.backgroundColor = 'rgba(0, 0, 0, 0.9)';
-        highscoreInputElement.style.color = '#ffff00';
-        highscoreInputElement.style.boxShadow = '0 0 15px rgba(255, 255, 0, 0.5)';
-        highscoreInputElement.style.outline = 'none';
-        highscoreInputElement.style.minWidth = '250px';
-        // highscoreInputElement.focus(); // REMOVED: Focus is now handled by touchStarted
-      }
-      // Instructions positioned lower to avoid overlap
-      fill(60, 60, 80); // Dimmer for instructions
-      textSize(GAME_OVER_INFO_TEXT_SIZE - 4);
-      if (isSubmissionInProgress) {
-        fill(60, 100, 100); // Bright yellow when submitting
-        text("SUBMITTING SCORE...", width/2, height/2 + GAME_OVER_PROMPT_Y_OFFSET + 60);
-      } else {
-        text("Tap to enter name, then type", width/2, height/2 + GAME_OVER_PROMPT_Y_OFFSET + 60);
-      }
-    } else {
-      // Desktop - show the typed name with highlighting
-      push();
-      // Background rectangle for the text input area
-      if (isSubmissionInProgress) {
-        fill(0, 0, 20, 200); // Dark background with some transparency
-        stroke(60, 60, 60); // Dimmer border when submitting
-      } else {
-        fill(0, 0, 20, 200); // Dark background with some transparency
-        stroke(60, 100, 100); // Bright yellow border
-      }
-      strokeWeight(2);
-      rectMode(CENTER);
-      let textWidth = max(200, playerNameInput.length * 12 + 40);
-      rect(width/2, height/2 + GAME_OVER_INFO_Y_OFFSET + 150, textWidth, 40, 5);
-      
-      // The actual text input
-      noStroke();
-      textSize(GAME_OVER_INFO_TEXT_SIZE);
-      if (isSubmissionInProgress) {
-        fill(60, 60, 80); // Dimmer text when submitting
-        text("SUBMITTING...", width/2, height/2 + GAME_OVER_INFO_Y_OFFSET + 150);
-      } else {
-        fill(60, 100, 100); // Bright yellow text
-        text(playerNameInput + "_", width/2, height/2 + GAME_OVER_INFO_Y_OFFSET + 150);
-      }
-      pop();
-      
-      // Instructions positioned lower
-      fill(60, 60, 80);
-      textSize(GAME_OVER_INFO_TEXT_SIZE - 4);
-      if (!isSubmissionInProgress) {
-        //text("Press ENTER when done", width/2, height/2 + GAME_OVER_PROMPT_Y_OFFSET + 20);
-      }
-    }
-  } else {
-    // Hide the input field when not needed
-    if (highscoreInputElement) {
-      highscoreInputElement.style.position = 'fixed';
-      highscoreInputElement.style.top = '-1000px';
-      highscoreInputElement.style.left = '-1000px';
-      highscoreInputElement.style.opacity = '0';
-      highscoreInputElement.style.pointerEvents = 'none';
-    }
-    
-    // Show appropriate restart instruction
-    if (typeof isMobileControlsEnabled === 'function' && isMobileControlsEnabled()) {
-      text("Tap to Restart", width / 2, height / 2 + GAME_OVER_PROMPT_Y_OFFSET);
-    } else {
-      text("Press ENTER to Restart", width / 2, height / 2 + GAME_OVER_PROMPT_Y_OFFSET);
-    }
-  }
 }
 
 // Function to submit high score (used by both desktop and mobile)
@@ -3083,117 +503,1499 @@ function submitHighScore() {
         highscoreInputElement.style.color = '#ffff00';
         highscoreInputElement.style.pointerEvents = 'auto';
       }
-      
-      // Show error message
-      setTimeout(() => {
-        alert("Failed to submit high score. Please check your connection and try again.");
-      }, 100);
     });
   }
 }
 
-function drawPlayingState() {
-  cameraOffsetX = player.pos.x - width / 2; cameraOffsetY = player.pos.y - height / 2;
+// Constants for game progression
+const BASE_KILLS_REQUIRED = 3; // Kills required for the first level
+const KILLS_INCREASE_PER_LEVEL = 3; // How many more kills needed each subsequent level
 
-  // Render the goal square if player is inside it
-  if (cave.isGoal(player.pos.x, player.pos.y)) {
-    cave.renderGoal(cameraOffsetX, cameraOffsetY);
-  }
+// Function to calculate required kills for a level
+function getKillsRequiredForLevel(level) {
+  if (level <= 0) return 0;
+  return BASE_KILLS_REQUIRED + (level - 1) * KILLS_INCREASE_PER_LEVEL;
+}
 
-  // Process current areas - spawn bubbles and render debug visuals
-  for (let area of currentAreas) {
-    area.spawnBubbles(cave, cameraOffsetX, cameraOffsetY);
-    area.render(cameraOffsetX, cameraOffsetY);
-  }
+// Helper function to get remaining kills needed
+function getKillsStillNeeded() {
+  const killsRequired = getKillsRequiredForLevel(currentLevel);
+  return Math.max(0, killsRequired - enemiesKilledThisLevel);
+}
 
-  // Process sonar bubbles, particles, and projectiles
-  processGameObjectArray(sonarBubbles, cameraOffsetX, cameraOffsetY);
-  processGameObjectArray(particles, cameraOffsetX, cameraOffsetY);
-  processGameObjectArray(projectiles, cameraOffsetX, cameraOffsetY, cave); // Projectiles need cave context
-
-  player.update(cave, enemies);
+// Helper function to process game object arrays (update, render, remove offscreen)
+function processGameObjectArray(arr, offsetX, offsetY, caveContext = null) {
+  let margin = 50; // Margin for objects slightly off-screen
   
-  // Apply mobile controls movement if enabled
-  applyMobileMovement();
-  
-  // Update and render enemies - only process those near the screen
-  let margin = 100; // Extra margin for off-screen enemies
-  for (let enemy of enemies) {
-    // Always update enemy logic (AI, movement) but only render if visible
-    enemy.update(cave, player);
+  for (let i = arr.length - 1; i >= 0; i--) {
+    let obj = arr[i];
     
-    // Check if enemy is near the viewport for rendering
-    if (enemy.pos.x + enemy.radius >= cameraOffsetX - margin &&
-        enemy.pos.x - enemy.radius <= cameraOffsetX + width + margin &&
-        enemy.pos.y + enemy.radius >= cameraOffsetY - margin &&
-        enemy.pos.y - enemy.radius <= cameraOffsetY + height + margin) {
-      enemy.render(cameraOffsetX, cameraOffsetY);
+    // Always update object logic
+    if (obj.update) {
+        if (caveContext && obj instanceof Projectile) {
+            obj.update(caveContext);
+        } else if (obj instanceof Enemy && typeof cave !== 'undefined') {
+            // Enemies need the cave and player objects
+            obj.update(cave, player);
+        } else {
+            obj.update(); 
+        }
+    }
+    
+    // Only render if object is near the viewport
+    if (obj.render && obj.pos) {
+      let objRadius = obj.radius || obj.size || 10; // Default radius if not specified
+      
+      if (obj.pos.x + objRadius >= offsetX - margin &&
+          obj.pos.x - objRadius <= offsetX + width + margin &&
+          obj.pos.y + objRadius >= offsetY - margin &&
+          obj.pos.y - objRadius <= offsetY + height + margin) {
+        obj.render(offsetX, offsetY);
+      }
+    } else if (obj.render) {
+      // Fallback for objects without position (render anyway)
+      obj.render(offsetX, offsetY);
+    }
+    
+    // Remove dead objects
+    if (obj.isOffscreen && obj.isOffscreen()) {
+      arr.splice(i, 1);
+    }
+  }
+}
+
+// Create an explosion at the given position
+function createExplosion(x, y, type) {
+  // Determine explosion parameters based on type
+  let count, colorH, colorS, colorB;
+  if (type === 'wall') {
+    count = EXPLOSION_PARTICLE_COUNT_TORPEDO_WALL;
+    colorH = EXPLOSION_PARTICLE_COLOR_H_WALL;
+    colorS = EXPLOSION_PARTICLE_COLOR_S_WALL;
+    colorB = EXPLOSION_PARTICLE_COLOR_B_WALL;
+  } else if (type === 'enemy') {
+    count = EXPLOSION_PARTICLE_COUNT_TORPEDO_ENEMY;
+    colorH = EXPLOSION_PARTICLE_COLOR_H_ENEMY;
+    colorS = EXPLOSION_PARTICLE_COLOR_S_ENEMY;
+    colorB = EXPLOSION_PARTICLE_COLOR_B_ENEMY;
+  } else {
+    count = EXPLOSION_PARTICLE_COUNT_TORPEDO_WALL; // Default
+    colorH = EXPLOSION_PARTICLE_COLOR_H_WALL;
+    colorS = EXPLOSION_PARTICLE_COLOR_S_WALL;
+    colorB = EXPLOSION_PARTICLE_COLOR_B_WALL;
+  }
+  
+  // Create particles in all directions
+  for (let i = 0; i < count; i++) {
+    let angle = random(TWO_PI);
+    let speed = random(EXPLOSION_PARTICLE_SPEED_MIN, EXPLOSION_PARTICLE_SPEED_MAX);
+    let velX = cos(angle) * speed;
+    let velY = sin(angle) * speed;
+    
+    particles.push(new Particle(
+      x, y, velX, velY,
+      random(EXPLOSION_PARTICLE_MAX_LIFESPAN * 0.6, EXPLOSION_PARTICLE_MAX_LIFESPAN),
+      EXPLOSION_PARTICLE_MIN_SIZE,
+      EXPLOSION_PARTICLE_MAX_SIZE,
+      colorH, colorS, colorB,
+      EXPLOSION_PARTICLE_ALPHA_MAX
+    ));
+  }
+}
+
+// Sound functionality
+function setupSounds() {
+  if (audioInitialized) return;
+
+  // Sonar ping
+  sonarOsc = new p5.Oscillator('sine');
+  sonarEnv = new p5.Envelope();
+  sonarEnv.setADSR(SONAR_ENV_ADSR.aT, SONAR_ENV_ADSR.dT, SONAR_ENV_ADSR.sR, SONAR_ENV_ADSR.rT);
+  sonarEnv.setRange(SONAR_ENV_LEVELS.aL, SONAR_ENV_LEVELS.rL);
+  sonarOsc.amp(sonarEnv);
+  sonarOsc.freq(SONAR_FREQ);
+  
+  // Wall explosion (torpedo hits wall)
+  explosionNoise = new p5.Noise('white');
+  explosionEnv = new p5.Envelope();
+  explosionEnv.setADSR(EXPLOSION_NOISE_ENV_ADSR.aT, EXPLOSION_NOISE_ENV_ADSR.dT, EXPLOSION_NOISE_ENV_ADSR.sR, EXPLOSION_NOISE_ENV_ADSR.rT);
+  explosionEnv.setRange(EXPLOSION_NOISE_ENV_LEVELS.aL, EXPLOSION_NOISE_ENV_LEVELS.rL);
+  explosionNoise.amp(explosionEnv);
+  
+  // Wall explosion bass hit
+  explosionBoomOsc = new p5.Oscillator('sine');
+  explosionBoomEnv = new p5.Envelope();
+  explosionBoomEnv.setADSR(EXPLOSION_BOOM_ENV_ADSR.aT, EXPLOSION_BOOM_ENV_ADSR.dT, EXPLOSION_BOOM_ENV_ADSR.sR, EXPLOSION_BOOM_ENV_ADSR.rT);
+  explosionBoomEnv.setRange(EXPLOSION_BOOM_ENV_LEVELS.aL, EXPLOSION_BOOM_ENV_LEVELS.rL);
+  explosionBoomOsc.amp(explosionBoomEnv);
+  explosionBoomOsc.freq(random(EXPLOSION_BOOM_MIN_FREQ, EXPLOSION_BOOM_MAX_FREQ));
+  
+  // Wall explosion deeper bass
+  explosionBassOsc = new p5.Oscillator('sine');
+  explosionBassEnv = new p5.Envelope();
+  explosionBassEnv.setADSR(EXPLOSION_BASS_ENV_ADSR.aT, EXPLOSION_BASS_ENV_ADSR.dT, EXPLOSION_BASS_ENV_ADSR.sR, EXPLOSION_BASS_ENV_ADSR.rT);
+  explosionBassEnv.setRange(EXPLOSION_BASS_ENV_LEVELS.aL, EXPLOSION_BASS_ENV_LEVELS.rL);
+  explosionBassOsc.amp(explosionBassEnv);
+  explosionBassOsc.freq(random(EXPLOSION_BASS_MIN_FREQ, EXPLOSION_BASS_MAX_FREQ));
+  
+  // Creature explosion (torpedo hits enemy)
+  creatureExplosionNoise = new p5.Noise('white');
+  creatureExplosionEnv = new p5.Envelope();
+  creatureExplosionEnv.setADSR(CREATURE_EXPLOSION_NOISE_ENV_ADSR.aT, CREATURE_EXPLOSION_NOISE_ENV_ADSR.dT, CREATURE_EXPLOSION_NOISE_ENV_ADSR.sR, CREATURE_EXPLOSION_NOISE_ENV_ADSR.rT);
+  creatureExplosionEnv.setRange(CREATURE_EXPLOSION_NOISE_ENV_LEVELS.aL, CREATURE_EXPLOSION_NOISE_ENV_LEVELS.rL);
+  creatureExplosionNoise.amp(creatureExplosionEnv);
+  
+  // Creature explosion mid hit
+  creatureExplosionBoomOsc = new p5.Oscillator('sine');
+  creatureExplosionBoomEnv = new p5.Envelope();
+  creatureExplosionBoomEnv.setADSR(CREATURE_EXPLOSION_BOOM_ENV_ADSR.aT, CREATURE_EXPLOSION_BOOM_ENV_ADSR.dT, CREATURE_EXPLOSION_BOOM_ENV_ADSR.sR, CREATURE_EXPLOSION_BOOM_ENV_ADSR.rT);
+  creatureExplosionBoomEnv.setRange(CREATURE_EXPLOSION_BOOM_ENV_LEVELS.aL, CREATURE_EXPLOSION_BOOM_ENV_LEVELS.rL);
+  creatureExplosionBoomOsc.amp(creatureExplosionBoomEnv);
+  creatureExplosionBoomOsc.freq(random(CREATURE_EXPLOSION_BOOM_MIN_FREQ, CREATURE_EXPLOSION_BOOM_MAX_FREQ));
+  
+  // Creature explosion bass
+  creatureExplosionBassOsc = new p5.Oscillator('sine');
+  creatureExplosionBassEnv = new p5.Envelope();
+  creatureExplosionBassEnv.setADSR(CREATURE_EXPLOSION_BASS_ENV_ADSR.aT, CREATURE_EXPLOSION_BASS_ENV_ADSR.dT, CREATURE_EXPLOSION_BASS_ENV_ADSR.sR, CREATURE_EXPLOSION_BASS_ENV_ADSR.rT);
+  creatureExplosionBassEnv.setRange(CREATURE_EXPLOSION_BASS_ENV_LEVELS.aL, CREATURE_EXPLOSION_BASS_ENV_LEVELS.rL);
+  creatureExplosionBassOsc.amp(creatureExplosionBassEnv);
+  creatureExplosionBassOsc.freq(random(CREATURE_EXPLOSION_BASS_MIN_FREQ, CREATURE_EXPLOSION_BASS_MAX_FREQ));
+  
+  // Bump sound
+  bumpOsc = new p5.Oscillator('triangle');
+  bumpEnv = new p5.Envelope();
+  bumpEnv.setADSR(BUMP_ENV_ADSR.aT, BUMP_ENV_ADSR.dT, BUMP_ENV_ADSR.sR, BUMP_ENV_ADSR.rT);
+  bumpEnv.setRange(BUMP_ENV_LEVELS.aL, BUMP_ENV_LEVELS.rL);
+  bumpOsc.amp(bumpEnv);
+  bumpOsc.freq(BUMP_FREQ);
+
+  // Torpedo firing sound
+  torpedoNoise = new p5.Noise('pink');
+  torpedoEnv = new p5.Envelope();
+  torpedoEnv.setADSR(TORPEDO_ENV_ADSR.aT, TORPEDO_ENV_ADSR.dT, TORPEDO_ENV_ADSR.sR, TORPEDO_ENV_ADSR.rT);
+  torpedoEnv.setRange(TORPEDO_ENV_LEVELS.aL, TORPEDO_ENV_LEVELS.rL);
+  torpedoNoise.amp(torpedoEnv);
+  
+  // Low air warning
+  lowAirOsc = new p5.Oscillator('sine');
+  lowAirEnv = new p5.Envelope();
+  lowAirEnv.setADSR(LOW_AIR_ENV_ADSR.aT, LOW_AIR_ENV_ADSR.dT, LOW_AIR_ENV_ADSR.sR, LOW_AIR_ENV_ADSR.rT);
+  lowAirEnv.setRange(LOW_AIR_ENV_LEVELS.aL, LOW_AIR_ENV_LEVELS.rL);
+  
+  // Powerup sound
+  powerupOsc = new p5.Oscillator('triangle');
+  powerupEnv = new p5.Envelope();
+  powerupEnv.setADSR(POWERUP_ENV_ADSR.aT, POWERUP_ENV_ADSR.dT, POWERUP_ENV_ADSR.sR, POWERUP_ENV_ADSR.rT);
+  powerupEnv.setRange(POWERUP_ENV_LEVELS.aL, POWERUP_ENV_LEVELS.rL);
+  powerupOsc.amp(powerupEnv); // Connect the envelope to the oscillator
+  lowAirOsc.amp(lowAirEnv);
+  lowAirOsc.freq(LOW_AIR_FREQ);
+  
+  // Current flow sound
+  currentFlowNoise = new p5.Noise('brown');
+  currentFlowNoiseEnv = new p5.Envelope();
+  currentFlowNoiseEnv.setADSR(CURRENT_FLOW_NOISE_ENV_ADSR.aT, CURRENT_FLOW_NOISE_ENV_ADSR.dT, CURRENT_FLOW_NOISE_ENV_ADSR.sR, CURRENT_FLOW_NOISE_ENV_ADSR.rT);
+  currentFlowNoiseEnv.setRange(CURRENT_FLOW_NOISE_ENV_LEVELS.aL, CURRENT_FLOW_NOISE_ENV_LEVELS.rL);
+  currentFlowNoise.amp(currentFlowNoiseEnv);
+  
+  // Current flow bass sound
+  currentFlowBassOsc = new p5.Oscillator('sine');
+  currentFlowBassEnv = new p5.Envelope();
+  currentFlowBassEnv.setADSR(CURRENT_FLOW_BASS_ENV_ADSR.aT, CURRENT_FLOW_BASS_ENV_ADSR.dT, CURRENT_FLOW_BASS_ENV_ADSR.sR, CURRENT_FLOW_BASS_ENV_ADSR.rT);
+  currentFlowBassEnv.setRange(CURRENT_FLOW_BASS_ENV_LEVELS.aL, CURRENT_FLOW_BASS_ENV_LEVELS.rL);
+  currentFlowBassOsc.amp(currentFlowBassEnv);
+  currentFlowBassOsc.freq(random(CURRENT_FLOW_BASS_MIN_FREQ, CURRENT_FLOW_BASS_MAX_FREQ));
+  
+  // Creature growl sound
+  creatureGrowlOsc = new p5.Oscillator('sawtooth');
+  creatureGrowlEnv = new p5.Envelope();
+  creatureGrowlEnv.setADSR(CREATURE_GROWL_ENV_ADSR.aT, CREATURE_GROWL_ENV_ADSR.dT, CREATURE_GROWL_ENV_ADSR.sR, CREATURE_GROWL_ENV_ADSR.rT);
+  creatureGrowlEnv.setRange(CREATURE_GROWL_ENV_LEVELS.aL, CREATURE_GROWL_ENV_LEVELS.rL);
+  creatureGrowlOsc.amp(creatureGrowlEnv);
+  
+  // Reactor hum sound
+  reactorHumOsc = new p5.Oscillator('sine');
+  reactorHumEnv = new p5.Envelope();
+  reactorHumEnv.setADSR(REACTOR_HUM_ENV_ADSR.aT, REACTOR_HUM_ENV_ADSR.dT, REACTOR_HUM_ENV_ADSR.sR, REACTOR_HUM_ENV_ADSR.rT);
+  reactorHumEnv.setRange(REACTOR_HUM_ENV_LEVELS.aL, REACTOR_HUM_ENV_LEVELS.rL);
+  reactorHumOsc.amp(reactorHumEnv);
+  reactorHumOsc.freq(REACTOR_HUM_FREQ);
+  reactorHumOsc.start(); // Continuous sound, just change amplitude
+  
+  // Game over death sounds
+  gameOverImpactNoise = new p5.Noise('white');
+  gameOverImpactEnv = new p5.Envelope();
+  gameOverImpactEnv.setADSR(GAME_OVER_IMPACT_ENV_ADSR.aT, GAME_OVER_IMPACT_ENV_ADSR.dT, GAME_OVER_IMPACT_ENV_ADSR.sR, GAME_OVER_IMPACT_ENV_ADSR.rT);
+  gameOverImpactEnv.setRange(GAME_OVER_IMPACT_ENV_LEVELS.aL, GAME_OVER_IMPACT_ENV_LEVELS.rL);
+  gameOverImpactNoise.amp(gameOverImpactEnv);
+  
+  gameOverGroanOsc = new p5.Oscillator('sawtooth');
+  gameOverGroanEnv = new p5.Envelope();
+  gameOverGroanEnv.setADSR(GAME_OVER_GROAN_ENV_ADSR.aT, GAME_OVER_GROAN_ENV_ADSR.dT, GAME_OVER_GROAN_ENV_ADSR.sR, GAME_OVER_GROAN_ENV_ADSR.rT);
+  gameOverGroanEnv.setRange(GAME_OVER_GROAN_ENV_LEVELS.aL, GAME_OVER_GROAN_ENV_LEVELS.rL);
+  gameOverGroanOsc.amp(gameOverGroanEnv);
+  gameOverGroanOsc.freq(random(GAME_OVER_GROAN_MIN_FREQ, GAME_OVER_GROAN_MAX_FREQ));
+  
+  gameOverFinalBoomNoise = new p5.Noise('brown');
+  gameOverFinalBoomEnv = new p5.Envelope();
+  gameOverFinalBoomEnv.setADSR(GAME_OVER_FINAL_BOOM_ENV_ADSR.aT, GAME_OVER_FINAL_BOOM_ENV_ADSR.dT, GAME_OVER_FINAL_BOOM_ENV_ADSR.sR, GAME_OVER_FINAL_BOOM_ENV_ADSR.rT);
+  gameOverFinalBoomEnv.setRange(GAME_OVER_FINAL_BOOM_ENV_LEVELS.aL, GAME_OVER_FINAL_BOOM_ENV_LEVELS.rL);
+  gameOverFinalBoomNoise.amp(gameOverFinalBoomEnv);
+  
+  // Start all oscillators and noises (they won't play until triggered)
+  sonarOsc.start(); bumpOsc.start(); lowAirOsc.start(); powerupOsc.start();
+  explosionNoise.start(); explosionBoomOsc.start(); explosionBassOsc.start();
+  creatureExplosionNoise.start(); creatureExplosionBoomOsc.start(); creatureExplosionBassOsc.start();
+  torpedoNoise.start();
+  currentFlowNoise.start(); currentFlowBassOsc.start();
+  creatureGrowlOsc.start();
+  gameOverImpactNoise.start(); gameOverGroanOsc.start(); gameOverFinalBoomNoise.start();
+  
+  audioInitialized = true;
+}
+
+function playSound(soundType) {
+  if (!audioInitialized) return;
+  
+  switch(soundType) {
+    case 'sonar':
+      sonarOsc.freq(SONAR_FREQ);
+      sonarEnv.play();
+      break;
+    case 'explosion': // Wall explosion
+      explosionNoise.pan(random(-0.2, 0.2)); // Random stereo positioning
+      explosionEnv.play();
+      explosionBoomOsc.freq(random(EXPLOSION_BOOM_MIN_FREQ, EXPLOSION_BOOM_MAX_FREQ));
+      explosionBoomEnv.play();
+      explosionBassOsc.freq(random(EXPLOSION_BASS_MIN_FREQ, EXPLOSION_BASS_MAX_FREQ));
+      explosionBassEnv.play();
+      break;
+    case 'creatureExplosion': // Enemy explosion
+      creatureExplosionNoise.pan(random(-0.3, 0.3)); // More random stereo positioning for variety
+      creatureExplosionEnv.play();
+      creatureExplosionBoomOsc.freq(random(CREATURE_EXPLOSION_BOOM_MIN_FREQ, CREATURE_EXPLOSION_BOOM_MAX_FREQ));
+      creatureExplosionBoomEnv.play();
+      creatureExplosionBassOsc.freq(random(CREATURE_EXPLOSION_BASS_MIN_FREQ, CREATURE_EXPLOSION_BASS_MAX_FREQ));
+      creatureExplosionBassEnv.play();
+      break;
+    case 'bump':
+      bumpOsc.freq(BUMP_FREQ + random(-20, 20)); // Slight variation
+      bumpEnv.play();
+      break;
+    case 'torpedo':
+      torpedoNoise.pan(random(-0.2, 0.2)); // Random stereo positioning
+      torpedoEnv.play();
+      break;
+    case 'lowAir':
+      if (millis() - lastLowAirBeepTime > LOW_AIR_BEEP_INTERVAL) {
+        lowAirOsc.freq(LOW_AIR_FREQ);
+        lowAirEnv.play();
+        lastLowAirBeepTime = millis();
+      }
+      break;
+      
+    case 'powerup':
+      // Rising pitch sound for powerup
+      powerupOsc.freq(POWERUP_START_FREQ);
+      powerupEnv.play();
+      // Use a setTimeout to create rising pitch effect with a safely bounded callback
+      let startTime = Date.now();
+      setTimeout(() => {
+        if (Date.now() - startTime < 500) { // Only change pitch if within reasonable time
+          powerupOsc.freq(POWERUP_END_FREQ);
+        }
+      }, 100);
+      break;
+    case 'currentFlow':
+      currentFlowNoiseEnv.play();
+      currentFlowBassOsc.freq(random(CURRENT_FLOW_BASS_MIN_FREQ, CURRENT_FLOW_BASS_MAX_FREQ));
+      currentFlowBassEnv.play();
+      break;
+    case 'creatureGrowl':
+      creatureGrowlOsc.freq(random(CREATURE_GROWL_MIN_FREQ, CREATURE_GROWL_MAX_FREQ));
+      creatureGrowlEnv.play();
+      break;
+    case 'gameOverImpact':
+      gameOverImpactEnv.play();
+      break;
+    case 'gameOverGroan':
+      gameOverGroanOsc.freq(random(GAME_OVER_GROAN_MIN_FREQ, GAME_OVER_GROAN_MAX_FREQ));
+      gameOverGroanEnv.play();
+      setTimeout(() => {
+        // Start pitching down the groan
+        let startFreq = gameOverGroanOsc.getFreq();
+        let targetFreq = GAME_OVER_GROAN_PITCH_DOWN_TARGET_FREQ;
+        let startTime = millis();
+        let pitchDownDuration = GAME_OVER_GROAN_PITCH_DOWN_TIME * 1000; // Convert to milliseconds
+        
+        function updatePitch() {
+          let elapsed = millis() - startTime;
+          let t = elapsed / pitchDownDuration;
+          if (t < 1) {
+            let currentFreq = startFreq + (targetFreq - startFreq) * t;
+            gameOverGroanOsc.freq(currentFreq);
+            setTimeout(updatePitch, 50); // Update every 50ms
+          }
+        }
+        
+        setTimeout(updatePitch, GAME_OVER_GROAN_PITCH_DOWN_DELAY * 1000);
+      }, GAME_OVER_GROAN_DELAY_MS);
+      break;
+    case 'gameOverFinalBoom':
+      gameOverFinalBoomEnv.play();
+      break;
+  }
+}
+
+// p5.js core functions
+
+function preload() {
+  // Load custom font
+  customFont = loadFont('Berpatroli.otf');
+  
+  // Initialize high score element 
+  highscoreInputElement = document.getElementById('highscoreInput');
+}
+
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  colorMode(HSB, 360, 100, 100, 255);
+  
+  // Set custom font if loaded, otherwise fallback to monospace
+  if (customFont) {
+    textFont(customFont);
+  } else {
+    textFont('monospace');
+  }
+  
+  // Initialize sounds when audioContext is available
+  setupSounds();
+  
+  // Create ModPlayer with our audio context
+  modPlayer = new window.ModPlayer(getAudioContext());
+  
+  // Load and play the background music (start.mod)
+  loadBackgroundMusic();
+  
+  // Initialize controls
+  // Function to initialize both mobile and gamepad controls
+  function setupControls() {
+    // Initialize mobile controls if available
+    if (typeof initMobileControls === 'function') {
+      initMobileControls();
+    }
+    
+    // Gamepad controls are initialized via event listeners in the gamepadControls.js file
+    // No explicit initialization needed as it's handled by the event listeners
+  }
+  
+  setupControls();
+
+  // Rest of setup...
+  resetGame();
+  
+  // Hide loading overlay once setup is complete
+  document.getElementById('loadingOverlay').style.display = 'none';
+}
+
+// Function to load and play the background music
+async function loadBackgroundMusic() {
+  try {
+    console.log("Loading background music...");
+    
+    // Create audio context if it doesn't exist
+    if (!getAudioContext()) {
+      console.log("Creating audio context for MOD player");
+      try {
+        userStartAudio(); // Try to start audio context with p5.js helper
+      } catch (e) {
+        console.warn("userStartAudio failed:", e);
+        // Try to create audio context directly if p5 fails
+        getAudioContext().resume().catch(err => console.error("Failed to resume audio context:", err));
+      }
+    }
+    
+    if (!modPlayer) {
+      console.log("Creating ModPlayer instance");
+      if (!window.ModPlayer) {
+        console.error("ModPlayer not found in window object!");
+        // Try to reload the ModPlayer script
+        await new Promise((resolve, reject) => {
+          const script = document.createElement('script');
+          script.src = 'ModPlayer.js';
+          script.onload = resolve;
+          script.onerror = reject;
+          document.head.appendChild(script);
+          console.log("Attempting to reload ModPlayer.js");
+        }).catch(err => console.error("Failed to reload ModPlayer.js:", err));
+        
+        // Try again after reloading
+        if (window.ModPlayer) {
+          modPlayer = new window.ModPlayer(getAudioContext());
+        } else {
+          throw new Error("ModPlayer still not available after reload attempt");
+        }
+      } else {
+        modPlayer = new window.ModPlayer(getAudioContext());
+      }
+    }
+    
+    // Load the MOD file
+    console.log("Fetching start.mod file");
+    const response = await fetch('start.mod');
+    if (!response.ok) {
+      throw new Error(`Failed to load MOD file: ${response.status} ${response.statusText}`);
+    }
+    
+    const modData = await response.arrayBuffer();
+    console.log("MOD file loaded, size:", modData.byteLength, "bytes");
+    
+    // Load the MOD data into the player
+    console.log("Loading MOD data into player");
+    await modPlayer.load(modData);
+    
+    // Set initial volume based on game state
+    if (gameState === 'playing') {
+      modPlayer.setVolume(0.3);
+    } else {
+      modPlayer.setVolume(0.5);
+    }
+    
+    // Start playback
+    console.log("Starting MOD playback");
+    const playResult = await modPlayer.play();
+    console.log("Playback result:", playResult);
+    
+  } catch (error) {
+    console.error("Error loading background music:", error);
+  }
+}
+
+function resetGame() {
+  currentLevel = 1;
+  totalScore = 0;
+  resetLevel();
+  // For events that shouldn't reset between levels, but should for new games
+  enemies = [];
+  projectiles = [];
+  sonarBubbles = [];
+  particles = [];
+  
+  // Reset highscore-related variables
+  isHighScoreChecked = false;
+  isSubmittingHighScore = false;
+  playerNameInput = '';
+  isHighScoreResult = false;
+  isSubmissionInProgress = false;
+  
+  // Reset game state to start
+  gameState = 'start';
+}
+
+function resetLevel() {
+  // Reset game objects
+  enemies = [];
+  projectiles = [];
+  sonarBubbles = [];
+  particles = [];
+  powerups = [];
+  currentAreas = [];
+  enemiesKilledThisLevel = 0; // Reset enemy kill counter for this level
+  levelScore = 0; // Reset level score
+  
+  // Set the cell size based on level
+  currentCellSize = BASE_CELL_SIZE;
+  
+  // Generate cave with the current cell size
+  cave = new Cave(WORLD_WIDTH, WORLD_HEIGHT, currentCellSize);
+  
+  // Create the player sub
+  let initialAirSupply = Math.max(
+    INITIAL_AIR_SUPPLY_BASE - (currentLevel * AIR_SUPPLY_LEVEL_REDUCTION),
+    MIN_AIR_SUPPLY_PER_LEVEL
+  );
+  
+  let airDepletionRate = BASE_AIR_DEPLETION_RATE + (currentLevel - 1) * AIR_DEPLETION_LEVEL_INCREASE;
+  
+  // Find a valid spawn position for the player
+  let spawnX = BASE_CELL_SIZE * PLAYER_START_X_BASE_CELLS;
+  let spawnY = cave.worldHeight / 2;
+  let attempt = 0;
+  
+  while (attempt < MAX_PLAYER_SPAWN_ATTEMPTS) {
+    let searchY = cave.worldHeight / 2 + random(-PLAYER_START_Y_RANDOM_RANGE_CELLS, PLAYER_START_Y_RANDOM_RANGE_CELLS) * cave.cellSize;
+    
+    if (!cave.isWall(spawnX, searchY, PLAYER_RADIUS * PLAYER_COLLISION_RADIUS_FACTOR)) {
+      spawnY = searchY;
+      break;
+    }
+    
+    // Try moving further right
+    spawnX += cave.cellSize * PLAYER_START_X_ATTEMPT_INCREMENT_CELLS;
+    
+    // If we've gone too far, stop
+    if (spawnX > cave.worldWidth * PLAYER_SPAWN_MAX_X_SEARCH_FACTOR) {
+      console.warn('Could not find valid player spawn position');
+      spawnX = BASE_CELL_SIZE * PLAYER_START_X_BASE_CELLS;
+      spawnY = cave.worldHeight / 2; // Fallback to center
+      break;
+    }
+    
+    attempt++;
+  }
+  
+  // Create player with the found position
+  player = new PlayerSub(spawnX, spawnY, initialAirSupply, airDepletionRate);
+  
+  // Initialize camera position centered on player
+  cameraOffsetX = player.pos.x - width / 2;
+  cameraOffsetY = player.pos.y - height / 2;
+  
+  // Spawn enemies based on level
+  function spawnEnemies() {
+    enemies = [];
+    // Calculate enemy count based on level
+    let enemyCount = BASE_ENEMY_COUNT + (currentLevel - 1) * ENEMY_COUNT_PER_LEVEL_INCREASE;
+    enemyCount = min(enemyCount, MAX_ENEMY_COUNT); // Cap enemy count
+    
+    for (let i = 0; i < enemyCount; i++) {
+      let enemyX, enemyY, eAttempts = 0;
+      do { // Try to spawn enemy in a clear area
+        enemyX = random(WORLD_WIDTH * ENEMY_SPAWN_MIN_X_WORLD_FACTOR, WORLD_WIDTH * ENEMY_SPAWN_MAX_X_WORLD_FACTOR);
+        enemyY = random(WORLD_HEIGHT * ENEMY_SPAWN_MIN_Y_WORLD_FACTOR, WORLD_HEIGHT * ENEMY_SPAWN_MAX_Y_WORLD_FACTOR); 
+        eAttempts++;
+      } while (cave.isWall(enemyX, enemyY, ENEMY_SPAWN_WALL_CHECK_RADIUS) && eAttempts < MAX_ENEMY_SPAWN_ATTEMPTS);
+      
+      if (eAttempts < MAX_ENEMY_SPAWN_ATTEMPTS) {
+        enemies.push(new Enemy(enemyX, enemyY));
+      }
+    }
+    
+    // Spawn jellyfish - 1 on level 1, +1 each level
+    jellyfish = [];
+    let jellyfishCount = currentLevel; // 1 on level 1, 2 on level 2, etc.
+    
+    for (let i = 0; i < jellyfishCount; i++) {
+      let jellyfishX, jellyfishY, jAttempts = 0;
+      do { // Try to spawn jellyfish in a clear area, away from player
+        jellyfishX = random(WORLD_WIDTH * 0.3, WORLD_WIDTH * 0.9); // Spawn in middle to right area
+        jellyfishY = random(WORLD_HEIGHT * 0.2, WORLD_HEIGHT * 0.8);
+        jAttempts++;
+      } while (cave.isWall(jellyfishX, jellyfishY, JELLYFISH_RADIUS + 10) && jAttempts < MAX_ENEMY_SPAWN_ATTEMPTS);
+      
+      if (jAttempts < MAX_ENEMY_SPAWN_ATTEMPTS) {
+        // Make sure jellyfish isn't too close to player start
+        let distFromPlayer = dist(jellyfishX, jellyfishY, player.pos.x, player.pos.y);
+        if (distFromPlayer > 150) { // Minimum distance from player
+          jellyfish.push(new Jellyfish(jellyfishX, jellyfishY));
+        }
+      }
     }
   }
   
-  // Update jellyfish (they don't render directly, only through sonar)
-  for (let jelly of jellyfish) jelly.update(cave, player);
+  spawnEnemies();
   
-  // Note: Jellyfish are not rendered directly - only visible through sonar hits
-  player.handleEnemyCollisions(enemies);
-  player.handleJellyfishCollisions(jellyfish);
+  // Create current areas
+  function generateCurrentAreas() {
+    currentAreas = []; // Clear existing areas
+    
+    for (let i = 0; i < CURRENT_AREAS_PER_LEVEL; i++) {
+      let attempts = 0;
+      let areaX, areaY, areaWidth, areaHeight;
+      let validArea = false;
+      
+      while (!validArea && attempts < 50) {
+        // Random dimensions
+        areaWidth = random(CURRENT_AREA_MIN_WIDTH, CURRENT_AREA_MAX_WIDTH);
+        areaHeight = random(CURRENT_AREA_MIN_HEIGHT, CURRENT_AREA_MAX_HEIGHT);
+        
+        // Random position, avoiding player start and goal areas
+        areaX = random(CURRENT_AREA_PADDING_FROM_PLAYER_START, 
+                      WORLD_WIDTH - areaWidth - CURRENT_AREA_PADDING_FROM_GOAL);
+        areaY = random(areaHeight / 2, WORLD_HEIGHT - areaHeight / 2);
+        
+        // Check if the area is mostly in open water
+        let openCells = 0;
+        let totalCells = 0;
+        let checkStep = 20; // Check every 20 pixels for performance
+        
+        for (let checkX = areaX; checkX < areaX + areaWidth; checkX += checkStep) {
+          for (let checkY = areaY; checkY < areaY + areaHeight; checkY += checkStep) {
+            totalCells++;
+            if (!cave.isWall(checkX, checkY)) {
+              openCells++;
+            }
+          }
+        }
+        
+        // Area is valid if at least 70% is open water
+        if (totalCells > 0 && (openCells / totalCells) > 0.7) {
+          validArea = true;
+        }
+        
+        attempts++;
+      }
+      
+      if (validArea) {
+        // Create a current area with random force direction
+        let angle = random(TWO_PI);
+        let force = random(CURRENT_FORCE_MAGNITUDE_MIN, CURRENT_FORCE_MAGNITUDE_MAX);
+        let forceVector = p5.Vector.fromAngle(angle);
+        
+        // Create a proper CurrentArea instance
+        currentAreas.push(new CurrentArea(
+          areaX,
+          areaY,
+          areaWidth,
+          areaHeight,
+          forceVector,
+          force
+        ));
+      }
+    }
+  }
+  
+  generateCurrentAreas();
+  
+  // Reset variables
+  keys = {
+    up: false, down: false, left: false, right: false, space: false, shift: false
+  };
+}
 
-  // Projectile-Enemy Collisions (This loop needs to stay separate due to nested iteration and specific logic)
+function draw() {
+  // Update input from gamepad if available
+  if (typeof updateGamepadInput === 'function') {
+    updateGamepadInput();
+  }
+  
+  // Game state machine
+  switch (gameState) {
+    case 'start':
+      drawStartScreen();
+      break;
+    case 'highScores':
+      drawHighScoreScreen();
+      break;
+    case 'playing':
+      updateGame();
+      drawGame();
+      break;
+    case 'levelComplete':
+      drawLevelCompleteScreen();
+      break;
+    case 'gameOver':
+      drawGameOverScreen();
+      break;
+    case 'gameComplete':
+      drawGameCompleteScreen();
+      break;
+    case 'loading':
+      break; // Loading overlay is handled separately
+  }
+}
+
+// Keyboard event handlers
+function keyPressed() {
+  // Start audio on Enter press from any game state if not already started
+  if (keyCode === ENTER) {
+    // Start audio if needed
+    if (!audioInitialized) {
+      console.log("Starting audio routine on ENTER key");
+      startAudioRoutine();
+    }
+    
+    // Make sure music is playing when starting from these screens
+    if ((gameState === 'start' || gameState === 'highScores' || gameState === 'gameOver' || gameState === 'gameComplete')) {
+      if (!modPlayer || !modPlayer.playing) {
+        console.log("Starting music on ENTER key from", gameState);
+        loadBackgroundMusic();
+      }
+    }
+  }
+
+  if (gameState === 'playing') {
+    if (keyCode === KEY_CODE_SPACE) player.shoot(); // Use constant for space key
+  }
+  
+  // Debug toggle for showing cave walls (works in any state)
+  if (key === ']') {
+    debugShowWalls = !debugShowWalls;
+    console.log("Debug wall view:", debugShowWalls ? "ON" : "OFF");
+  }
+  
+  if (gameState === 'start' && keyCode === ENTER) {
+    // Transition from start screen to high scores
+    gameState = 'highScores';
+    highScores = null; // Reset to show loading
+    
+    // Slightly increase volume for highscores screen
+    if (modPlayer && modPlayer.playing) {
+      modPlayer.fadeVolume(0.4, 1000);
+    }
+    
+    // Load high scores asynchronously
+    highScoreManager.getHighScores().then(scores => {
+      highScores = scores;
+    }).catch(error => {
+      console.error('Failed to load high scores:', error);
+      highScores = []; // Set to empty array on error
+    });
+  } else if (gameState === 'highScores' && keyCode === ENTER) {
+    // Transition from high scores to game
+    gameState = 'loading';
+    showLoadingOverlay("GENERATING LEVEL");
+    
+    // Fade down music for gameplay
+    if (modPlayer && modPlayer.playing) {
+      modPlayer.fadeVolume(0.3, 1000);
+    }
+    
+    // Use setTimeout to allow loading screen to render
+    setTimeout(() => {
+      initGameObjects();
+      player.health = PLAYER_INITIAL_HEALTH; 
+      player.airSupply = player.initialAirSupply; // Reset to full for new game
+      player.lastSonarTime = frameCount - player.sonarCooldown; // Allow immediate sonar
+      player.lastShotTime = frameCount - player.shotCooldown;   // Allow immediate shot
+      gameState = 'playing';
+    }, 100); // Small delay to allow loading screen to render
+  } else if (gameState === 'gameOver' && keyCode === ENTER) {
+    if (isSubmittingHighScore && playerNameInput.trim().length > 0 && !isSubmissionInProgress) {
+      // Submit the high score
+      submitHighScore();
+    } else if (!isSubmittingHighScore) {
+      // Reset game state variables
+      isHighScoreChecked = false;
+      isSubmittingHighScore = false;
+      playerNameInput = '';
+      isHighScoreResult = false;
+      isSubmissionInProgress = false;
+      
+      resetGame();
+      // Game state is already set to 'start' in resetGame()
+      
+      // Restart music if it's stopped
+      if (modPlayer && !modPlayer.playing) {
+        loadBackgroundMusic();
+      } else if (modPlayer && modPlayer.playing) {
+        modPlayer.fadeVolume(0.5, 1000); // Restore volume
+      }
+    }
+  } else if (gameState === 'gameComplete' && keyCode === ENTER) {
+    resetGame();
+    gameState = 'start'; // Return to start screen
+    
+    // Restart music if it's stopped
+    if (modPlayer && !modPlayer.playing) {
+      loadBackgroundMusic();
+    } else if (modPlayer && modPlayer.playing) {
+      modPlayer.fadeVolume(0.5, 1000); // Restore volume
+    }
+  } else if (gameState === 'levelComplete' && keyCode === ENTER) {
+    prepareNextLevel();
+    
+    // Adjust music volume for next level
+    if (modPlayer && modPlayer.playing) {
+      modPlayer.fadeVolume(0.3, 1000);
+    }
+  }
+}
+
+function keyTyped() {
+  // Handle name input for high score submission
+  if (gameState === 'gameOver' && isSubmittingHighScore) {
+    if (key.length === 1 && key.match(/[a-zA-Z0-9 ]/)) {
+      // Allow letters, numbers, and spaces
+      if (playerNameInput.length < 20) { // Limit name length
+        playerNameInput += key;
+      }
+    }
+  }
+}
+
+function keyReleased() {
+  // Handle backspace for name input
+  if (gameState === 'gameOver' && isSubmittingHighScore) {
+    if (keyCode === BACKSPACE && playerNameInput.length > 0) {
+      playerNameInput = playerNameInput.slice(0, -1);
+      return false; // Prevent default behavior
+    }
+  }
+}
+
+// Key code constants
+const KEY_CODE_SPACE = 32;
+const KEY_CODE_W = 87;
+const KEY_CODE_S = 83;
+const KEY_CODE_A = 65;
+const KEY_CODE_D = 68;
+
+// Audio initialization function
+function startAudioRoutine() {
+  if (audioInitialized) return;
+  
+  // Try to start audio
+  if (getAudioContext()) {
+    let ctx = getAudioContext();
+    if (ctx && ctx.state === 'suspended') {
+      ctx.resume().then(() => { 
+        audioInitialized = true; 
+        setupSounds();
+        
+        // Play background music if it's not already playing
+        if (modPlayer && !modPlayer.playing) {
+          console.log("Starting music after audio context resumed");
+          loadBackgroundMusic();
+        }
+        
+        console.log("Audio context resumed successfully");
+      });
+    } else if (ctx && ctx.state === 'running') { 
+      audioInitialized = true; 
+      setupSounds();
+      
+      // Play background music if it's not already playing
+      if (modPlayer && !modPlayer.playing) {
+        console.log("Starting music with already running audio context");
+        loadBackgroundMusic();
+      }
+      
+      console.log("Audio context already running");
+    }
+  }
+}
+
+// Prepare next level
+function prepareNextLevel() {
+  currentLevel++;
+  if (currentLevel > MAX_LEVELS) {
+    gameState = 'gameComplete';
+    
+    // Adjust music for game completion
+    if (modPlayer && modPlayer.playing) {
+      modPlayer.fadeVolume(0.7, 2000); // Celebratory volume
+      
+      // Optionally could load a different mod file for victory
+      // But we'll stick with volume change for now
+    }
+    
+    return;
+  }
+  
+  gameState = 'loading';
+  showLoadingOverlay("GENERATING LEVEL " + currentLevel);
+  
+  // Adjust music for loading screen
+  if (modPlayer && modPlayer.playing) {
+    modPlayer.fadeVolume(0.4, 500); // Slightly louder during loading
+  }
+  
+  // Use setTimeout to allow loading screen to render
+  setTimeout(() => {
+    resetLevel();
+    gameState = 'playing';
+    
+    // Adjust music for gameplay
+    if (modPlayer && modPlayer.playing) {
+      modPlayer.fadeVolume(0.3, 500); // Lower during gameplay for concentration
+    }
+  }, 100);
+}
+
+// Show loading overlay
+function showLoadingOverlay(message) {
+  let overlay = document.getElementById('loadingOverlay');
+  let text = document.getElementById('loadingText');
+  
+  if (overlay && text) {
+    text.innerText = message;
+    overlay.style.display = 'flex';
+  }
+}
+
+// Hide loading overlay
+function hideLoadingOverlay() {
+  let overlay = document.getElementById('loadingOverlay');
+  if (overlay) {
+    overlay.style.display = 'none';
+  }
+}
+
+// Screen drawing functions
+function drawStartScreen() {
+  background(BACKGROUND_COLOR_H, BACKGROUND_COLOR_S, BACKGROUND_COLOR_B);
+
+  // Animate submarine
+  let subX = width / 2;
+  let subY = height / 2 + START_SCREEN_TITLE_Y_OFFSET - 80;
+  
+  push();
+  translate(subX, subY);
+  
+  // Create a temporary submarine object for rendering
+  let tempSub = {
+    radius: PLAYER_RADIUS,
+    propellerAngle: startScreenPropellerAngle,
+    
+    _renderBody() {
+      fill(PLAYER_COLOR_BODY_H, PLAYER_COLOR_BODY_S, PLAYER_COLOR_BODY_B);
+      noStroke();
+      ellipse(0, 0, this.radius * PLAYER_BODY_WIDTH_FACTOR, this.radius * PLAYER_BODY_HEIGHT_FACTOR);
+    },
+    
+    _renderSail() {
+      fill(PLAYER_COLOR_SAIL_H, PLAYER_COLOR_SAIL_S, PLAYER_COLOR_SAIL_B);
+      rectMode(CENTER);
+      rect(this.radius * PLAYER_SAIL_OFFSET_X_FACTOR, 0, this.radius * PLAYER_SAIL_WIDTH_FACTOR, this.radius * PLAYER_SAIL_HEIGHT_FACTOR, this.radius * PLAYER_SAIL_CORNER_RADIUS_FACTOR);
+      rectMode(CORNER); // Reset rectMode
+    },
+    
+    _renderFin() {
+      fill(PLAYER_COLOR_FIN_H, PLAYER_COLOR_FIN_S, PLAYER_COLOR_FIN_B);
+      beginShape();
+      vertex(-this.radius * PLAYER_FIN_X1_FACTOR, -this.radius * PLAYER_FIN_Y1_FACTOR);
+      vertex(-this.radius * PLAYER_FIN_X2_FACTOR, this.radius * PLAYER_FIN_Y2_FACTOR);
+      vertex(-this.radius * PLAYER_FIN_X3_FACTOR, this.radius * PLAYER_FIN_Y3_FACTOR);
+      vertex(-this.radius * PLAYER_FIN_X4_FACTOR, -this.radius * PLAYER_FIN_Y4_FACTOR);
+      endShape(CLOSE);
+    },
+    
+    _renderPropeller() {
+      push();
+      translate(this.radius * PLAYER_PROPELLER_X_OFFSET_FACTOR, 0); // Position propeller at the back
+      
+      fill(PLAYER_COLOR_PROPELLER_H, PLAYER_COLOR_PROPELLER_S, PLAYER_COLOR_PROPELLER_B);
+      noStroke();
+      
+      let apparentHeight = this.radius * PLAYER_PROPELLER_MAX_SIDE_HEIGHT_FACTOR * abs(sin(this.propellerAngle));
+      let thickness = this.radius * PLAYER_PROPELLER_THICKNESS_FACTOR;
+      
+      rectMode(CENTER);
+      rect(0, 0, thickness, apparentHeight);
+      rectMode(CORNER); // Reset rectMode
+      
+      pop();
+    }
+  };
+  
+  // Use the same rendering methods as the in-game submarine
+  tempSub._renderBody();
+  tempSub._renderSail();
+  tempSub._renderFin();
+  tempSub._renderPropeller();
+  
+  pop();
+  
+  // Update propeller animation - use the same speed factor as in-game
+  startScreenPropellerAngle += 0.2;
+  
+  // Spawn bubbles from propeller
+  if (frameCount % 10 === 0) {
+    sonarBubbles.push(new SonarBubble(subX - 20 + random(-5, 5), subY + random(-5, 5)));
+  }
+  
+  // Update and render bubbles
+  for (let i = sonarBubbles.length - 1; i >= 0; i--) {
+    sonarBubbles[i].update();
+    sonarBubbles[i].render(0, 0);
+    if (sonarBubbles[i].isOffscreen()) {
+      sonarBubbles.splice(i, 1);
+    }
+  }
+  
+  textAlign(CENTER, CENTER);
+  fill(START_SCREEN_TITLE_COLOR_H, START_SCREEN_TITLE_COLOR_S, START_SCREEN_TITLE_COLOR_B); 
+  textSize(START_SCREEN_TITLE_TEXT_SIZE);
+  text(`Reactor Dive`, width / 2, height / 2 + START_SCREEN_TITLE_Y_OFFSET);
+  
+  textSize(START_SCREEN_INFO_TEXT_SIZE);
+  text("Christian Nold 2025", width / 2, height / 2 + START_SCREEN_INFO_Y_OFFSET_3);
+
+  text(`Destroy enemies and reach the flooded reactor`, width / 2, height / 2 + START_SCREEN_INFO_Y_OFFSET_1);
+  
+  // Show different control instructions based on device
+  if (typeof isMobileControlsEnabled === 'function' && isMobileControlsEnabled()) {
+    text("Touch controls: Joystick (left) and Fire button (right)", width / 2, height / 2 + START_SCREEN_INFO_Y_OFFSET_2);
+  } else {
+    text("WASD/Arrows: Move. SPACE: Shoot.", width / 2, height / 2 + START_SCREEN_INFO_Y_OFFSET_2);
+  }
+  
+  textSize(START_SCREEN_PROMPT_TEXT_SIZE); 
+  fill(START_SCREEN_PROMPT_COLOR_H, START_SCREEN_PROMPT_COLOR_S, START_SCREEN_PROMPT_COLOR_B);
+  
+  // Show different instructions based on whether mobile controls are active
+  if (typeof isMobileControlsEnabled === 'function' && isMobileControlsEnabled()) {
+    text("Tap anywhere to Dive", width / 2, height / 2 + START_SCREEN_PROMPT_Y_OFFSET);
+  } else {
+    text("Press ENTER to Dive", width / 2, height / 2 + START_SCREEN_PROMPT_Y_OFFSET);
+  }
+  
+  if (!audioInitialized) {
+      textSize(START_SCREEN_AUDIO_NOTE_TEXT_SIZE); 
+      fill(START_SCREEN_AUDIO_NOTE_COLOR_H, START_SCREEN_AUDIO_NOTE_COLOR_S, START_SCREEN_AUDIO_NOTE_COLOR_B);
+      text("(Sound will enable after you press Enter)", width/2, height/2 + START_SCREEN_AUDIO_NOTE_Y_OFFSET);
+ }
+}
+
+function drawHighScoreScreen() {
+  background(BACKGROUND_COLOR_H, BACKGROUND_COLOR_S, BACKGROUND_COLOR_B);
+  textAlign(CENTER, CENTER);
+  
+  // Title
+  fill(0, 0, 100); // White text
+  textSize(48);
+  text("HIGH SCORES", width / 2, height / 2 - 200);
+  
+  // High scores list
+  textSize(24);
+  if (!highScores) {
+    // Loading state
+    fill(60, 100, 80); // Yellow loading text
+    text("Loading scores...", width / 2, height / 2);
+  } else if (highScores.length === 0) {
+    // No scores yet
+    fill(0, 0, 60); // Gray text
+    text("No scores yet. Be the first!", width / 2, height / 2);
+  } else {
+    // Display scores
+    fill(0, 0, 90); // Light gray for scores
+    for (let i = 0; i < Math.min(highScores.length, 10); i++) {
+      let score = highScores[i];
+      let yPos = height / 2 - 150 + i * 30;
+      text(`${i + 1}. ${score.name}: ${score.score}`, width / 2, yPos);
+    }
+  }
+  
+  // Instructions
+  textSize(20);
+  fill(60, 100, 100); // Yellow prompt text
+  if (typeof isMobileControlsEnabled === 'function' && isMobileControlsEnabled()) {
+    text("Tap to Play", width / 2, height / 2 + 200);
+  } else {
+    text("Press ENTER to Play", width / 2, height / 2 + 200);
+  }
+}
+
+function drawLevelCompleteScreen() {
+  background(BACKGROUND_COLOR_H, BACKGROUND_COLOR_S, BACKGROUND_COLOR_B);
+  
+  textAlign(CENTER, CENTER);
+  fill(LEVEL_COMPLETE_TITLE_COLOR_H, LEVEL_COMPLETE_TITLE_COLOR_S, LEVEL_COMPLETE_TITLE_COLOR_B); 
+  textSize(LEVEL_COMPLETE_TITLE_TEXT_SIZE);
+  text(`Level ${currentLevel} Complete!`, width / 2, height / 2 + LEVEL_COMPLETE_TITLE_Y_OFFSET);
+  
+  fill(255);
+  textSize(LEVEL_COMPLETE_INFO_TEXT_SIZE);
+  text(`Enemies Destroyed: ${enemiesKilledThisLevel}`, width / 2, height / 2 + LEVEL_COMPLETE_INFO_Y_OFFSET);
+  text(`Score: ${levelScore}`, width / 2, height / 2 + LEVEL_COMPLETE_INFO_Y_OFFSET + 30);
+  
+  textSize(START_SCREEN_PROMPT_TEXT_SIZE); 
+  fill(START_SCREEN_PROMPT_COLOR_H, START_SCREEN_PROMPT_COLOR_S, START_SCREEN_PROMPT_COLOR_B);
+  text("Press ENTER to Continue", width / 2, height / 2 + LEVEL_COMPLETE_PROMPT_Y_OFFSET);
+}
+
+function drawGameCompleteScreen() {
+  background(BACKGROUND_COLOR_H, BACKGROUND_COLOR_S, BACKGROUND_COLOR_B);
+  
+  textAlign(CENTER, CENTER);
+  fill(GAME_COMPLETE_TITLE_COLOR_H, GAME_COMPLETE_TITLE_COLOR_S, GAME_COMPLETE_TITLE_COLOR_B); 
+  textSize(GAME_COMPLETE_TITLE_TEXT_SIZE);
+  text(`Game Complete!`, width / 2, height / 2 + GAME_COMPLETE_TITLE_Y_OFFSET);
+  
+  fill(255);
+  textSize(GAME_COMPLETE_INFO_TEXT_SIZE);
+  text(`You have saved humanity`, width / 2, height / 2 + GAME_COMPLETE_INFO_Y_OFFSET);
+  text(`Final Score: ${totalScore}`, width / 2, height / 2 + GAME_COMPLETE_INFO_Y_OFFSET + 30);
+  
+  textSize(START_SCREEN_PROMPT_TEXT_SIZE); 
+  fill(START_SCREEN_PROMPT_COLOR_H, START_SCREEN_PROMPT_COLOR_S, START_SCREEN_PROMPT_COLOR_B);
+  text("Press ENTER to Play Again", width / 2, height / 2 + GAME_COMPLETE_PROMPT_Y_OFFSET);
+}
+
+function drawGameOverScreen() {
+  background(BACKGROUND_COLOR_H, BACKGROUND_COLOR_S, BACKGROUND_COLOR_B);
+  
+  // Check if this is a high score (only do this once)
+  if (!isHighScoreChecked) {
+    isHighScoreChecked = true;
+    console.log('Checking if score', totalScore, 'is a high score...');
+    
+    // Make sure music is stopped on game over screen
+    if (modPlayer && modPlayer.playing) {
+      console.log("Found music still playing on game over screen - stopping it");
+      modPlayer.silence();
+    }
+    
+    highScoreManager.isHighScore(totalScore).then(result => {
+      isHighScoreResult = result;
+      if (result) {
+        console.log('Score qualifies as a high score!');
+        isSubmittingHighScore = true;
+        playerNameInput = '';
+      } else {
+        console.log('Score does not qualify as a high score.');
+      }
+    }).catch(error => {
+      console.error('Error checking high score:', error);
+      isHighScoreResult = false;
+    });
+  }
+  
+  textAlign(CENTER, CENTER);
+  fill(GAME_OVER_TITLE_COLOR_H, GAME_OVER_TITLE_COLOR_S, GAME_OVER_TITLE_COLOR_B); 
+  textSize(GAME_OVER_TITLE_TEXT_SIZE);
+  text("MISSION FAILED", width/2, height/2 + GAME_OVER_TITLE_Y_OFFSET);
+  
+  textSize(GAME_OVER_INFO_TEXT_SIZE);
+  text(player.health <= 0 ? "Submarine Destroyed!" : "Air Supply Depleted!", width/2, height/2 + GAME_OVER_INFO_Y_OFFSET);
+  text(`Total Score: ${totalScore}`, width/2, height/2 + GAME_OVER_INFO_Y_OFFSET + 30);
+  
+  // Handle high score submission
+  if (isSubmittingHighScore) {
+    // Highlight "NEW HIGH SCORE!" with a background
+    push();
+    fill(60, 100, 100); // Bright yellow
+    textSize(GAME_OVER_INFO_TEXT_SIZE + 6); // Slightly larger
+    text("NEW HIGH SCORE!", width/2, height/2 + GAME_OVER_INFO_Y_OFFSET + 70);
+    pop();
+    
+    // "Enter your name:" instruction
+    fill(60, 80, 90); // Slightly dimmer yellow
+    textSize(GAME_OVER_INFO_TEXT_SIZE - 2);
+    text("Enter your name:", width/2, height/2 + GAME_OVER_INFO_Y_OFFSET + 110);
+    
+    // Show mobile input field or desktop text input
+    if (typeof isMobileControlsEnabled === 'function' && isMobileControlsEnabled()) {
+      // Position the HTML input field with better spacing for mobile
+      if (highscoreInputElement) {
+        highscoreInputElement.style.position = 'fixed';
+        highscoreInputElement.style.top = '65%'; // Moved down to avoid overlap
+        highscoreInputElement.style.left = '50%';
+        highscoreInputElement.style.transform = 'translate(-50%, -50%)';
+        highscoreInputElement.style.opacity = '1';
+        highscoreInputElement.style.pointerEvents = 'auto';
+        highscoreInputElement.style.zIndex = '10000';
+        highscoreInputElement.style.padding = '12px 20px';
+        highscoreInputElement.style.fontSize = '20px';
+        highscoreInputElement.style.textAlign = 'center';
+        highscoreInputElement.style.border = '3px solid #ffff00';
+        highscoreInputElement.style.borderRadius = '8px';
+        highscoreInputElement.style.backgroundColor = 'rgba(0, 0, 0, 0.9)';
+        highscoreInputElement.style.color = '#ffff00';
+        highscoreInputElement.style.boxShadow = '0 0 15px rgba(255, 255, 0, 0.5)';
+        highscoreInputElement.style.outline = 'none';
+        highscoreInputElement.style.minWidth = '250px';
+      }
+      // Instructions positioned lower to avoid overlap
+      fill(60, 60, 80); // Dimmer for instructions
+      textSize(GAME_OVER_INFO_TEXT_SIZE - 4);
+      if (isSubmissionInProgress) {
+        fill(60, 100, 100); // Bright yellow when submitting
+        text("SUBMITTING SCORE...", width/2, height/2 + GAME_OVER_PROMPT_Y_OFFSET + 60);
+      } else {
+        text("Tap to enter name, then type", width/2, height/2 + GAME_OVER_PROMPT_Y_OFFSET + 60);
+      }
+    } else {
+      // Desktop - show the typed name with highlighting
+      push();
+      // Background rectangle for the text input area
+      if (isSubmissionInProgress) {
+        fill(0, 0, 20, 200); // Dark background with some transparency
+        stroke(60, 60, 60); // Dimmer border when submitting
+      } else {
+        fill(0, 0, 20, 200); // Dark background with some transparency
+        stroke(60, 100, 100); // Bright yellow border
+      }
+      strokeWeight(2);
+      rectMode(CENTER);
+      let textWidth = max(200, playerNameInput.length * 12 + 40);
+      rect(width/2, height/2 + GAME_OVER_INFO_Y_OFFSET + 150, textWidth, 40, 5);
+      
+      // The actual text input
+      noStroke();
+      textSize(GAME_OVER_INFO_TEXT_SIZE);
+      if (isSubmissionInProgress) {
+        fill(60, 60, 80); // Dimmer text when submitting
+        text("SUBMITTING...", width/2, height/2 + GAME_OVER_INFO_Y_OFFSET + 150);
+      } else {
+        fill(60, 100, 100); // Bright yellow text
+        text(playerNameInput + "_", width/2, height/2 + GAME_OVER_INFO_Y_OFFSET + 150);
+      }
+      pop();
+    }
+    
+    // Submit instructions
+    textSize(START_SCREEN_PROMPT_TEXT_SIZE); 
+    fill(START_SCREEN_PROMPT_COLOR_H, START_SCREEN_PROMPT_COLOR_S, START_SCREEN_PROMPT_COLOR_B);
+    text("Press ENTER to Submit", width / 2, height / 2 + GAME_OVER_PROMPT_Y_OFFSET);
+  } else {
+    // Hide the input field when not needed
+    if (highscoreInputElement) {
+      highscoreInputElement.style.position = 'fixed';
+      highscoreInputElement.style.top = '-1000px';
+      highscoreInputElement.style.left = '-1000px';
+      highscoreInputElement.style.opacity = '0';
+      highscoreInputElement.style.pointerEvents = 'none';
+    }
+    
+    textSize(START_SCREEN_PROMPT_TEXT_SIZE); 
+    fill(START_SCREEN_PROMPT_COLOR_H, START_SCREEN_PROMPT_COLOR_S, START_SCREEN_PROMPT_COLOR_B);
+    text("Press ENTER to Restart", width / 2, height / 2 + GAME_OVER_PROMPT_Y_OFFSET);
+  }
+}
+
+// Function to spawn a random powerup at the specified position
+function spawnRandomPowerup(x, y) {
+  // Determine powerup type
+  let types = ['health', 'air', 'shield'];
+  let typeWeights = [0.4, 0.4, 0.2]; // 40% health, 40% air, 20% shield
+  
+  let randomValue = random();
+  let cumulativeWeight = 0;
+  let selectedType = types[0]; // Default to first type
+  
+  for (let i = 0; i < types.length; i++) {
+    cumulativeWeight += typeWeights[i];
+    if (randomValue <= cumulativeWeight) {
+      selectedType = types[i];
+      break;
+    }
+  }
+  
+  // Create the powerup
+  powerups.push(new Powerup(x, y, selectedType));
+  console.log(`Spawned ${selectedType} powerup at ${x}, ${y}`);
+}
+
+// Helper function
+function initGameObjects() {
+  resetLevel();
+}
+
+// Game update functions
+function updateGame() {
+  // Apply movement from mobile controls if available
+  if (typeof applyMobileMovement === 'function') {
+    applyMobileMovement();
+  }
+
+  // Update player and handle game mechanics
+  player.update(cave, enemies);
+  
+  // Process current areas - spawn bubbles
+  for (let area of currentAreas) {
+    if (typeof area.spawnBubbles === 'function') {
+      area.spawnBubbles(cave, cameraOffsetX, cameraOffsetY);
+    }
+  }
+
+  // Handle player collisions with enemies
+  if (typeof player.handleEnemyCollisions === 'function') {
+    player.handleEnemyCollisions(enemies);
+  }
+  
+  // Handle player collisions with powerups
+  for (let i = powerups.length - 1; i >= 0; i--) {
+    let powerup = powerups[i];
+    let distance = dist(player.pos.x, player.pos.y, powerup.pos.x, powerup.pos.y);
+    
+    if (distance < player.radius + powerup.radius) {
+      powerup.applyEffect(player);
+      playSound('powerup'); // Play powerup sound
+      console.log(`Collected ${powerup.type} powerup at ${powerup.pos.x}, ${powerup.pos.y}`);
+      powerups.splice(i, 1); // Remove collected powerup
+    }
+    
+    // Remove powerups that have been around too long
+    if (powerup.age > POWERUP_LIFESPAN) {
+      console.log(`Powerup expired after ${powerup.age} frames`);
+      powerups.splice(i, 1);
+    }
+  }
+  
+  if (typeof player.handleJellyfishCollisions === 'function' && jellyfish) {
+    player.handleJellyfishCollisions(jellyfish);
+  }
+  
+  // Projectile-Enemy Collisions
   for (let i = projectiles.length - 1; i >= 0; i--) {
+    let projectileRemoved = false;
     for (let j = enemies.length - 1; j >= 0; j--) {
-      if (projectiles[i] && enemies[j]) {
+      if (projectiles[i] && enemies[j] && !projectileRemoved) {
         let d = dist(projectiles[i].pos.x, projectiles[i].pos.y, enemies[j].pos.x, enemies[j].pos.y);
         if (d < projectiles[i].radius + enemies[j].radius) {
-          createExplosion(projectiles[i].pos.x, projectiles[i].pos.y, 'enemy'); // Create enemy explosion before splicing
+          // Store enemy position for explosion
+          let enemyX = enemies[j].pos.x;
+          let enemyY = enemies[j].pos.y;
+          
+          // Remove enemy and projectile
           enemies.splice(j, 1); 
-          projectiles.splice(i, 1); 
+          projectiles.splice(i, 1);
+          projectileRemoved = true; // Mark as removed to avoid array index issues
+          
+          // Create visual and audio feedback
+          createExplosion(enemyX, enemyY, 'enemy');
           enemiesKilledThisLevel++;
-          playSound('creatureExplosion'); // Use creature explosion sound
+          playSound('creatureExplosion');
+          
+          // Chance to spawn a powerup
+          if (random() < POWERUP_SPAWN_CHANCE_ON_ENEMY_DEATH) {
+            spawnRandomPowerup(enemyX, enemyY);
+          }
+          
           break; 
         }
       }
     }
   }
 
-  // Projectile-Jellyfish Collisions
-  for (let i = projectiles.length - 1; i >= 0; i--) {
-    for (let j = jellyfish.length - 1; j >= 0; j--) {
-      if (projectiles[i] && jellyfish[j]) {
-        let d = dist(projectiles[i].pos.x, projectiles[i].pos.y, jellyfish[j].pos.x, jellyfish[j].pos.y);
-        if (d < projectiles[i].radius + jellyfish[j].radius) {
-          // Jellyfish takes damage instead of being destroyed immediately
-          let destroyed = jellyfish[j].takeDamage();
-          createExplosion(projectiles[i].pos.x, projectiles[i].pos.y, 'creature');
-          projectiles.splice(i, 1);
-          
-          if (destroyed) {
-            jellyfish.splice(j, 1);
-            enemiesKilledThisLevel++;
-            playSound('creatureExplosion'); // Use creature explosion sound when destroyed
-          } else {
-            playSound('bump'); // Different sound for non-fatal hit
+  // Projectile-Jellyfish Collisions (if jellyfish exist)
+  if (typeof jellyfish !== 'undefined' && jellyfish.length > 0) {
+    for (let i = projectiles.length - 1; i >= 0; i--) {
+      if (projectiles[i] === undefined) continue; // Skip if already removed
+      let projectileRemoved = false;
+      
+      for (let j = jellyfish.length - 1; j >= 0; j--) {
+        if (projectiles[i] && jellyfish[j] && !projectileRemoved) {
+          let d = dist(projectiles[i].pos.x, projectiles[i].pos.y, jellyfish[j].pos.x, jellyfish[j].pos.y);
+          if (d < projectiles[i].radius + jellyfish[j].radius) {
+            // Store positions for effects
+            let jellyX = jellyfish[j].pos.x;
+            let jellyY = jellyfish[j].pos.y;
+            
+            // Jellyfish takes damage instead of being destroyed immediately
+            let destroyed = jellyfish[j].takeDamage();
+            
+            // Create explosion at the jellyfish position
+            createExplosion(jellyX, jellyY, 'creature');
+            
+            // Remove projectile
+            projectiles.splice(i, 1);
+            projectileRemoved = true;
+            
+            if (destroyed) {
+              jellyfish.splice(j, 1);
+              enemiesKilledThisLevel++;
+              playSound('creatureExplosion');
+              
+              // Higher chance to spawn a powerup from jellyfish
+              if (random() < POWERUP_SPAWN_CHANCE_ON_JELLYFISH_DEATH) {
+                spawnRandomPowerup(jellyX, jellyY);
+              }
+            } else {
+              playSound('bump'); // Different sound for non-fatal hit
+            }
+            break;
           }
-          break;
         }
-
       }
     }
   }
 
-  player.render(cameraOffsetX, cameraOffsetY);
+  // Update game objects (but don't render yet - rendering happens in drawGame)
+  processGameObjectArray(projectiles, cameraOffsetX, cameraOffsetY, cave);
+  processGameObjectArray(enemies, cameraOffsetX, cameraOffsetY, cave); // Pass cave for enemy updates
+  processGameObjectArray(particles, cameraOffsetX, cameraOffsetY);
+  processGameObjectArray(sonarBubbles, cameraOffsetX, cameraOffsetY);
+  
+  // Update powerups
+  for (let i = 0; i < powerups.length; i++) {
+    if (powerups[i] && powerups[i].update) {
+      powerups[i].update();
+    }
+  }
 
-  // Debug: Show cave walls
+  // Update camera position
+  cameraOffsetX = player.pos.x - width / 2;
+  cameraOffsetY = player.pos.y - height / 2;
+  
+  // Check for game over conditions
+  if (player.health <= 0 || player.airSupply <= 0) {
+    gameState = 'gameOver';
+    
+    // Stop or fade out music when game is over
+    if (modPlayer && modPlayer.playing) {
+      modPlayer.fadeVolume(0, 2000); // Fade out over 2 seconds
+    }
+    
+    // Play game over sound
+    playSound('explosion');
+  }
+  
+  // Check for level completion - if player is in the goal area and enough enemies are killed
+  if (cave.isGoal(player.pos.x, player.pos.y) && getKillsStillNeeded() === 0) {
+    gameState = 'levelComplete';
+    
+    // Change music volume for level complete
+    if (modPlayer && modPlayer.playing) {
+      modPlayer.fadeVolume(0.7, 1000); // Fade up to celebrate
+    }
+    
+    // Play success sound
+    playSound('powerup');
+  }
+}
+
+function drawGame() {
+  // Set up camera offset based on player position
+  cameraOffsetX = player.pos.x - width / 2;
+  cameraOffsetY = player.pos.y - height / 2;
+
+  // Draw background
+  background(BACKGROUND_COLOR_H, BACKGROUND_COLOR_S, BACKGROUND_COLOR_B);
+
+  // Render the goal square if player is inside it
+  if (cave.isGoal(player.pos.x, player.pos.y)) {
+    cave.renderGoal(cameraOffsetX, cameraOffsetY);
+  }
+
+  // Draw cave walls for debugging if enabled
   if (debugShowWalls) {
     drawDebugCaveWalls(cameraOffsetX, cameraOffsetY);
   }
-
-  // HUD
-  fill(HUD_TEXT_COLOR_H, HUD_TEXT_COLOR_S, HUD_TEXT_COLOR_B); textSize(HUD_TEXT_SIZE); textAlign(LEFT, TOP);
-  text(`Hull: ${player.health}%`, HUD_MARGIN_X, HUD_MARGIN_Y+ HUD_LINE_SPACING);
-  text(`Air: ${floor(player.airSupply / AIR_SUPPLY_FRAMES_TO_SECONDS_DIVISOR)} seconds `, HUD_MARGIN_X, HUD_MARGIN_Y + HUD_LINE_SPACING*2);
-  const killsRequired = getKillsRequiredForLevel(currentLevel);
-  let killsStillNeeded = Math.max(0, killsRequired - enemiesKilledThisLevel);
-  text(`Kills Needed: ${killsStillNeeded}`, HUD_MARGIN_X, HUD_MARGIN_Y + HUD_LINE_SPACING * 3);
+  
+  // Process current areas - render debug visuals
+  for (let area of currentAreas) {
+    if (typeof area.render === 'function') {
+      area.render(cameraOffsetX, cameraOffsetY);
+    }
+  }
+  
+  // Render all game objects
+  processGameObjectArray(sonarBubbles, cameraOffsetX, cameraOffsetY);
+  processGameObjectArray(particles, cameraOffsetX, cameraOffsetY);
+  processGameObjectArray(projectiles, cameraOffsetX, cameraOffsetY, cave);
+  processGameObjectArray(enemies, cameraOffsetX, cameraOffsetY);
+  processGameObjectArray(powerups, cameraOffsetX, cameraOffsetY); // Render powerups
+  
+  // Render the player
+  player.render(cameraOffsetX, cameraOffsetY);
+  
+  // Note: sonar hits are now rendered inside the player.render() method
+  // No separate call to renderSonarHits needed
+  
+  // Draw UI elements (HUD)
+  // Constants for HUD
+  const HUD_MARGIN_X = 20;
+  const HUD_MARGIN_Y = 20;
+  const HUD_LINE_SPACING = 25;
+  const HUD_TEXT_SIZE = 16;
+  const HUD_TEXT_COLOR_H = 120;
+  const HUD_TEXT_COLOR_S = 80;
+  const HUD_TEXT_COLOR_B = 90;
+  const AIR_SUPPLY_FRAMES_TO_SECONDS_DIVISOR = 60;
+  
+  // Draw HUD
+  fill(HUD_TEXT_COLOR_H, HUD_TEXT_COLOR_S, HUD_TEXT_COLOR_B); 
+  textSize(HUD_TEXT_SIZE); 
+  textAlign(LEFT, TOP);
+  
+  text(`Hull: ${player.health}%`, HUD_MARGIN_X, HUD_MARGIN_Y + HUD_LINE_SPACING);
+  text(`Air: ${floor(player.airSupply / AIR_SUPPLY_FRAMES_TO_SECONDS_DIVISOR)} seconds`, HUD_MARGIN_X, HUD_MARGIN_Y + HUD_LINE_SPACING * 2);
+  
+  text(`Kills Needed: ${getKillsStillNeeded()}`, HUD_MARGIN_X, HUD_MARGIN_Y + HUD_LINE_SPACING * 3);
+  
   let distanceToGoal = dist(player.pos.x, player.pos.y, cave.goalPos.x, cave.goalPos.y);
   text(`Distance to Reactor: ${floor(distanceToGoal)} meters`, HUD_MARGIN_X, HUD_MARGIN_Y + HUD_LINE_SPACING * 4);
 
@@ -3235,218 +2037,108 @@ function drawPlayingState() {
   text("REACTOR", indicatorX, indicatorY + indicatorSize + 5);
   textAlign(LEFT, TOP); // Reset text alignment
   
-  // Render mobile controls after HUD
-  renderMobileControls();
-
-  // Update reactor hum volume based on distance to goal (reactor)
-  updateReactorHum(distanceToGoal);
-
-  // Check Game Over / Level Complete Conditions
-  if (player.health <= 0 || player.airSupply <= 0) {
-      if(gameState === 'playing') {
-        // Player died - don't add level score to total, just calculate for display
-        let timeLeftInSeconds = Math.max(0, Math.floor(player.airSupply / 60)); // Convert frames to seconds (assuming 60 FPS)
-        levelScore = timeLeftInSeconds * 10;
-        playSound('gameOver');
-        
-        // Reset highscore checking variables
-        isHighScoreChecked = false;
-        isSubmittingHighScore = false;
-        playerNameInput = '';
-        isHighScoreResult = false;
-      }
-      gameState = 'gameOver';
-  } else if (cave.isGoal(player.pos.x, player.pos.y) && killsStillNeeded === 0) {
-    // Level completed successfully - calculate score and add to total
-    let timeLeftInSeconds = Math.max(0, Math.floor(player.airSupply / 60)); // Convert frames to seconds (assuming 60 FPS)
-    levelScore = (timeLeftInSeconds * 10) + 500; // Time bonus + 500 points for completing level
-    totalScore += levelScore;
-    gameState = (currentLevel >= MAX_LEVELS) ? 'gameComplete' : 'levelComplete';
+  // Render mobile controls if applicable
+  if (typeof renderMobileControls === 'function') {
+    renderMobileControls();
   }
-}
-
-function draw() {
-  background(BACKGROUND_COLOR_H, BACKGROUND_COLOR_S, BACKGROUND_COLOR_B);
-
-  if (gameState === 'start') {
-    drawStartScreen();
-    return;
-  }
-  if (gameState === 'highScores') {
-    drawHighScoreScreen();
-    return;
-  }
-  if (gameState === 'loading') {
-    drawLoadingScreen();
-    return;
-  }
-  if (gameState === 'levelComplete') {
-    drawLevelCompleteScreen();
-    return;
-  }
-  if (gameState === 'gameComplete') {
-    drawGameCompleteScreen();
-    return;
-  }
-  if (gameState === 'gameOver') {
-    drawGameOverScreen();
-    return;
-  }
-  // gameState === 'playing'
-  drawPlayingState();
   
-  // Check win/lose conditions for playing state
-  if (gameState === 'playing') {
-    // Check win/lose conditions
-    if (player.health <= 0 || player.airSupply <= 0) {
-      gameState = 'gameOver';
-      // Calculate final score before game over
-      levelScore = 0;
-      playSound('gameOver');
-      
-      // Silence and stop music on game over
-      if (modPlayer) {
-        console.log("Game over - stopping music");
-        modPlayer.silence(); // Immediately silence and stop the music
-        // Double-check after a short delay to ensure it's really stopped
-        setTimeout(() => {
-          if (modPlayer.playing) {
-            console.log("Failsafe: Music still playing after game over, forcing stop");
-            modPlayer.stop();
-          }
-        }, 200);
-      }
-    } else if (cave.isGoal(player.pos.x, player.pos.y) && enemiesKilledThisLevel >= getKillsRequiredForLevel(currentLevel)) {
-      gameState = 'levelComplete';
-      // Calculate level score
-      let timeLeftInSeconds = Math.floor(player.airSupply / AIR_SUPPLY_FRAMES_TO_SECONDS_DIVISOR);
-      levelScore = enemiesKilledThisLevel * 100 + timeLeftInSeconds * 10;
-      totalScore += levelScore;
-      
-      // Silence and stop music on level completion
-      if (modPlayer) {
-        console.log("Level complete - stopping music");
-        modPlayer.silence(); // Immediately silence and stop the music
-        // Double-check after a short delay to ensure it's really stopped
-        setTimeout(() => {
-          if (modPlayer.playing) {
-            console.log("Failsafe: Music still playing after level complete, forcing stop");
-            modPlayer.stop();
-          }
-        }, 200);
-      }
-      
-      if (currentLevel >= MAX_LEVELS) {
-        gameState = 'gameComplete';
-        // Make sure music is also stopped for game complete
-        if (modPlayer && modPlayer.playing) {
-          console.log("Game complete - stopping music");
-          modPlayer.silence();
-        }
+  // Update reactor hum volume based on distance to goal if function exists
+  if (typeof updateReactorHum === 'function') {
+    updateReactorHum(distanceToGoal);
+  }
+}
+
+// Debug function to draw all cave walls for debugging
+function drawDebugCaveWalls(offsetX, offsetY) {
+  push();
+  
+  // Draw grid
+  stroke(80, 40, 40, 70);  // Light grid lines
+  strokeWeight(0.5);
+  
+  // Calculate visible area with buffer
+  let startGridX = Math.floor(offsetX / cave.cellSize);
+  let endGridX = Math.ceil((offsetX + width) / cave.cellSize);
+  let startGridY = Math.floor(offsetY / cave.cellSize);
+  let endGridY = Math.ceil((offsetY + height) / cave.cellSize);
+  
+  // Constrain to world bounds
+  startGridX = max(0, startGridX);
+  endGridX = min(cave.gridWidth, endGridX);
+  startGridY = max(0, startGridY);
+  endGridY = min(cave.gridHeight, endGridY);
+  
+  // Draw walls
+  noStroke();
+  fill(120, 50, 50, 120); // Semi-transparent light green for walls
+  
+  for (let x = startGridX; x < endGridX; x++) {
+    for (let y = startGridY; y < endGridY; y++) {
+      if (cave.grid[x][y] === 1) {  // If this cell is a wall
+        rect(
+          x * cave.cellSize - offsetX, 
+          y * cave.cellSize - offsetY, 
+          cave.cellSize, 
+          cave.cellSize
+        );
       }
     }
   }
-}
-function windowResized() { resizeCanvas(windowWidth, windowHeight); }
-
-// --- Dynamic Kills Requirement Constants ---
-const BASE_KILLS_REQUIRED = 3; // Kills required for the first level
-const KILLS_INCREASE_PER_LEVEL = 3; // How many more kills needed each subsequent level
-function getKillsRequiredForLevel(level) {
-  if (level <= 0) return 0;
-  return BASE_KILLS_REQUIRED + (level - 1) * KILLS_INCREASE_PER_LEVEL;
-}
-
-// --- Touch Event Forwarding for Mobile Controls ---
-function touchStarted() {
-  // --- New logic for game state transitions and input focus ---
-  if (!audioInitialized) {
-    startAudioRoutine();
-  }
-
-  // Handle high score input focus on mobile. A tap anywhere on the screen will trigger it.
-  if (gameState === 'gameOver' && isSubmittingHighScore && isMobileControlsEnabled() && !isMobileInputFocused && !isSubmissionInProgress) {
-    if (highscoreInputElement) {
-      console.log("User tapped, focusing high score input element.");
-      highscoreInputElement.focus();
-      isMobileInputFocused = true;
-    } else {
-      // Fallback if the element doesn't exist for some reason
-      const name = prompt("NEW HIGH SCORE! Enter your name (20 chars max):", "");
-      if (name && !isSubmissionInProgress) {
-        playerNameInput = name;
-        submitHighScore();
-      }
-    }
-    return false; // Consume this touch to prevent other actions
-  }
-
-  // Handle screen transitions on tap for mobile
-  if (isMobileControlsEnabled()) {
-    if (gameState === 'start') {
-      gameState = 'highScores';
-      highScores = null;
-      highScoreManager.getHighScores().then(scores => { highScores = scores; })
-        .catch(error => { console.error('Failed to load high scores:', error); highScores = []; });
-      return false;
-    }
-    if (gameState === 'highScores') {
-      gameState = 'loading';
-      showLoadingOverlay("GENERATING LEVEL");
+  
+  // Draw jellyfish
+  fill(0, 255, 255); // Cyan for jellyfish
+  for (let jelly of jellyfish) {
+    let jellyX = jelly.pos.x - offsetX;
+    let jellyY = jelly.pos.y - offsetY;
+    
+    // Only draw if on screen (with some margin)
+    if (jellyX >= -jelly.radius && jellyX <= width + jelly.radius &&
+        jellyY >= -jelly.radius && jellyY <= height + jelly.radius) {
+      ellipse(jellyX, jellyY, jelly.radius * 2, jelly.radius * 2);
       
-      // Set low background music volume for gameplay
-      if (modPlayer && modPlayer.playing) {
-        modPlayer.fadeVolume(0.1, 1000); // Lower volume for gameplay background music
-      }
-      
-      setTimeout(() => {
-        initGameObjects();
-        player.health = PLAYER_INITIAL_HEALTH;
-        player.airSupply = player.initialAirSupply;
-        player.lastSonarTime = frameCount - player.sonarCooldown;
-        player.lastShotTime = frameCount - player.shotCooldown;
-        gameState = 'playing';
-        if (audioInitialized && reactorHumOsc && reactorHumOsc.started) {
-          reactorHumOsc.amp(0, 0);
-        }
-      }, 100);
-      return false;
-    }
-    if (gameState === 'gameOver' && !isSubmittingHighScore) {
-      resetGame();
-      return false;
-    }
-    if (gameState === 'gameComplete') {
-      resetGame();
-      return false;
-    }
-    if (gameState === 'levelComplete') {
-      prepareNextLevel();
-      return false;
+      // Add jellyfish info text
+      fill(255, 255, 255); // White text
+      textAlign(CENTER, CENTER);
+      textSize(10);
+      text(`J${jelly.health}`, jellyX, jellyY);
+      fill(0, 255, 255); // Back to cyan
     }
   }
-  // --- End of new logic ---
+  
+  // Add debug info text
+  fill(255, 255, 0); // Yellow text
+  noStroke();
+  textAlign(RIGHT, TOP);
+  textSize(16);
+  text("DEBUG: Cave Walls & Enemies (Press ] to toggle)", width - 10, 10);
+  text(`Grid: ${cave.gridWidth}x${cave.gridHeight}, Cell: ${cave.cellSize}px`, width - 10, 30);
+  text(`Enemies: ${enemies.length}, Jellyfish: ${jellyfish.length}`, width - 10, 50);
 
-  if (typeof handleMobileTouchStart === 'function') {
-    handleMobileTouchStart(touches);
-  }
-  // Prevent default to avoid issues on mobile
-  return false;
+  // Draw the goal area
+  fill(0, 255, 0, 150); // Semi-transparent green for goal
+  noStroke();
+  let goalScreenX = cave.goalPos.x - offsetX - cave.goalSize / 2;
+  let goalScreenY = cave.goalPos.y - offsetY - cave.goalSize / 2;
+  rect(goalScreenX, goalScreenY, cave.goalSize, cave.goalSize);
+  
+  // Add goal text
+  fill(255, 255, 255); // White text
+  textAlign(CENTER, CENTER);
+  textSize(16);
+  text("GOAL", cave.goalPos.x - offsetX, cave.goalPos.y - offsetY);
+  
+  // Draw player position
+  fill(255, 255, 0); // Yellow for player
+  noStroke();
+  let playerScreenX = player.pos.x - offsetX;
+  let playerScreenY = player.pos.y - offsetY;
+  ellipse(playerScreenX, playerScreenY, player.radius * 2, player.radius * 2);
+  
+  // Add player text
+  fill(0, 0, 0); // Black text
+  textAlign(CENTER, CENTER);
+  textSize(12);
+  text("P", playerScreenX, playerScreenY);
+  
+  pop();
 }
-
-function touchMoved() {
-  if (typeof handleMobileTouchMove === 'function') {
-    handleMobileTouchMove(touches);
-  }
-  // Prevent default to avoid issues on mobile
-  return false;
-}
-
-function touchEnded() {
-  if (typeof handleMobileTouchEnd === 'function') {
-    handleMobileTouchEnd(touches);
-  }
-  // Prevent default to avoid issues on mobile
-  return false;
-}
-

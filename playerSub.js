@@ -12,6 +12,9 @@ class PlayerSub {
     this.shotCooldown = PLAYER_SHOT_COOLDOWN_FRAMES; this.lastShotTime = -this.shotCooldown; // Allow immediate first shot
     this.propellerAngle = 0; // For propeller animation
     this.wasInCurrent = false; // Track if player was in current area last frame
+    // Shield powerup properties
+    this.shield = false;
+    this.shieldDuration = 0;
     // No need to store bubbles in player, they will be global
   }
   fireSonar(cave, enemies, jellyfish) {
@@ -77,7 +80,8 @@ class PlayerSub {
       this.lastShotTime = frameCount; playSound('torpedo');
     }
   }
-  update(cave, currentEnemies) {
+  update(cave, enemiesArray) {
+    // Use the global enemies variable for consistency
     if (keyIsDown(UP_ARROW) || keyIsDown(KEY_CODE_W)) this.vel.add(p5.Vector.fromAngle(this.angle).mult(this.thrustPower));
     if (keyIsDown(DOWN_ARROW) || keyIsDown(KEY_CODE_S)) this.vel.add(p5.Vector.fromAngle(this.angle).mult(-this.thrustPower * PLAYER_REVERSE_THRUST_FACTOR));
     if (keyIsDown(LEFT_ARROW) || keyIsDown(KEY_CODE_A)) this.angle -= this.turnSpeed;
@@ -133,18 +137,33 @@ class PlayerSub {
     }
 
 
-    if (frameCount - this.lastSonarTime >= this.sonarCooldown) this.fireSonar(cave, currentEnemies, jellyfish);
+    if (frameCount - this.lastSonarTime >= this.sonarCooldown) this.fireSonar(cave, enemies, jellyfish);
 
     this.vel.limit(this.maxSpeed); let nextPos = p5.Vector.add(this.pos, this.vel);
     if (cave.isWall(nextPos.x, nextPos.y, this.radius * PLAYER_COLLISION_RADIUS_FACTOR)) {
       this.pos.sub(this.vel.copy().mult(PLAYER_BUMP_RECOIL_FACTOR)); // Move back slightly
       this.vel.mult(PLAYER_BUMP_VELOCITY_REVERSE_FACTOR); // Reverse and dampen velocity
-      this.health -= PLAYER_BUMP_DAMAGE; if (this.health < 0) this.health = 0; playSound('bump');
+      
+      if (!this.shield) {
+        this.health -= PLAYER_BUMP_DAMAGE; 
+        if (this.health < 0) this.health = 0;
+      }
+      
+      playSound('bump');
     } else {
       this.pos.add(this.vel);
     }
     this.vel.mult(this.damping); this.airSupply -= this.airDepletionRate;
     if (this.airSupply < 0) this.airSupply = 0;
+    
+    // Update shield duration
+    if (this.shield) {
+      this.shieldDuration--;
+      if (this.shieldDuration <= 0) {
+        this.shield = false;
+        this.shieldDuration = 0;
+      }
+    }
 
     // Low air warning sound
     if (audioInitialized && this.airSupply > 0 && this.airSupply < this.initialAirSupply * PLAYER_LOW_AIR_THRESHOLD_FACTOR) {
@@ -214,6 +233,57 @@ class PlayerSub {
 
     pop(); // End propeller transformations
   }
+  
+  _renderShield() {
+    // Add white glow using shadow
+    drawingContext.shadowBlur = 15;
+    drawingContext.shadowColor = 'rgba(255, 255, 255, 0.7)';
+    
+    // Outer shield ring - more subtle blue-white
+    noFill();
+    let alpha = map(sin(frameCount * 0.08), -1, 1, 40, 80);
+    let shieldColor = color(190, 30, 100, alpha); // Light blue-white
+    stroke(shieldColor);
+    strokeWeight(2);
+    let shieldPulse = 0.1 * sin(frameCount * 0.08);
+    let outerShieldSize = this.radius * (2.2 + shieldPulse);
+    
+    // Rotating shield effect
+    push();
+    rotate(frameCount * 0.01);
+    ellipse(0, 0, outerShieldSize, outerShieldSize);
+    pop();
+    
+    // Inner shield ring
+    push();
+    rotate(-frameCount * 0.005);
+    let innerShieldSize = this.radius * (1.8 + shieldPulse);
+    ellipse(0, 0, innerShieldSize, innerShieldSize);
+    pop();
+    
+    // Reset shadow
+    drawingContext.shadowBlur = 0;
+    
+    // Only add particles occasionally
+    if (frameCount % 8 === 0) {
+      let angle = random(TWO_PI);
+      let xPos = cos(angle) * this.radius * 1.1;
+      let yPos = sin(angle) * this.radius * 1.1;
+      
+      // Convert to world coordinates
+      let worldX = this.pos.x + cos(this.angle) * xPos - sin(this.angle) * yPos;
+      let worldY = this.pos.y + sin(this.angle) * xPos + cos(this.angle) * yPos;
+      
+      particles.push(new Particle(
+        worldX, worldY,
+        random(-0.3, 0.3), random(-0.3, 0.3),
+        random(15, 25),
+        0.5, 1.5,
+        190, 30, 100, // Light blue-white
+        100
+      ));
+    }
+  }
 
   render(offsetX, offsetY) {
     // Render Sonar Hits FIRST, so they are behind the player sub
@@ -222,6 +292,11 @@ class PlayerSub {
     push();
     translate(width / 2, height / 2); // Player is always centered
     rotate(this.angle); // And rotated
+
+    // Render shield if active
+    if (this.shield) {
+      this._renderShield();
+    }
 
     this._renderBody();
     this._renderSail();
@@ -248,7 +323,11 @@ class PlayerSub {
       let enemy = enemies[i];
       let d = dist(this.pos.x, this.pos.y, enemy.pos.x, enemy.pos.y);
       if (d < this.radius * PLAYER_COLLISION_RADIUS_FACTOR + enemy.radius) { // Use consistent collision factor
-        this.health -= PLAYER_ENEMY_COLLISION_DAMAGE; if (this.health < 0) this.health = 0;
+        if (!this.shield) {
+          this.health -= PLAYER_ENEMY_COLLISION_DAMAGE; 
+          if (this.health < 0) this.health = 0;
+        }
+        
         let knockbackPlayer = p5.Vector.sub(this.pos, enemy.pos).normalize().mult(PLAYER_ENEMY_COLLISION_KNOCKBACK);
         this.vel.add(knockbackPlayer);
         playSound('explosion'); // Play explosion sound for enemy destruction
@@ -260,8 +339,11 @@ class PlayerSub {
       let jelly = jellyfish[i];
       let d = dist(this.pos.x, this.pos.y, jelly.pos.x, jelly.pos.y);
       if (d < this.radius * PLAYER_COLLISION_RADIUS_FACTOR + jelly.radius) {
-        this.health -= JELLYFISH_DAMAGE; // More damage than regular enemies
-        if (this.health < 0) this.health = 0;
+        if (!this.shield) {
+          this.health -= JELLYFISH_DAMAGE; // More damage than regular enemies
+          if (this.health < 0) this.health = 0;
+        }
+        
         let knockbackPlayer = p5.Vector.sub(this.pos, jelly.pos).normalize().mult(PLAYER_ENEMY_COLLISION_KNOCKBACK * 1.5); // Stronger knockback
         this.vel.add(knockbackPlayer);
         playSound('explosion'); // Play explosion sound for collision

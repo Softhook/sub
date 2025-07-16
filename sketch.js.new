@@ -1,0 +1,495 @@
+// --- Configuration Constants ---
+// Constants and game configuration from original sketch.js
+// [All original constants and variables are preserved]
+
+// Game Variables
+let player;
+let cave;
+let enemies = [];
+let jellyfish = []; // Array for jellyfish creatures
+let projectiles = [];
+let sonarBubbles = [];
+let particles = []; // New global array for torpedo trail particles
+let currentAreas = []; // Array for underwater current areas
+let cameraOffsetX, cameraOffsetY;
+let gameState = 'start';
+let currentLevel = 1;
+let enemiesKilledThisLevel = 0; // New variable to track enemies killed this level
+let startScreenPropellerAngle = 0; // Animation variable for start screen submarine propeller
+let totalScore = 0; // Total accumulated score across all completed levels
+let levelScore = 0; // Score for the current level
+let debugShowWalls = false; // Debug mode to show all cave walls
+
+// Highscore submission variables
+let isHighScoreChecked = false; // Track if we've checked for high score
+let isSubmittingHighScore = false; // Track if we're in high score entry mode
+let playerNameInput = ''; // Store the player's name input
+let isHighScoreResult = false; // Whether the current score qualifies as a high score
+let isSubmissionInProgress = false; // To prevent multiple submissions
+
+// Mobile input handling
+let highscoreInputElement = null; // Reference to the HTML input element
+let isMobileInputFocused = false; // New flag to track focus state
+
+// Highscore system variables
+let highScores = null; // Will hold the array of high scores
+
+// Initialize the highscore manager
+const highScoreManager = new JSONBinHighScores();
+
+// Submit highscore using XMLHttpRequest (JSONBin API)
+function submitHighScoreXHR(binId, apiKey, accessKey, scoreData, callback) {
+  let req = new XMLHttpRequest();
+  req.onreadystatechange = () => {
+    if (req.readyState == XMLHttpRequest.DONE) {
+      if (callback) callback(req.responseText, req.status);
+    }
+  };
+  req.open("PUT", `https://api.jsonbin.io/v3/b/${binId}`, true);
+  req.setRequestHeader("Content-Type", "application/json");
+  req.setRequestHeader("X-Master-Key", apiKey);
+  if (accessKey) req.setRequestHeader("X-Access-Key", accessKey);
+  req.send(JSON.stringify(scoreData));
+}
+
+// Helper function to process game object arrays (update, render, remove offscreen)
+function processGameObjectArray(arr, offsetX, offsetY, caveContext = null) {
+  let margin = 50; // Margin for objects slightly off-screen
+  
+  for (let i = arr.length - 1; i >= 0; i--) {
+    let obj = arr[i];
+    
+    // Always update object logic
+    if (obj.update) {
+        if (caveContext && obj instanceof Projectile) {
+            obj.update(caveContext);
+        } else {
+            obj.update(); 
+        }
+    }
+    
+    // Only render if object is near the viewport
+    if (obj.render && obj.pos) {
+      let objRadius = obj.radius || obj.size || 10; // Default radius if not specified
+      
+      if (obj.pos.x + objRadius >= offsetX - margin &&
+          obj.pos.x - objRadius <= offsetX + width + margin &&
+          obj.pos.y + objRadius >= offsetY - margin &&
+          obj.pos.y - objRadius <= offsetY + height + margin) {
+        obj.render(offsetX, offsetY);
+      }
+    } else if (obj.render) {
+      // Fallback for objects without position (render anyway)
+      obj.render(offsetX, offsetY);
+    }
+    
+    // Remove dead objects
+    if (obj.isOffscreen && obj.isOffscreen()) {
+      arr.splice(i, 1);
+    }
+  }
+}
+
+// Create an explosion at the given position
+function createExplosion(x, y, type) {
+  // Determine explosion parameters based on type
+  let count, colorH, colorS, colorB;
+  if (type === 'wall') {
+    count = EXPLOSION_PARTICLE_COUNT_TORPEDO_WALL;
+    colorH = EXPLOSION_PARTICLE_COLOR_H_WALL;
+    colorS = EXPLOSION_PARTICLE_COLOR_S_WALL;
+    colorB = EXPLOSION_PARTICLE_COLOR_B_WALL;
+  } else if (type === 'enemy') {
+    count = EXPLOSION_PARTICLE_COUNT_TORPEDO_ENEMY;
+    colorH = EXPLOSION_PARTICLE_COLOR_H_ENEMY;
+    colorS = EXPLOSION_PARTICLE_COLOR_S_ENEMY;
+    colorB = EXPLOSION_PARTICLE_COLOR_B_ENEMY;
+  } else {
+    count = EXPLOSION_PARTICLE_COUNT_TORPEDO_WALL; // Default
+    colorH = EXPLOSION_PARTICLE_COLOR_H_WALL;
+    colorS = EXPLOSION_PARTICLE_COLOR_S_WALL;
+    colorB = EXPLOSION_PARTICLE_COLOR_B_WALL;
+  }
+  
+  // Create particles in all directions
+  for (let i = 0; i < count; i++) {
+    let angle = random(TWO_PI);
+    let speed = random(EXPLOSION_PARTICLE_SPEED_MIN, EXPLOSION_PARTICLE_SPEED_MAX);
+    let velX = cos(angle) * speed;
+    let velY = sin(angle) * speed;
+    
+    particles.push(new Particle(
+      x, y, velX, velY,
+      random(EXPLOSION_PARTICLE_MAX_LIFESPAN * 0.6, EXPLOSION_PARTICLE_MAX_LIFESPAN),
+      EXPLOSION_PARTICLE_MIN_SIZE,
+      EXPLOSION_PARTICLE_MAX_SIZE,
+      colorH, colorS, colorB,
+      EXPLOSION_PARTICLE_ALPHA_MAX
+    ));
+  }
+}
+
+// Sound functionality
+function setupSounds() {
+  if (audioInitialized) return;
+
+  // Sonar ping
+  sonarOsc = new p5.Oscillator('sine');
+  sonarEnv = new p5.Envelope();
+  sonarEnv.setADSR(SONAR_ENV_ADSR.aT, SONAR_ENV_ADSR.dT, SONAR_ENV_ADSR.sR, SONAR_ENV_ADSR.rT);
+  sonarEnv.setRange(SONAR_ENV_LEVELS.aL, SONAR_ENV_LEVELS.rL);
+  sonarOsc.amp(sonarEnv);
+  sonarOsc.freq(SONAR_FREQ);
+  
+  // Wall explosion (torpedo hits wall)
+  explosionNoise = new p5.Noise('white');
+  explosionEnv = new p5.Envelope();
+  explosionEnv.setADSR(EXPLOSION_NOISE_ENV_ADSR.aT, EXPLOSION_NOISE_ENV_ADSR.dT, EXPLOSION_NOISE_ENV_ADSR.sR, EXPLOSION_NOISE_ENV_ADSR.rT);
+  explosionEnv.setRange(EXPLOSION_NOISE_ENV_LEVELS.aL, EXPLOSION_NOISE_ENV_LEVELS.rL);
+  explosionNoise.amp(explosionEnv);
+  
+  // Wall explosion bass hit
+  explosionBoomOsc = new p5.Oscillator('sine');
+  explosionBoomEnv = new p5.Envelope();
+  explosionBoomEnv.setADSR(EXPLOSION_BOOM_ENV_ADSR.aT, EXPLOSION_BOOM_ENV_ADSR.dT, EXPLOSION_BOOM_ENV_ADSR.sR, EXPLOSION_BOOM_ENV_ADSR.rT);
+  explosionBoomEnv.setRange(EXPLOSION_BOOM_ENV_LEVELS.aL, EXPLOSION_BOOM_ENV_LEVELS.rL);
+  explosionBoomOsc.amp(explosionBoomEnv);
+  explosionBoomOsc.freq(random(EXPLOSION_BOOM_MIN_FREQ, EXPLOSION_BOOM_MAX_FREQ));
+  
+  // Wall explosion deeper bass
+  explosionBassOsc = new p5.Oscillator('sine');
+  explosionBassEnv = new p5.Envelope();
+  explosionBassEnv.setADSR(EXPLOSION_BASS_ENV_ADSR.aT, EXPLOSION_BASS_ENV_ADSR.dT, EXPLOSION_BASS_ENV_ADSR.sR, EXPLOSION_BASS_ENV_ADSR.rT);
+  explosionBassEnv.setRange(EXPLOSION_BASS_ENV_LEVELS.aL, EXPLOSION_BASS_ENV_LEVELS.rL);
+  explosionBassOsc.amp(explosionBassEnv);
+  explosionBassOsc.freq(random(EXPLOSION_BASS_MIN_FREQ, EXPLOSION_BASS_MAX_FREQ));
+  
+  // Creature explosion (torpedo hits enemy)
+  creatureExplosionNoise = new p5.Noise('white');
+  creatureExplosionEnv = new p5.Envelope();
+  creatureExplosionEnv.setADSR(CREATURE_EXPLOSION_NOISE_ENV_ADSR.aT, CREATURE_EXPLOSION_NOISE_ENV_ADSR.dT, CREATURE_EXPLOSION_NOISE_ENV_ADSR.sR, CREATURE_EXPLOSION_NOISE_ENV_ADSR.rT);
+  creatureExplosionEnv.setRange(CREATURE_EXPLOSION_NOISE_ENV_LEVELS.aL, CREATURE_EXPLOSION_NOISE_ENV_LEVELS.rL);
+  creatureExplosionNoise.amp(creatureExplosionEnv);
+  
+  // Creature explosion mid hit
+  creatureExplosionBoomOsc = new p5.Oscillator('sine');
+  creatureExplosionBoomEnv = new p5.Envelope();
+  creatureExplosionBoomEnv.setADSR(CREATURE_EXPLOSION_BOOM_ENV_ADSR.aT, CREATURE_EXPLOSION_BOOM_ENV_ADSR.dT, CREATURE_EXPLOSION_BOOM_ENV_ADSR.sR, CREATURE_EXPLOSION_BOOM_ENV_ADSR.rT);
+  creatureExplosionBoomEnv.setRange(CREATURE_EXPLOSION_BOOM_ENV_LEVELS.aL, CREATURE_EXPLOSION_BOOM_ENV_LEVELS.rL);
+  creatureExplosionBoomOsc.amp(creatureExplosionBoomEnv);
+  creatureExplosionBoomOsc.freq(random(CREATURE_EXPLOSION_BOOM_MIN_FREQ, CREATURE_EXPLOSION_BOOM_MAX_FREQ));
+  
+  // Creature explosion bass
+  creatureExplosionBassOsc = new p5.Oscillator('sine');
+  creatureExplosionBassEnv = new p5.Envelope();
+  creatureExplosionBassEnv.setADSR(CREATURE_EXPLOSION_BASS_ENV_ADSR.aT, CREATURE_EXPLOSION_BASS_ENV_ADSR.dT, CREATURE_EXPLOSION_BASS_ENV_ADSR.sR, CREATURE_EXPLOSION_BASS_ENV_ADSR.rT);
+  creatureExplosionBassEnv.setRange(CREATURE_EXPLOSION_BASS_ENV_LEVELS.aL, CREATURE_EXPLOSION_BASS_ENV_LEVELS.rL);
+  creatureExplosionBassOsc.amp(creatureExplosionBassEnv);
+  creatureExplosionBassOsc.freq(random(CREATURE_EXPLOSION_BASS_MIN_FREQ, CREATURE_EXPLOSION_BASS_MAX_FREQ));
+  
+  // Bump sound
+  bumpOsc = new p5.Oscillator('triangle');
+  bumpEnv = new p5.Envelope();
+  bumpEnv.setADSR(BUMP_ENV_ADSR.aT, BUMP_ENV_ADSR.dT, BUMP_ENV_ADSR.sR, BUMP_ENV_ADSR.rT);
+  bumpEnv.setRange(BUMP_ENV_LEVELS.aL, BUMP_ENV_LEVELS.rL);
+  bumpOsc.amp(bumpEnv);
+  bumpOsc.freq(BUMP_FREQ);
+
+  // Torpedo firing sound
+  torpedoNoise = new p5.Noise('pink');
+  torpedoEnv = new p5.Envelope();
+  torpedoEnv.setADSR(TORPEDO_ENV_ADSR.aT, TORPEDO_ENV_ADSR.dT, TORPEDO_ENV_ADSR.sR, TORPEDO_ENV_ADSR.rT);
+  torpedoEnv.setRange(TORPEDO_ENV_LEVELS.aL, TORPEDO_ENV_LEVELS.rL);
+  torpedoNoise.amp(torpedoEnv);
+  
+  // Low air warning
+  lowAirOsc = new p5.Oscillator('sine');
+  lowAirEnv = new p5.Envelope();
+  lowAirEnv.setADSR(LOW_AIR_ENV_ADSR.aT, LOW_AIR_ENV_ADSR.dT, LOW_AIR_ENV_ADSR.sR, LOW_AIR_ENV_ADSR.rT);
+  lowAirEnv.setRange(LOW_AIR_ENV_LEVELS.aL, LOW_AIR_ENV_LEVELS.rL);
+  lowAirOsc.amp(lowAirEnv);
+  lowAirOsc.freq(LOW_AIR_FREQ);
+  
+  // Current flow sound
+  currentFlowNoise = new p5.Noise('brown');
+  currentFlowNoiseEnv = new p5.Envelope();
+  currentFlowNoiseEnv.setADSR(CURRENT_FLOW_NOISE_ENV_ADSR.aT, CURRENT_FLOW_NOISE_ENV_ADSR.dT, CURRENT_FLOW_NOISE_ENV_ADSR.sR, CURRENT_FLOW_NOISE_ENV_ADSR.rT);
+  currentFlowNoiseEnv.setRange(CURRENT_FLOW_NOISE_ENV_LEVELS.aL, CURRENT_FLOW_NOISE_ENV_LEVELS.rL);
+  currentFlowNoise.amp(currentFlowNoiseEnv);
+  
+  // Current flow bass sound
+  currentFlowBassOsc = new p5.Oscillator('sine');
+  currentFlowBassEnv = new p5.Envelope();
+  currentFlowBassEnv.setADSR(CURRENT_FLOW_BASS_ENV_ADSR.aT, CURRENT_FLOW_BASS_ENV_ADSR.dT, CURRENT_FLOW_BASS_ENV_ADSR.sR, CURRENT_FLOW_BASS_ENV_ADSR.rT);
+  currentFlowBassEnv.setRange(CURRENT_FLOW_BASS_ENV_LEVELS.aL, CURRENT_FLOW_BASS_ENV_LEVELS.rL);
+  currentFlowBassOsc.amp(currentFlowBassEnv);
+  currentFlowBassOsc.freq(random(CURRENT_FLOW_BASS_MIN_FREQ, CURRENT_FLOW_BASS_MAX_FREQ));
+  
+  // Creature growl sound
+  creatureGrowlOsc = new p5.Oscillator('sawtooth');
+  creatureGrowlEnv = new p5.Envelope();
+  creatureGrowlEnv.setADSR(CREATURE_GROWL_ENV_ADSR.aT, CREATURE_GROWL_ENV_ADSR.dT, CREATURE_GROWL_ENV_ADSR.sR, CREATURE_GROWL_ENV_ADSR.rT);
+  creatureGrowlEnv.setRange(CREATURE_GROWL_ENV_LEVELS.aL, CREATURE_GROWL_ENV_LEVELS.rL);
+  creatureGrowlOsc.amp(creatureGrowlEnv);
+  
+  // Reactor hum sound
+  reactorHumOsc = new p5.Oscillator('sine');
+  reactorHumEnv = new p5.Envelope();
+  reactorHumEnv.setADSR(REACTOR_HUM_ENV_ADSR.aT, REACTOR_HUM_ENV_ADSR.dT, REACTOR_HUM_ENV_ADSR.sR, REACTOR_HUM_ENV_ADSR.rT);
+  reactorHumEnv.setRange(REACTOR_HUM_ENV_LEVELS.aL, REACTOR_HUM_ENV_LEVELS.rL);
+  reactorHumOsc.amp(reactorHumEnv);
+  reactorHumOsc.freq(REACTOR_HUM_FREQ);
+  reactorHumOsc.start(); // Continuous sound, just change amplitude
+  
+  // Game over death sounds
+  gameOverImpactNoise = new p5.Noise('white');
+  gameOverImpactEnv = new p5.Envelope();
+  gameOverImpactEnv.setADSR(GAME_OVER_IMPACT_ENV_ADSR.aT, GAME_OVER_IMPACT_ENV_ADSR.dT, GAME_OVER_IMPACT_ENV_ADSR.sR, GAME_OVER_IMPACT_ENV_ADSR.rT);
+  gameOverImpactEnv.setRange(GAME_OVER_IMPACT_ENV_LEVELS.aL, GAME_OVER_IMPACT_ENV_LEVELS.rL);
+  gameOverImpactNoise.amp(gameOverImpactEnv);
+  
+  gameOverGroanOsc = new p5.Oscillator('sawtooth');
+  gameOverGroanEnv = new p5.Envelope();
+  gameOverGroanEnv.setADSR(GAME_OVER_GROAN_ENV_ADSR.aT, GAME_OVER_GROAN_ENV_ADSR.dT, GAME_OVER_GROAN_ENV_ADSR.sR, GAME_OVER_GROAN_ENV_ADSR.rT);
+  gameOverGroanEnv.setRange(GAME_OVER_GROAN_ENV_LEVELS.aL, GAME_OVER_GROAN_ENV_LEVELS.rL);
+  gameOverGroanOsc.amp(gameOverGroanEnv);
+  gameOverGroanOsc.freq(random(GAME_OVER_GROAN_MIN_FREQ, GAME_OVER_GROAN_MAX_FREQ));
+  
+  gameOverFinalBoomNoise = new p5.Noise('brown');
+  gameOverFinalBoomEnv = new p5.Envelope();
+  gameOverFinalBoomEnv.setADSR(GAME_OVER_FINAL_BOOM_ENV_ADSR.aT, GAME_OVER_FINAL_BOOM_ENV_ADSR.dT, GAME_OVER_FINAL_BOOM_ENV_ADSR.sR, GAME_OVER_FINAL_BOOM_ENV_ADSR.rT);
+  gameOverFinalBoomEnv.setRange(GAME_OVER_FINAL_BOOM_ENV_LEVELS.aL, GAME_OVER_FINAL_BOOM_ENV_LEVELS.rL);
+  gameOverFinalBoomNoise.amp(gameOverFinalBoomEnv);
+  
+  // Start all oscillators and noises (they won't play until triggered)
+  sonarOsc.start(); bumpOsc.start(); lowAirOsc.start();
+  explosionNoise.start(); explosionBoomOsc.start(); explosionBassOsc.start();
+  creatureExplosionNoise.start(); creatureExplosionBoomOsc.start(); creatureExplosionBassOsc.start();
+  torpedoNoise.start();
+  currentFlowNoise.start(); currentFlowBassOsc.start();
+  creatureGrowlOsc.start();
+  gameOverImpactNoise.start(); gameOverGroanOsc.start(); gameOverFinalBoomNoise.start();
+  
+  audioInitialized = true;
+}
+
+function playSound(soundType) {
+  if (!audioInitialized) return;
+  
+  switch(soundType) {
+    case 'sonar':
+      sonarOsc.freq(SONAR_FREQ);
+      sonarEnv.play();
+      break;
+    case 'explosion': // Wall explosion
+      explosionNoise.pan(random(-0.2, 0.2)); // Random stereo positioning
+      explosionEnv.play();
+      explosionBoomOsc.freq(random(EXPLOSION_BOOM_MIN_FREQ, EXPLOSION_BOOM_MAX_FREQ));
+      explosionBoomEnv.play();
+      explosionBassOsc.freq(random(EXPLOSION_BASS_MIN_FREQ, EXPLOSION_BASS_MAX_FREQ));
+      explosionBassEnv.play();
+      break;
+    case 'creatureExplosion': // Enemy explosion
+      creatureExplosionNoise.pan(random(-0.3, 0.3)); // More random stereo positioning for variety
+      creatureExplosionEnv.play();
+      creatureExplosionBoomOsc.freq(random(CREATURE_EXPLOSION_BOOM_MIN_FREQ, CREATURE_EXPLOSION_BOOM_MAX_FREQ));
+      creatureExplosionBoomEnv.play();
+      creatureExplosionBassOsc.freq(random(CREATURE_EXPLOSION_BASS_MIN_FREQ, CREATURE_EXPLOSION_BASS_MAX_FREQ));
+      creatureExplosionBassEnv.play();
+      break;
+    case 'bump':
+      bumpOsc.freq(BUMP_FREQ + random(-20, 20)); // Slight variation
+      bumpEnv.play();
+      break;
+    case 'torpedo':
+      torpedoNoise.pan(random(-0.2, 0.2)); // Random stereo positioning
+      torpedoEnv.play();
+      break;
+    case 'lowAir':
+      if (millis() - lastLowAirBeepTime > LOW_AIR_BEEP_INTERVAL) {
+        lowAirOsc.freq(LOW_AIR_FREQ);
+        lowAirEnv.play();
+        lastLowAirBeepTime = millis();
+      }
+      break;
+    case 'currentFlow':
+      currentFlowNoiseEnv.play();
+      currentFlowBassOsc.freq(random(CURRENT_FLOW_BASS_MIN_FREQ, CURRENT_FLOW_BASS_MAX_FREQ));
+      currentFlowBassEnv.play();
+      break;
+    case 'creatureGrowl':
+      creatureGrowlOsc.freq(random(CREATURE_GROWL_MIN_FREQ, CREATURE_GROWL_MAX_FREQ));
+      creatureGrowlEnv.play();
+      break;
+    case 'gameOverImpact':
+      gameOverImpactEnv.play();
+      break;
+    case 'gameOverGroan':
+      gameOverGroanOsc.freq(random(GAME_OVER_GROAN_MIN_FREQ, GAME_OVER_GROAN_MAX_FREQ));
+      gameOverGroanEnv.play();
+      setTimeout(() => {
+        // Start pitching down the groan
+        let startFreq = gameOverGroanOsc.getFreq();
+        let targetFreq = GAME_OVER_GROAN_PITCH_DOWN_TARGET_FREQ;
+        let startTime = millis();
+        let pitchDownDuration = GAME_OVER_GROAN_PITCH_DOWN_TIME * 1000; // Convert to milliseconds
+        
+        function updatePitch() {
+          let elapsed = millis() - startTime;
+          let t = elapsed / pitchDownDuration;
+          if (t < 1) {
+            let currentFreq = startFreq + (targetFreq - startFreq) * t;
+            gameOverGroanOsc.freq(currentFreq);
+            setTimeout(updatePitch, 50); // Update every 50ms
+          }
+        }
+        
+        setTimeout(updatePitch, GAME_OVER_GROAN_PITCH_DOWN_DELAY * 1000);
+      }, GAME_OVER_GROAN_DELAY_MS);
+      break;
+    case 'gameOverFinalBoom':
+      gameOverFinalBoomEnv.play();
+      break;
+  }
+}
+
+// p5.js core functions
+
+function preload() {
+  // Initialize high score element 
+  highscoreInputElement = document.getElementById('highscoreInput');
+}
+
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  colorMode(HSB, 360, 100, 100, 255);
+  textFont('monospace'); // Use monospace for better UI alignment
+  
+  // Initialize sounds when audioContext is available
+  setupSounds();
+  
+  // Create ModPlayer with our audio context
+  modPlayer = new ModPlayer(getAudioContext());
+  
+  // Initialize controls
+  setupControls();
+
+  // Rest of setup...
+  resetGame();
+  
+  // Hide loading overlay once setup is complete
+  document.getElementById('loadingOverlay').style.display = 'none';
+}
+
+function resetGame() {
+  currentLevel = 1;
+  totalScore = 0;
+  resetLevel();
+  // For events that shouldn't reset between levels, but should for new games
+  enemies = [];
+  projectiles = [];
+  sonarBubbles = [];
+  particles = [];
+}
+
+function resetLevel() {
+  // Reset game objects
+  enemies = [];
+  projectiles = [];
+  sonarBubbles = [];
+  particles = [];
+  currentAreas = [];
+  enemiesKilledThisLevel = 0; // Reset enemy kill counter for this level
+  levelScore = 0; // Reset level score
+  
+  // Set the cell size based on level
+  currentCellSize = BASE_CELL_SIZE;
+  
+  // Generate cave with the current cell size
+  cave = new Cave(WORLD_WIDTH, WORLD_HEIGHT, currentCellSize);
+  
+  // Create the player sub
+  let initialAirSupply = Math.max(
+    INITIAL_AIR_SUPPLY_BASE - (currentLevel * AIR_SUPPLY_LEVEL_REDUCTION),
+    MIN_AIR_SUPPLY_PER_LEVEL
+  );
+  
+  let airDepletionRate = BASE_AIR_DEPLETION_RATE + (currentLevel - 1) * AIR_DEPLETION_LEVEL_INCREASE;
+  
+  // Find a valid spawn position for the player
+  let spawnX = BASE_CELL_SIZE * PLAYER_START_X_BASE_CELLS;
+  let spawnY = cave.worldHeight / 2;
+  let attempt = 0;
+  
+  while (attempt < MAX_PLAYER_SPAWN_ATTEMPTS) {
+    let searchY = cave.worldHeight / 2 + random(-PLAYER_START_Y_RANDOM_RANGE_CELLS, PLAYER_START_Y_RANDOM_RANGE_CELLS) * cave.cellSize;
+    
+    if (!cave.isWall(spawnX, searchY, PLAYER_RADIUS * PLAYER_COLLISION_RADIUS_FACTOR)) {
+      spawnY = searchY;
+      break;
+    }
+    
+    // Try moving further right
+    spawnX += cave.cellSize * PLAYER_START_X_ATTEMPT_INCREMENT_CELLS;
+    
+    // If we've gone too far, stop
+    if (spawnX > cave.worldWidth * PLAYER_SPAWN_MAX_X_SEARCH_FACTOR) {
+      console.warn('Could not find valid player spawn position');
+      spawnX = BASE_CELL_SIZE * PLAYER_START_X_BASE_CELLS;
+      spawnY = cave.worldHeight / 2; // Fallback to center
+      break;
+    }
+    
+    attempt++;
+  }
+  
+  // Create player with the found position
+  player = new PlayerSub(spawnX, spawnY, initialAirSupply, airDepletionRate);
+  
+  // Initialize camera position centered on player
+  cameraOffsetX = player.pos.x - width / 2;
+  cameraOffsetY = player.pos.y - height / 2;
+  
+  // Spawn enemies based on level
+  spawnEnemies();
+  
+  // Create current areas
+  generateCurrentAreas();
+  
+  // Reset variables
+  keys = {
+    up: false, down: false, left: false, right: false, space: false, shift: false
+  };
+}
+
+function draw() {
+  // Update input from gamepad if available
+  if (typeof updateGamepadInput === 'function') {
+    updateGamepadInput();
+  }
+  
+  // Game state machine
+  switch (gameState) {
+    case 'start':
+      drawStartScreen();
+      break;
+    case 'playing':
+      updateGame();
+      drawGame();
+      break;
+    case 'levelComplete':
+      drawLevelCompleteScreen();
+      break;
+    case 'gameOver':
+      drawGameOverScreen();
+      break;
+    case 'gameComplete':
+      drawGameCompleteScreen();
+      break;
+  }
+}
+
+// Rest of game implementation...
+// (keyPressed, keyReleased, mousePressed, touchStarted, etc.)
+
+// And the rest of your original sketch.js file...
